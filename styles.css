@@ -1,0 +1,490 @@
+body { font-family: 'Inter', sans-serif; }
+
+/* Setup Modal Dark Grey Background */
+#setup-modal > div:not(.bloom-enter-wrap) {
+    background-color: #050505 !important; /* Darker pitch black */
+    border-color: #1a1a1a !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Fix Chrome/WebKit autofill styling overriding dark mode inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-text-fill-color: #ffffff !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+}
+
+/* Searchbar Clear Button Alignment Fix */
+#btn-clear-search:not(.hidden) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Queue Item Active State using Ambient Colors */
+.queue-item-active {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-1, #ec4899) 60%, transparent) 0%, color-mix(in srgb, var(--color-1, #ec4899) 15%, transparent) 100%) !important;
+    border-color: color-mix(in srgb, var(--color-1, #ec4899) 50%, transparent) !important;
+}
+
+/* Lyrics Classes & Masks */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.mask-image-y {
+    mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+
+/* BUTTERY SMOOTH LYRICS ENGINE */
+.lyric-line {
+    transform-origin: center;
+    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                text-shadow 0.5s ease;
+    will-change: transform, color, text-shadow;
+}
+
+.lyric-active {
+    color: #ffffff !important;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+    transform: scale(1.25);
+}
+
+/* Material Icons Baseline Alignment */
+.material-symbols-rounded {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Force Filled Look */
+.icon-fill {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #404040; }
+
+/* Disable pointer events on the video to enforce custom controls */
+#player { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+.video-loaded #player { opacity: 1; }
+
+/* Range slider styling for progress and volume */
+input[type=range] {
+    -webkit-appearance: none;
+    background: transparent;
+    accent-color: #ffffff;
+    --range-progress: 0%;
+}
+
+#volume-bar {
+    --range-progress: 100%;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to right, #ffffff var(--range-progress), #334155 var(--range-progress));
+    border-radius: 2px;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    margin-top: -4px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+.audio-mode #player { opacity: 0; pointer-events: none; }
+
+/* =========================================
+   FULL-WRAPPER AMBIENT AUDIO MODE
+   ========================================= */
+
+/* Make the entire wrapper act as the ambient container in audio mode */
+.audio-mode {
+    position: relative;
+    background-color: transparent !important;
+    overflow: hidden !important;
+}
+
+/* Ensure mini-player remains opaque behind the vibrant colors so it doesn't mix with background text */
+#video-wrapper.is-collapsed.audio-mode {
+    background-color: #050505 !important;
+}
+
+/* 1. Spinning blobs covering the entire wrapper */
+.audio-mode::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background:
+        radial-gradient(circle at 30% 30%, var(--color-1, transparent), transparent 60%),
+        radial-gradient(circle at 70% 30%, var(--color-2, transparent), transparent 60%),
+        radial-gradient(circle at 20% 80%, var(--color-3, transparent), transparent 60%),
+        radial-gradient(circle at 80% 80%, var(--color-4, transparent), transparent 60%);
+    animation: audio-ambient-spin 20s linear infinite;
+    filter: blur(50px) saturate(150%);
+    z-index: 0;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+/* 2. Frosted glass overlay over the entire wrapper to ensure controls are legible */
+.audio-mode::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* 3. Elevate the actual content (controls, artwork) above the ambient layers */
+.audio-mode > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* 4. Reset audio-cover so it doesn't double-darken the artwork area */
+.audio-mode #audio-cover {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    overflow: hidden;
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes audio-ambient-spin {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.1); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+/* Enhance global ambient layer visibility */
+#ambient-blobs {
+    opacity: 0.8 !important;
+    filter: blur(70px) saturate(200%) !important;
+}
+
+/* Dynamic Extracted Color Blob Animation Engine */
+@keyframes float1 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(20vw, 20vh) scale(1.1); }
+}
+@keyframes float2 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-20vw, 20vh) scale(1.05); }
+}
+@keyframes float3 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(20vw, -20vh) scale(1.15); }
+}
+@keyframes float4 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-20vw, -20vh) scale(1.1); }
+}
+
+.blob {
+    position: absolute;
+    border-radius: 50%;
+    animation-play-state: paused;
+    transition: background-color 1.5s ease-out;
+}
+
+.ambient-playing .blob {
+    animation-play-state: running;
+}
+
+/* Used vmax instead of vw so they beautifully fill tall mobile screens too */
+.blob-1 {
+    top: -10vh; left: -10vw; width: 75vmax; height: 75vmax;
+    background: var(--color-1, transparent);
+    animation: float1 25s infinite alternate ease-in-out;
+}
+
+.blob-2 {
+    top: -10vh; right: -10vw; width: 65vmax; height: 65vmax;
+    background: var(--color-2, transparent);
+    animation: float2 20s infinite alternate-reverse ease-in-out;
+}
+
+.blob-3 {
+    bottom: -10vh; left: -10vw; width: 70vmax; height: 70vmax;
+    background: var(--color-3, transparent);
+    animation: float3 22s infinite alternate ease-in-out;
+}
+
+.blob-4 {
+    bottom: -10vh; right: -10vw; width: 80vmax; height: 80vmax;
+    background: var(--color-4, transparent);
+    animation: float4 28s infinite alternate-reverse ease-in-out;
+}
+
+/* Play/Pause Overlay Animation */
+@keyframes pop-fade {
+    0% { transform: scale(0.8); opacity: 0; }
+    20% { transform: scale(1.1); opacity: 1; }
+    80% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.3); opacity: 0; }
+}
+
+.animate-pop-fade {
+    display: flex !important;
+    animation: pop-fade 0.6s ease-out forwards;
+}
+
+/* Smooth Grid-based Player Collapse (Desktop Only) */
+@media (min-width: 1025px) {
+    .video-wrapper-grid {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        align-content: end;
+        transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .video-wrapper-grid.is-collapsed {
+        grid-template-rows: 0fr auto;
+    }
+    #video-container {
+        min-height: 0;
+        overflow: hidden;
+        transition: opacity 0.3s ease;
+    }
+    .is-collapsed #video-container {
+        opacity: 0;
+    }
+}
+
+/* =========================================
+   MOBILE UI OVERRIDES & TAB SYSTEM
+   ========================================= */
+@media (max-width: 1024px) {
+
+    /* Safely hide underlying tabs when Player is Expanded */
+    body.player-expanded #queue-panel,
+    body.player-expanded #main-sidebar,
+    body.player-expanded #search-overlay {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* Hide search bar on mobile unless in home tab */
+    body:not(.mobile-tab-home) #search-container {
+        display: none !important;
+    }
+
+    /* Prevent search results from overlapping with the transparent screens */
+    body.mobile-tab-queue #search-overlay,
+    body.mobile-tab-chat #search-overlay {
+        display: none !important;
+    }
+
+    /* TABS (Queue & Chat) - Pure Ambient Background Transparency */
+    #queue-panel {
+        position: fixed !important;
+        top: var(--header-height, 72px) !important; /* Starts exactly below Top App Bar */
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 124px !important; /* 60px nav + 64px mini player */
+        height: auto !important;
+        z-index: 110 !important;
+        background-color: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border: none !important;
+        display: none !important; /* Hidden by default */
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+    body.mobile-tab-queue #queue-panel {
+        display: flex !important;
+    }
+
+    #main-sidebar {
+        position: fixed !important;
+        top: var(--header-height, 72px) !important; /* Starts exactly below Top App Bar */
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 124px !important;
+        height: auto !important;
+        z-index: 110 !important;
+        background-color: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border: none !important;
+        display: none !important;
+    }
+    body.mobile-tab-chat #main-sidebar {
+        display: flex !important;
+    }
+
+    /* Pad search overlay so items don't hide behind mini player */
+    #search-overlay .overflow-y-auto {
+        padding-bottom: 140px !important;
+    }
+
+    /* Ensure the main grid also has padding so the last item isn't covered */
+    main.flex-1 {
+        padding-bottom: 64px !important;
+    }
+
+    /* Global Mobile Player Container (Floats safely dynamically via height) */
+    #video-wrapper {
+        position: fixed !important;
+        left: 0;
+        right: 0;
+        z-index: 150 !important; /* Consistently above tabs */
+        background-color: transparent !important; /* Allow ambient through! */
+        display: flex !important;
+        flex-direction: column;
+        transition: height 0.3s cubic-bezier(0.25, 1, 0.5, 1), bottom 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1) !important;
+        overflow: hidden !important;
+        border-top: 1px solid #1a1a1a;
+    }
+
+    /* Collapsed State (Mini Player) */
+    #video-wrapper.is-collapsed {
+        top: auto !important;
+        bottom: 60px !important; /* Always sits securely above bottom nav */
+        height: 64px !important;
+        background-color: #050505 !important; /* MUST be opaque so it hides scrolling text behind */
+    }
+    #video-wrapper.is-collapsed #mobile-progress-container {
+        display: none !important; /* Hide progress bar entirely */
+    }
+    #video-wrapper.is-collapsed #player-controls {
+        padding: 0 0.5rem !important;
+        height: 64px !important;
+        display: flex;
+        justify-content: center;
+        background: transparent !important;
+        border-top: none !important;
+    }
+    #video-wrapper.is-collapsed #mobile-toolbar-layout {
+        margin: 0 !important;
+        height: 100%;
+        width: 100% !important;
+    }
+    #video-wrapper.is-collapsed #media-playback-area {
+        display: none !important; /* Hide video strictly */
+    }
+    #video-wrapper.is-collapsed #video-container {
+        opacity: 1 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        border: none !important;
+    }
+
+    /* Mini Player Specific Alignment (Match requested format exactly) */
+    #video-wrapper.is-collapsed .mobile-controls-container {
+        margin-top: 0 !important;
+    }
+    #video-wrapper.is-collapsed .mobile-meta-container {
+        flex: 1; /* Pushes controls safely to the right naturally */
+    }
+
+    /* Expanded State (Perfectly fitted between Top App Bar & Bottom Nav) */
+    #video-wrapper:not(.is-collapsed) {
+        top: var(--header-height, 72px) !important; /* Starts exactly below Top App Bar */
+        bottom: 60px !important; /* Ends exactly above Bottom Nav */
+        height: auto !important;
+        z-index: 150 !important;
+        background-color: transparent !important; /* Ambient layer shines completely through! */
+        border-top: none !important;
+    }
+    #video-wrapper:not(.is-collapsed) #video-container {
+        opacity: 1 !important;
+        display: flex !important;
+        flex: 1;
+        border-bottom: none !important;
+    }
+    #video-wrapper:not(.is-collapsed) #media-playback-area {
+        display: flex !important;
+        flex: 1;
+        margin-top: 60px; /* Safe space to prevent overlapping with our new collapse top bar */
+    }
+    #video-wrapper:not(.is-collapsed) #queue-panel {
+        display: none !important; /* Hide queue completely if player is expanded */
+    }
+    #video-wrapper:not(.is-collapsed) #mobile-player-topbar {
+        display: flex !important; /* Show Collapse arrow */
+    }
+    #video-wrapper:not(.is-collapsed) #player-controls {
+        background: transparent !important;
+        border-top: none !important;
+        padding-bottom: 1rem !important;
+        padding-top: 1rem !important;
+    }
+    #video-wrapper:not(.is-collapsed) .mobile-meta-container {
+        display: none !important; /* Hide small meta, large cover renders above */
+    }
+    #video-wrapper:not(.is-collapsed) .mobile-controls-container {
+        width: 100%;
+        justify-content: center !important;
+        gap: 1.5rem !important;
+        margin-top: 1rem !important;
+    }
+    #video-wrapper:not(.is-collapsed) .mobile-controls-container button span {
+        transform: scale(1.4);
+        margin: 0 16px;
+    }
+}
+
+/* =========================================
+   SETUP MODAL BLOOM ANIMATION
+   ========================================= */
+.bloom-enter-wrap {
+    animation: bloom-enter 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity, filter;
+}
+
+@keyframes bloom-enter {
+    0% {
+        opacity: 0;
+        transform: scale(0.2);
+        filter: blur(40px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0px);
+    }
+}
+
+.rotate-slow {
+    animation: rotate-slow 60s linear infinite;
+    will-change: transform;
+}
+
+@keyframes rotate-slow {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
