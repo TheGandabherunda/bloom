@@ -358,7 +358,7 @@ function parseLRC(lrcText) {
             const m = parseInt(match[1], 10);
             const s = parseFloat(match[2]);
             const text = match[4].trim();
-            if (text || result.length > 0) result.push({ time: m * 60 + s, text: text || '🎵' });
+            if (text || result.length > 0) result.push({ time: m * 60 + s, text: text || '•••' });
         }
     }
     return result;
