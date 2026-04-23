@@ -238,10 +238,11 @@ function togglePlayerExpand() {
 }
 
 // UI Bindings
-if (ui.btnModeVideo) ui.btnModeVideo.addEventListener('click', () => { setPlayerMode('video'); if(isLyricsMode) toggleLyricsMode(); });
-if (ui.btnModeAudio) ui.btnModeAudio.addEventListener('click', () => { setPlayerMode('audio'); if(isLyricsMode) toggleLyricsMode(); });
-if (ui.btnMobileModeVideo) ui.btnMobileModeVideo.addEventListener('click', () => { setPlayerMode('video'); if(isLyricsMode) toggleLyricsMode(); });
-if (ui.btnMobileModeAudio) ui.btnMobileModeAudio.addEventListener('click', () => { setPlayerMode('audio'); if(isLyricsMode) toggleLyricsMode(); });
+// REMOVED: if(isLyricsMode) toggleLyricsMode() so the lyrics panel stays open when switching.
+if (ui.btnModeVideo) ui.btnModeVideo.addEventListener('click', () => { setPlayerMode('video'); });
+if (ui.btnModeAudio) ui.btnModeAudio.addEventListener('click', () => { setPlayerMode('audio'); });
+if (ui.btnMobileModeVideo) ui.btnMobileModeVideo.addEventListener('click', () => { setPlayerMode('video'); });
+if (ui.btnMobileModeAudio) ui.btnMobileModeAudio.addEventListener('click', () => { setPlayerMode('audio'); });
 ui.btnModeLyrics.addEventListener('click', toggleLyricsMode);
 ui.btnLyricsBack.addEventListener('click', toggleLyricsMode);
 
