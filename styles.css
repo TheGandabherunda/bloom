@@ -459,6 +459,49 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 /* =========================================
+   FULLSCREEN AUTO-HIDE FEATURE
+   ========================================= */
+
+body.fullscreen-idle,
+body.fullscreen-idle * {
+    cursor: none !important;
+}
+
+/* Hide Player Controls and Collapse Space */
+body.fullscreen-idle #player-controls {
+    opacity: 0 !important;
+    margin-bottom: -100px !important;
+    pointer-events: none !important;
+}
+
+/* Hide Header and Collapse Space */
+body.fullscreen-idle header {
+    opacity: 0 !important;
+    margin-top: -100px !important;
+    pointer-events: none !important;
+}
+
+/* Hide Queue Panel and Expand Video to Full Width */
+@media (min-width: 1024px) {
+    body.fullscreen-idle #queue-panel {
+        opacity: 0 !important;
+        margin-right: -320px !important; /* matches lg:w-[320px] */
+        pointer-events: none !important;
+    }
+}
+
+@media (min-width: 1280px) {
+    body.fullscreen-idle #queue-panel {
+        margin-right: -380px !important; /* matches xl:w-[380px] */
+    }
+}
+
+/* Enforce smooth layout transitions for the hide/show and space collapsing */
+header, #queue-panel, #player-controls {
+    transition: margin 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* =========================================
    SETUP MODAL BLOOM ANIMATION
    ========================================= */
 .bloom-enter-wrap {

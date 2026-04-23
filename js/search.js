@@ -596,7 +596,10 @@ async function fetchVideoMeta(id) {
 // ---------------------------------------------------------
 // SEARCH UI RENDERING
 // ---------------------------------------------------------
+
 function renderSearchGrids(filter) {
+    if (ui.secSearchPlaceholder) ui.secSearchPlaceholder.classList.add('hidden');
+
     const renderCard = (item) => {
         const thumbArray = Array.isArray(item.thumbnail) ? item.thumbnail : [item.thumbnail];
         let thumb = thumbArray.find(t => typeof t === 'string' && t && !t.includes('/vi/PL') && !t.includes('/vi/RD') && !t.includes('/vi/OL'));
@@ -671,6 +674,8 @@ function sortResultsByRelevance(items, query) {
 
 function showSearchSkeletons() {
     if (ui.gridVideos.querySelector('.animate-pulse')) return;
+    if (ui.secSearchPlaceholder) ui.secSearchPlaceholder.classList.add('hidden');
+
     ui.searchOverlay.classList.remove('hidden');
     if (!isPlayerCollapsed) togglePlayerExpand();
     document.querySelectorAll('.filter-chip').forEach(c => { c.classList.remove('bg-slate-700', 'text-white'); c.classList.add('bg-slate-800/80', 'text-slate-400'); });
@@ -691,7 +696,9 @@ function showSearchSkeletons() {
 
 async function performSearch(force = false) {
     const rawQuery = ui.searchInput.value.trim();
-    if (!rawQuery) { ui.searchOverlay.classList.add('hidden'); return; }
+    if (!rawQuery) {
+        return;
+    }
 
     if (!force && rawQuery === currentSearchQuery && !ui.searchOverlay.classList.contains('hidden') && !isSearching) return;
 
@@ -791,7 +798,7 @@ ui.searchInput.addEventListener('input', (e) => {
         if (val !== currentSearchQuery) showSearchSkeletons();
         debouncedSearch();
     } else {
-        ui.btnClearSearch.classList.add('hidden'); ui.searchOverlay.classList.add('hidden');
+        ui.btnClearSearch.classList.add('hidden');
         ui.loaderSearch.classList.add('hidden'); isSearching = false;
         if (globalSearchController) globalSearchController.abort();
         debouncedSearch.cancel();
@@ -799,23 +806,36 @@ ui.searchInput.addEventListener('input', (e) => {
 });
 
 let isSearchFocused = false;
+
 ui.searchInput.addEventListener('focus', (e) => {
-    isSearchFocused = true; const val = e.target.value.trim();
-    if (val && AppState.lastSearchResults.length > 0) { ui.searchOverlay.classList.remove('hidden'); if (!isPlayerCollapsed) togglePlayerExpand(); }
+    isSearchFocused = true;
+
+    const val = e.target.value.trim();
+    if (val && AppState.lastSearchResults.length > 0) {
+        ui.searchOverlay.classList.remove('hidden');
+        if (!isPlayerCollapsed) togglePlayerExpand();
+    }
 });
+
 ui.searchInput.addEventListener('blur', () => { isSearchFocused = false; });
-ui.searchInput.addEventListener('mousedown', (e) => {
-    if (isSearchFocused) {
-        const val = e.target.value.trim();
-        if (val && AppState.lastSearchResults.length > 0 && !ui.searchOverlay.classList.contains('hidden')) { ui.searchOverlay.classList.add('hidden'); ui.searchInput.blur(); e.preventDefault(); }
+
+// Close search overlay if clicking completely outside the search bar and overlay
+document.addEventListener('mousedown', (e) => {
+    if (!ui.searchOverlay.classList.contains('hidden') &&
+        !ui.searchForm.contains(e.target) &&
+        !ui.searchOverlay.contains(e.target)) {
+        ui.searchOverlay.classList.add('hidden');
+        isSearchFocused = false;
+        ui.searchInput.blur();
     }
 });
 
 ui.btnClearSearch.addEventListener('click', () => {
-    ui.searchInput.value = ''; ui.btnClearSearch.classList.add('hidden'); ui.searchOverlay.classList.add('hidden');
+    ui.searchInput.value = ''; ui.btnClearSearch.classList.add('hidden');
     ui.loaderSearch.classList.add('hidden'); isSearching = false;
     if (globalSearchController) globalSearchController.abort();
     debouncedSearch.cancel();
+    ui.searchOverlay.classList.add('hidden');
 });
 ui.btnCloseSearch.addEventListener('click', () => { ui.searchOverlay.classList.add('hidden'); });
 

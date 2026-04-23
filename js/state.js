@@ -109,6 +109,7 @@ var ui = {
     btnClearSearch: document.getElementById('btn-clear-search'),
     searchOverlay: document.getElementById('search-overlay'),
     btnCloseSearch: document.getElementById('btn-close-search'),
+    secSearchPlaceholder: document.getElementById('sec-search-placeholder'),
 
     secMusic: document.getElementById('sec-music'),
     gridMusic: document.getElementById('grid-music'),
@@ -144,6 +145,7 @@ var ui = {
     btnMobileModeAudio: document.getElementById('btn-mobile-mode-audio'),
     btnModeLyrics: document.getElementById('btn-mode-lyrics'),
     btnFullscreen: document.getElementById('btn-fullscreen'),
+    btnToggleFsQueue: document.getElementById('btn-toggle-fs-queue'),
 
     nowPlayingCover: document.getElementById('now-playing-cover'),
     nowPlayingTitle: document.getElementById('now-playing-title'),
@@ -157,6 +159,7 @@ var ui = {
     tabChat: document.getElementById('tab-chat'),
     tabPeers: document.getElementById('tab-peers'),
 
+    queuePanel: document.getElementById('queue-panel'),
     queueList: document.getElementById('queue-list'),
     queueCount: document.getElementById('queue-count'),
     queueEmptyMsg: document.getElementById('queue-empty-msg'),

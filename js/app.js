@@ -11,15 +11,25 @@ function applyRoleUI() {
     ui.progressBar.disabled = !isController;
     ui.roleBadge.textContent = AppState.myRole;
 
-    if (AppState.myRole === ROLES.OWNER) {
-        ui.roleBadge.className = 'px-2 py-0.5 rounded font-semibold transition-colors bg-[#be0aff]/20 text-[#be0aff] hidden sm:inline-block';
-        ui.emptyStateText.textContent = "Search or add videos to the queue to get started.";
-    } else if (AppState.myRole === ROLES.ADMIN) {
-        ui.roleBadge.className = 'px-2 py-0.5 rounded font-semibold transition-colors bg-[#ff8700]/20 text-[#ff8700] hidden sm:inline-block';
-        ui.emptyStateText.textContent = "Search or add videos to the queue to get started.";
+    const iconContainer = document.getElementById('empty-state-icon-container');
+    if (AppState.myRole === ROLES.OWNER || AppState.myRole === ROLES.ADMIN) {
+        ui.roleBadge.className = AppState.myRole === ROLES.OWNER ? 'px-2 py-0.5 rounded font-semibold transition-colors bg-[#be0aff]/20 text-[#be0aff] hidden sm:inline-block' : 'px-2 py-0.5 rounded font-semibold transition-colors bg-[#ff8700]/20 text-[#ff8700] hidden sm:inline-block';
+
+        document.getElementById('empty-state-title').textContent = "What do you want to play?";
+        ui.emptyStateText.textContent = "Search for videos, music, or playlists to add them to the room's queue.";
+
+        iconContainer.className = 'w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 lg:mb-6 border border-slate-700/50 shadow-inner';
+        document.getElementById('empty-state-icon').className = 'material-symbols-rounded text-[40px] text-slate-500';
+        document.getElementById('empty-state-icon').textContent = 'search';
     } else {
         ui.roleBadge.className = 'px-2 py-0.5 rounded font-semibold transition-colors bg-blue-500/20 text-blue-400 hidden sm:inline-block';
+
+        document.getElementById('empty-state-title').textContent = "Ready to Play";
         ui.emptyStateText.textContent = "Waiting for the Admins to play something.";
+
+        iconContainer.className = 'flex items-center justify-center mb-2 lg:mb-4';
+        document.getElementById('empty-state-icon').className = 'material-symbols-rounded text-[48px] lg:text-[64px] text-slate-700';
+        document.getElementById('empty-state-icon').textContent = 'graphic_eq';
     }
     renderQueue();
 }
@@ -216,7 +226,7 @@ function togglePlayerExpand() {
     isPlayerCollapsed = !isPlayerCollapsed;
     if (isPlayerCollapsed) {
         ui.videoWrapper.classList.add('is-collapsed');
-        if(ui.playerToggleIcon) ui.playerToggleIcon.textContent = 'expand_less';
+        if(ui.playerToggleIcon) ui.playerToggleIcon.textContent = 'expand_more';
         document.body.classList.remove('player-expanded');
     }
     else {
@@ -242,6 +252,66 @@ if (ui.playerControls) {
     ui.playerControls.addEventListener('click', (e) => {
         if (e.target.closest('button') || e.target.closest('input') || e.target.closest('.queue-action-btn')) return;
         togglePlayerExpand();
+    });
+}
+
+// Fullscreen specific Queue Side Panel Toggle & Auto-hide feature
+let fullscreenIdleTimeout;
+
+function resetFullscreenIdle() {
+    if (document.fullscreenElement) {
+        document.body.classList.remove('fullscreen-idle');
+        clearTimeout(fullscreenIdleTimeout);
+
+        // Hide controls after 3 seconds of inactivity
+        fullscreenIdleTimeout = setTimeout(() => {
+            if (document.fullscreenElement && AppState.isPlaying) {
+                document.body.classList.add('fullscreen-idle');
+            }
+        }, 3000);
+    }
+}
+
+// Listen for user interactions to wake up the UI in fullscreen
+['mousemove', 'mousedown', 'keydown', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, resetFullscreenIdle);
+});
+
+document.addEventListener('fullscreenchange', () => {
+    const icon = ui.btnFullscreen.querySelector('.material-symbols-rounded');
+    if (document.fullscreenElement) {
+        icon.textContent = 'fullscreen_exit';
+        if (isPlayerCollapsed) {
+            isPlayerCollapsed = false;
+            ui.videoWrapper.classList.remove('is-collapsed');
+            if(ui.playerToggleIcon) ui.playerToggleIcon.textContent = 'expand_more';
+            document.body.classList.add('player-expanded');
+        }
+        if (ui.btnToggleFsQueue) ui.btnToggleFsQueue.classList.remove('hidden');
+
+        resetFullscreenIdle();
+    } else {
+        icon.textContent = 'fullscreen';
+        if (ui.btnToggleFsQueue) ui.btnToggleFsQueue.classList.add('hidden');
+        if (ui.queuePanel) ui.queuePanel.style.display = ''; // Reset display logic when exiting
+
+        clearTimeout(fullscreenIdleTimeout);
+        document.body.classList.remove('fullscreen-idle');
+    }
+});
+
+if (ui.btnToggleFsQueue) {
+    ui.btnToggleFsQueue.addEventListener('click', () => {
+        if (!ui.queuePanel) return;
+        if (ui.queuePanel.style.display === 'none') {
+            ui.queuePanel.style.display = '';
+            ui.btnToggleFsQueue.classList.add('text-white');
+            ui.btnToggleFsQueue.classList.remove('text-slate-400');
+        } else {
+            ui.queuePanel.style.display = 'none';
+            ui.btnToggleFsQueue.classList.remove('text-white');
+            ui.btnToggleFsQueue.classList.add('text-slate-400');
+        }
     });
 }
 
