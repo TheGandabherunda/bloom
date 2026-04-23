@@ -32,29 +32,26 @@ var AppState = {
         debug: 2,
         config: {
             iceServers: [
+                // Google STUN (most reliable globally)
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
                 { urls: 'stun:stun4.l.google.com:19302' },
-                { urls: 'stun:global.stun.twilio.com:3478' },
+                // Cloudflare & Twilio STUN
                 { urls: 'stun:stun.cloudflare.com:3478' },
-                // Relay Servers (TURN) - Encrypted fallback for strict NATs (like Iroh DERP)
-                {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                }
+                { urls: 'stun:global.stun.twilio.com:3478' },
+                // Open Relay TURN — all ports + transports for strict NATs
+                // TCP variants are critical: UDP is often blocked on mobile/corporate networks
+                { urls: 'turn:openrelay.metered.ca:80',                username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:80?transport=tcp',  username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:443',               username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+                // FreeTURN — independent public TURN server
+                { urls: 'turn:freeturn.net:3478', username: 'free', credential: 'free' },
+                { urls: 'turn:freeturn.net:5349', username: 'free', credential: 'free' },
+                // Anyfirewall — extra relay for double-NAT / carrier-grade NAT networks
+                { urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc' }
             ]
         }
     }

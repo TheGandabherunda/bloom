@@ -125,93 +125,179 @@ function extractValidThumbnails(obj) {
 }
 
 // ---------------------------------------------------------
-// HIGH-SPEED CONCURRENT OMNI-RACING ENGINE & ABORT CONTROLLER
+// STRICT CATEGORY CLASSIFIER
+// Music  = audio-only tracks (Topic channels, official audio, lyrics)
+// Videos = everything else including music videos, live, etc.
+// ---------------------------------------------------------
+function classifyItem(title, author, forceCategory) {
+    const t = (title || '').toLowerCase();
+    const a = (author || '').toLowerCase();
+
+    const strongMusicSignals = [
+        a.endsWith(' - topic'),
+        t.includes('official audio'),
+        t.includes('(audio)'),
+        t.includes('[audio]'),
+        t.includes('audio only'),
+        t.includes('lyric video'),
+        t.includes('lyrics video'),
+        t.includes(' lyrics'),
+        t.includes('(lyrics)'),
+        t.includes('[lyrics]'),
+        t.endsWith(' lyrics'),
+    ];
+
+    const videoSignals = [
+        t.includes('official video'),
+        t.includes('official mv'),
+        t.includes('official music video'),
+        t.includes('music video'),
+        t.includes('(mv)'),
+        t.includes('[mv]'),
+        t.includes('video clip'),
+        t.includes('live at'),
+        t.includes('live from'),
+        t.includes('live performance'),
+        t.includes('concert'),
+        t.includes('(live)'),
+        t.includes('[live]'),
+        t.includes('live version'),
+        t.includes('reaction'),
+        t.includes('behind the scenes'),
+        t.includes('vlog'),
+        t.includes('podcast'),
+        t.includes('interview'),
+        t.includes('episode'),
+        t.includes('trailer'),
+    ];
+
+    const hasStrongMusic = strongMusicSignals.some(Boolean);
+    const hasVideoSignal = videoSignals.some(Boolean);
+
+    if (forceCategory === 'music') {
+        if (hasVideoSignal && !hasStrongMusic) return 'video';
+        return 'music';
+    }
+    if (forceCategory === 'video') {
+        if (hasStrongMusic && !hasVideoSignal) return 'music';
+        return 'video';
+    }
+    return 'video';
+}
+
+// ---------------------------------------------------------
+// API INSTANCES
+// NOTE: Only instances that reliably allow CORS from browser origins are kept.
+// Invidious instances that send proper Access-Control-Allow-Origin headers.
+// Piped instances have inconsistent CORS — we try them but expect failures.
+// The HTML proxy scraper is the PRIMARY reliable path.
 // ---------------------------------------------------------
 var INVIDIOUS_INSTANCES = [
     'https://inv.tux.pizza',
-    'https://invidious.protokolla.fi',
-    'https://inv.us.projectsegfau.lt',
-    'https://inv.nadeko.net'
+    'https://inv.nadeko.net',
+    'https://invidious.privacydns.top',
+    'https://iv.melmac.space',
+    'https://invidious.nerdvpn.de'
 ];
 
 var PIPED_INSTANCES = [
+    'https://pipedapi.kavin.rocks',
     'https://api.piped.projectsegfau.lt',
-    'https://pipedapi.in.projectsegfau.lt',
     'https://pipedapi.us.projectsegfau.lt'
 ];
 
-async function fetchFastest(endpoints, timeoutMs = 6000, globalSignal) {
+// Proxy list for HTML scraping — allorigins is the most reliable
+var PROXY_LIST = [
+    (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`
+];
+
+// ---------------------------------------------------------
+// FETCH HELPERS
+// ---------------------------------------------------------
+async function fetchWithTimeout(url, signal, timeoutMs = 5000) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const abortHandler = () => controller.abort();
-    if (globalSignal) globalSignal.addEventListener('abort', abortHandler);
-
-    const promises = endpoints.map(url =>
-        fetch(url, { signal: controller.signal })
-            .then(res => { if (!res.ok) throw new Error(`HTTP Error: ${res.status}`); return res.json(); })
-            .then(data => { if (data.error) throw new Error(`API Error: ${data.error}`); return data; })
-    );
+    if (signal) signal.addEventListener('abort', abortHandler, { once: true });
 
     try {
-        const firstSuccess = await Promise.any(promises);
-        controller.abort(); clearTimeout(timeoutId);
-        if (globalSignal) globalSignal.removeEventListener('abort', abortHandler);
-        return firstSuccess;
-    } catch (err) {
-        clearTimeout(timeoutId);
-        if (globalSignal) globalSignal.removeEventListener('abort', abortHandler);
-        if (err.name === 'AbortError' || (globalSignal && globalSignal.aborted)) throw new Error("Search Aborted");
-        throw new Error("All API endpoints in this race failed or timed out.");
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data && data.error) throw new Error(`API Error: ${data.error}`);
+        return data;
+    } finally {
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener('abort', abortHandler);
     }
 }
 
-function normalizeApiResult(data, forcedType) {
+async function fetchFastest(endpoints, timeoutMs = 5000, globalSignal) {
+    if (!endpoints || endpoints.length === 0) throw new Error('No endpoints provided');
+    const promises = endpoints.map(url => fetchWithTimeout(url, globalSignal, timeoutMs).then(data => {
+        if (!data) throw new Error('Empty response');
+        return data;
+    }));
+    try {
+        return await Promise.any(promises);
+    } catch (err) {
+        if (globalSignal && globalSignal.aborted) throw new Error("Search Aborted");
+        throw new Error("All API endpoints failed.");
+    }
+}
+
+function normalizeApiResult(data, forcedCategory) {
     let items = []; let isPiped = false;
     if (Array.isArray(data)) items = data;
     else if (data && data.items && Array.isArray(data.items)) { items = data.items; isPiped = true; }
     else return [];
-
-    return items.map(item => {
-        if (isPiped) return mapPipedItem(item, forcedType === 'music', forcedType === 'playlist');
-        return mapInvidiousItem(item, forcedType === 'music', forcedType === 'playlist');
-    }).filter(Boolean);
+    return items.map(item => isPiped ? mapPipedItem(item, forcedCategory) : mapInvidiousItem(item, forcedCategory)).filter(Boolean);
 }
 
-function mapInvidiousItem(item, forceMusic = false, forcePlaylist = false) {
-    let type = forcePlaylist ? 'playlist' : (item.type || 'video');
+function mapInvidiousItem(item, forcedCategory) {
+    let type = (item.type || 'video');
+    let id = type === 'playlist' ? item.playlistId : item.videoId;
+    if (!id) return null;
+    if (id.startsWith('PL') || id.startsWith('RD') || id.startsWith('OL')) type = 'playlist';
     if (type !== 'video' && type !== 'playlist') return null;
 
-    let id = type === 'video' ? item.videoId : item.playlistId; if (!id) return null;
-    if (id.startsWith('PL') || id.startsWith('RD') || id.startsWith('OL')) type = 'playlist';
+    const title = item.title || 'Unknown Title';
+    const author = item.author || 'Unknown Author';
+    const duration = item.lengthSeconds || 0;
+    const year = item.publishedText ? parseYearFromText(item.publishedText) : '';
 
-    let title = item.title || 'Unknown Title'; let author = item.author || 'Unknown Author';
-    let duration = item.lengthSeconds || 0; let year = item.publishedText ? parseYearFromText(item.publishedText) : '';
-
-    let thumbnail = '';
     if (type === 'playlist') {
+        let thumbnail = '';
         if (item.playlistThumbnail && !item.playlistThumbnail.includes('/vi/PL')) {
             thumbnail = item.playlistThumbnail.startsWith('//') ? 'https:' + item.playlistThumbnail : item.playlistThumbnail;
         }
-    } else if (item.videoThumbnails) {
+        return { originalIndex: 0, type: 'playlist', id, title, author, thumbnail, duration: 0, isMusic: true, isPlaylist: true, isSong: false, isVideo: false, year };
+    }
+
+    let thumbnail = '';
+    if (item.videoThumbnails) {
         const thumbs = extractValidThumbnails(item.videoThumbnails);
         thumbnail = thumbs.length > 0 ? thumbs[0] : '';
     }
-
-    const titleLower = title.toLowerCase();
-    const isSong = forceMusic || author.endsWith(' - Topic') || titleLower.includes('official audio') || titleLower.includes('lyric');
-
-    return { originalIndex: 0, type, id, title, author, thumbnail, duration, isSong, isVideo: type === 'video' && !isSong, isPlaylist: type === 'playlist', isMusic: isSong || type === 'playlist', year };
+    const detectedCategory = classifyItem(title, author, forcedCategory);
+    return { originalIndex: 0, type: 'video', id, title, author, thumbnail, duration, year, isSong: detectedCategory === 'music', isVideo: detectedCategory === 'video', isPlaylist: false, isMusic: detectedCategory === 'music', _detectedCategory: detectedCategory };
 }
 
-function mapPipedItem(item, forceMusic = false, forcePlaylist = false) {
+function mapPipedItem(item, forcedCategory) {
     let id = ''; let type = 'video';
-    if (item.type === 'stream') { id = item.url.split('?v=')[1] || item.url.replace('/watch?v=', ''); type = 'video'; }
-    else if (item.type === 'playlist') { id = item.url.split('?list=')[1] || item.url.replace('/playlist?list=', ''); type = 'playlist'; }
+    if (item.type === 'stream') { id = item.url ? (item.url.split('?v=')[1] || item.url.replace('/watch?v=', '')) : ''; type = 'video'; }
+    else if (item.type === 'playlist') { id = item.url ? (item.url.split('?list=')[1] || item.url.replace('/playlist?list=', '')) : ''; type = 'playlist'; }
     else return null;
-
-    if (forcePlaylist) type = 'playlist';
+    if (!id) return null;
     if (id.startsWith('PL') || id.startsWith('RD') || id.startsWith('OL')) type = 'playlist';
+
+    if (type === 'playlist') {
+        let thumbnail = item.thumbnail || '';
+        if (thumbnail.includes('/vi/PL') || thumbnail.includes('/vi/RD') || thumbnail.includes('/vi/OL')) thumbnail = '';
+        return { originalIndex: 0, type: 'playlist', id, title: item.name || item.title || 'Unknown', author: item.uploaderName || 'Unknown', thumbnail, duration: 0, isMusic: true, isPlaylist: true, isSong: false, isVideo: false, year: '' };
+    }
 
     let year = '';
     if (item.uploadedDate) {
@@ -219,43 +305,39 @@ function mapPipedItem(item, forceMusic = false, forcePlaylist = false) {
         if (yearMatch) year = (new Date().getFullYear() - parseInt(yearMatch[1])).toString();
         else if (/(month|week|day|hour|minute|second)/i.test(item.uploadedDate)) year = new Date().getFullYear().toString();
     }
-
-    const isSong = forceMusic || item.uploaderName?.endsWith(' - Topic') || item.title?.toLowerCase().includes('official audio');
+    const title = item.title || 'Unknown'; const author = item.uploaderName || 'Unknown';
     let thumbnail = item.thumbnail || '';
     if (thumbnail.includes('/vi/PL') || thumbnail.includes('/vi/RD') || thumbnail.includes('/vi/OL')) thumbnail = '';
-
-    return { originalIndex: 0, type, id, title: item.title, author: item.uploaderName || 'Unknown', thumbnail: thumbnail, duration: item.duration || 0, isSong, isVideo: type === 'video' && !isSong, isPlaylist: type === 'playlist', isMusic: isSong || type === 'playlist', year };
+    const detectedCategory = classifyItem(title, author, forcedCategory);
+    return { originalIndex: 0, type: 'video', id, title, author, thumbnail, duration: item.duration || 0, year, isSong: detectedCategory === 'music', isVideo: detectedCategory === 'video', isPlaylist: false, isMusic: detectedCategory === 'music', _detectedCategory: detectedCategory };
 }
 
 // ---------------------------------------------------------
-// ROBUST HTML SCRAPER RACER
+// HTML PROXY SCRAPER — primary search path
+// Uses multiple proxies with race; allorigins is most reliable
 // ---------------------------------------------------------
-async function proxyScrapeRace(url, timeoutMs = 7000, globalSignal) {
-    const rawProxies = [
-        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-    ];
-
-    const proxies = shuffleArray(rawProxies);
-
+async function proxyScrapeRace(url, timeoutMs = 9000, globalSignal) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const abortHandler = () => controller.abort();
-    if (globalSignal) globalSignal.addEventListener('abort', abortHandler);
+    if (globalSignal) globalSignal.addEventListener('abort', abortHandler, { once: true });
 
-    const promises = proxies.map(async (proxyUrl) => {
+    const proxies = shuffleArray([...PROXY_LIST]);
+
+    const promises = proxies.map(async (makeUrl) => {
+        const proxyUrl = makeUrl(url);
         const res = await fetch(proxyUrl, { signal: controller.signal });
-        if (!res.ok) throw new Error('Proxy HTTP Fail');
+        if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
 
         let text = '';
         if (proxyUrl.includes('allorigins.win/get')) {
             const data = await res.json();
-            text = data.contents;
+            text = data.contents || '';
         } else {
             text = await res.text();
         }
 
-        if (!text || (!text.includes('ytInitialData') && !text.includes('initialData'))) throw new Error('No YouTube Data payload found');
+        if (!text || (!text.includes('ytInitialData') && !text.includes('initialData'))) throw new Error('No YT data in response');
         return text;
     });
 
@@ -268,69 +350,77 @@ async function proxyScrapeRace(url, timeoutMs = 7000, globalSignal) {
         clearTimeout(timeoutId);
         if (globalSignal) globalSignal.removeEventListener('abort', abortHandler);
         if (e.name === 'AbortError' || (globalSignal && globalSignal.aborted)) throw new Error("Search Aborted");
-        throw new Error("All proxy fallback endpoints failed");
+        throw new Error("All proxy endpoints failed");
     }
 }
 
 async function searchYouTubeHTML(query, category, globalSignal) {
-    let url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query + (category === 'music' ? ' song audio' : ''))}&gl=US&hl=en`;
-    if (category === 'playlist') url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAw%253D%253D&gl=US&hl=en`;
+    // Build the correct YouTube search URL for each category
+    let searchQuery = query;
+    let filterParam = '';
 
-    const html = await proxyScrapeRace(url, 6000, globalSignal);
+    if (category === 'music') {
+        // EgIQAQ%3D%3D = YouTube music/audio filter
+        searchQuery = query + ' audio';
+        filterParam = '&sp=EgIQAQ%3D%3D';
+    } else if (category === 'playlist') {
+        // EgIQAw%3D%3D = playlist filter
+        filterParam = '&sp=EgIQAw%3D%3D';
+    }
+    // For 'video': no filter — YouTube returns everything, we classify after
+
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}&gl=US&hl=en${filterParam}`;
+    const html = await proxyScrapeRace(url, 9000, globalSignal);
     const ytData = extractJSONFromHTML(html, ['ytInitialData', 'initialData']);
-    if (!ytData) throw new Error('Failed to parse JSON from HTML');
+    if (!ytData) throw new Error('Failed to parse JSON from YouTube HTML');
 
     const parsedItems = []; const uniqueIds = new Set();
     let targeted = null;
-    try { targeted = ytData.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents; } catch(e){}
+    try { targeted = ytData.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents; } catch(e) {}
 
     function extractVideo(obj) {
         if (parsedItems.length >= 60) return;
         if (!obj || typeof obj !== 'object') return;
+
         const v = obj.videoRenderer || obj.compactVideoRenderer || obj.gridVideoRenderer || obj.playlistRenderer || obj.playlistVideoRenderer || obj.radioRenderer;
         const l = obj.lockupViewModel;
 
         if (l && l.contentId && !uniqueIds.has(l.contentId)) {
             const isPlay = l.contentType === 'LOCKUP_CONTENT_TYPE_PLAYLIST' || l.contentType === 'LOCKUP_CONTENT_TYPE_ALBUM' || l.contentId.startsWith('PL') || l.contentId.startsWith('RD') || l.contentId.startsWith('OL');
-            const isVid = !isPlay && (l.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO' || !l.contentType);
-
+            const isVid = !isPlay;
             if (isVid || isPlay) {
                 uniqueIds.add(l.contentId);
                 const thumbs = extractValidThumbnails(l.image || l.thumbnail);
                 let finalThumb = thumbs.length > 0 ? thumbs[0] : '';
                 if (finalThumb.includes('/vi/PL') || finalThumb.includes('/vi/RD')) finalThumb = '';
-
-                parsedItems.push({
-                    type: isPlay ? 'playlist' : 'video', id: l.contentId,
-                    title: getYTText(l.metadata?.lockupMetadataViewModel?.title) || "Unknown", author: findAuthorName(l) || "Unknown",
-                    thumbnail: finalThumb, duration: 0, isSong: false, isVideo: isVid, isPlaylist: isPlay, year: ''
-                });
+                const itemTitle = getYTText(l.metadata?.lockupMetadataViewModel?.title) || "Unknown";
+                const itemAuthor = findAuthorName(l) || "Unknown";
+                if (isPlay) {
+                    parsedItems.push({ type: 'playlist', id: l.contentId, title: itemTitle, author: itemAuthor, thumbnail: finalThumb, duration: 0, isSong: false, isVideo: false, isPlaylist: true, isMusic: true, year: '', _detectedCategory: 'playlist' });
+                } else {
+                    const dc = classifyItem(itemTitle, itemAuthor, category);
+                    parsedItems.push({ type: 'video', id: l.contentId, title: itemTitle, author: itemAuthor, thumbnail: finalThumb, duration: 0, isSong: dc === 'music', isVideo: dc === 'video', isPlaylist: false, isMusic: dc === 'music', year: '', _detectedCategory: dc });
+                }
             }
         } else if (v) {
             let id = v.videoId || v.playlistId; let type = v.playlistId ? 'playlist' : 'video';
             if (id && (id.startsWith('PL') || id.startsWith('RD') || id.startsWith('OL'))) type = 'playlist';
-
             if (id && !uniqueIds.has(id)) {
                 uniqueIds.add(id);
                 let durSeconds = 0; let lengthText = getYTText(v.lengthText);
                 if (!lengthText && v.thumbnailOverlays) { const overlay = v.thumbnailOverlays.find(o => o.thumbnailOverlayTimeStatusRenderer); lengthText = getYTText(overlay?.thumbnailOverlayTimeStatusRenderer?.text); }
                 if (lengthText) { const parts = lengthText.split(':').reverse(); durSeconds += parseInt(parts[0] || 0); durSeconds += parseInt(parts[1] || 0) * 60; if (parts[2]) durSeconds += parseInt(parts[2]) * 3600; }
                 const titleText = getYTText(v.title) || "Unknown"; const authorText = findAuthorName(v) || 'Unknown';
-
-                const titleLower = titleText.toLowerCase();
-                let isSong = false; let isVideo = type === 'video';
-                if (authorText.endsWith(' - Topic') || titleLower.includes('official audio') || titleLower.includes('lyric') || titleLower.includes('music video') || titleLower.includes('song') || category === 'music') {
-                    isSong = true; isVideo = false;
-                }
-
                 const thumbs = extractValidThumbnails(v.thumbnail || v.thumbnails);
                 let finalThumb = thumbs.length > 0 ? thumbs[0] : '';
                 if (finalThumb.includes('/vi/PL') || finalThumb.includes('/vi/RD')) finalThumb = '';
-
-                parsedItems.push({
-                    type: type, id, title: titleText, author: authorText, thumbnail: finalThumb,
-                    duration: durSeconds, isSong: isSong, isVideo: isVideo, isPlaylist: type === 'playlist', year: v.publishedTimeText ? parseYearFromText(getYTText(v.publishedTimeText)) : ''
-                });
+                const year = v.publishedTimeText ? parseYearFromText(getYTText(v.publishedTimeText)) : '';
+                if (type === 'playlist') {
+                    parsedItems.push({ type: 'playlist', id, title: titleText, author: authorText, thumbnail: finalThumb, duration: durSeconds, isSong: false, isVideo: false, isPlaylist: true, isMusic: true, year, _detectedCategory: 'playlist' });
+                } else {
+                    const dc = classifyItem(titleText, authorText, category);
+                    parsedItems.push({ type: 'video', id, title: titleText, author: authorText, thumbnail: finalThumb, duration: durSeconds, isSong: dc === 'music', isVideo: dc === 'video', isPlaylist: false, isMusic: dc === 'music', year, _detectedCategory: dc });
+                }
             }
         }
         if (Array.isArray(obj)) { for (let i = 0; i < obj.length; i++) extractVideo(obj[i]); }
@@ -340,18 +430,25 @@ async function searchYouTubeHTML(query, category, globalSignal) {
     if (targeted && Array.isArray(targeted)) extractVideo(targeted); else extractVideo(ytData);
 
     return parsedItems.filter(item => {
-        if (category === 'music') { item.isMusic = true; return item.isSong || item.isPlaylist; }
-        if (category === 'playlist') { item.isMusic = true; return item.type === 'playlist'; }
-        if (category === 'video') { item.isMusic = false; return item.type === 'video' && !item.isSong; }
+        if (category === 'playlist') return item.type === 'playlist';
+        if (category === 'music') return item._detectedCategory === 'music' && item.type !== 'playlist';
+        if (category === 'video') return item._detectedCategory === 'video' && item.type !== 'playlist';
         return true;
     });
 }
 
+// ---------------------------------------------------------
+// MAIN SEARCH CATEGORY FUNCTION
+// Strategy: HTML scraper runs immediately as primary path.
+// Direct API calls run concurrently — if they win AND aren't CORS-blocked,
+// we use them. Otherwise HTML result is used. Both are merged + deduped.
+// ---------------------------------------------------------
 async function searchCategory(query, category, globalSignal) {
-    let invEndpoints = []; let pipedEndpoints = [];
-
     const shuffledInv = shuffleArray([...INVIDIOUS_INSTANCES]);
     const shuffledPiped = shuffleArray([...PIPED_INSTANCES]);
+
+    let invEndpoints = [];
+    let pipedEndpoints = [];
 
     if (category === 'video') {
         invEndpoints = shuffledInv.map(b => `${b}/api/v1/search?q=${encodeURIComponent(query)}&type=video`);
@@ -364,24 +461,50 @@ async function searchCategory(query, category, globalSignal) {
         pipedEndpoints = shuffledPiped.map(b => `${b}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
     }
 
-    const promises = [
-        fetchFastest(invEndpoints, 3500, globalSignal).then(d => normalizeApiResult(d, category)).then(res => res.length > 0 ? res : Promise.reject('Empty API')),
-        fetchFastest(pipedEndpoints, 3500, globalSignal).then(d => normalizeApiResult(d, category)).then(res => res.length > 0 ? res : Promise.reject('Empty API')),
-        searchYouTubeHTML(query, category, globalSignal).then(res => res.length > 0 ? res : Promise.reject('Empty HTML'))
-    ];
-
-    const strictTimeout = new Promise(resolve => {
-        const id = setTimeout(() => resolve([]), 8000);
-        if (globalSignal) globalSignal.addEventListener('abort', () => clearTimeout(id));
+    // Wrap each source — return [] on failure (CORS, network, parse error)
+    const safeWrap = (promise) => promise.catch(err => {
+        if (err.message === 'Search Aborted') throw err;
+        return [];
     });
 
-    return Promise.race([
-        Promise.any(promises).catch((e) => {
-            if (e.name === 'AbortError' || e.message === 'Search Aborted') throw e;
-            return [];
-        }),
-        strictTimeout
-    ]);
+    const invPromise = safeWrap(
+        fetchFastest(invEndpoints, 5000, globalSignal).then(d => normalizeApiResult(d, category)).then(r => r.length ? r : [])
+    );
+    const pipedPromise = safeWrap(
+        fetchFastest(pipedEndpoints, 5000, globalSignal).then(d => normalizeApiResult(d, category)).then(r => r.length ? r : [])
+    );
+    const htmlPromise = safeWrap(searchYouTubeHTML(query, category, globalSignal));
+
+    // 11s hard timeout — returns empty if nothing resolves in time
+    const hardTimeout = new Promise(resolve => {
+        const id = setTimeout(() => resolve([]), 11000);
+        if (globalSignal) globalSignal.addEventListener('abort', () => { clearTimeout(id); resolve([]); }, { once: true });
+    });
+
+    try {
+        const [invResult, pipedResult, htmlResult] = await Promise.all([
+            Promise.race([invPromise, hardTimeout]),
+            Promise.race([pipedPromise, hardTimeout]),
+            Promise.race([htmlPromise, hardTimeout])
+        ]);
+
+        if (globalSignal && globalSignal.aborted) return [];
+
+        // Merge all sources, deduplicate by ID
+        const seen = new Set();
+        const merged = [];
+        // HTML first — it's always the freshest and most reliable source
+        for (const item of [...htmlResult, ...invResult, ...pipedResult]) {
+            if (item && item.id && !seen.has(item.id)) {
+                seen.add(item.id);
+                merged.push(item);
+            }
+        }
+        return merged;
+    } catch (err) {
+        if (err.message === 'Search Aborted') return [];
+        return [];
+    }
 }
 
 async function fetchPlaylistItems(playlistId, isMusicMode = false, knownPlaylistAuthor = null) {
@@ -391,41 +514,26 @@ async function fetchPlaylistItems(playlistId, isMusicMode = false, knownPlaylist
     ];
 
     const promises = [
-        fetchFastest(endpoints, 4000).then(data => {
+        fetchFastest(endpoints, 6000).then(data => {
             if (data.videos) {
-                return data.videos.map(v => ({
-                    id: v.videoId, title: v.title, author: v.author || knownPlaylistAuthor || data.author || 'Unknown',
-                    thumbnail: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`,
-                    duration: v.lengthSeconds || 0, isMusic: isMusicMode, year: ''
-                }));
+                return data.videos.map(v => ({ id: v.videoId, title: v.title, author: v.author || knownPlaylistAuthor || data.author || 'Unknown', thumbnail: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`, duration: v.lengthSeconds || 0, isMusic: isMusicMode, year: '' }));
             } else if (data.relatedStreams) {
-                return data.relatedStreams.map(v => ({
-                    id: v.url.split('?v=')[1] || v.url.replace('/watch?v=', ''),
-                    title: v.title, author: v.uploaderName || knownPlaylistAuthor || data.uploader || 'Unknown',
-                    thumbnail: v.thumbnail, duration: v.duration || 0, isMusic: isMusicMode, year: ''
-                }));
+                return data.relatedStreams.map(v => ({ id: v.url.split('?v=')[1] || v.url.replace('/watch?v=', ''), title: v.title, author: v.uploaderName || knownPlaylistAuthor || data.uploader || 'Unknown', thumbnail: v.thumbnail, duration: v.duration || 0, isMusic: isMusicMode, year: '' }));
             }
             throw new Error('Invalid API data');
         }),
-        proxyScrapeRace(`https://www.youtube.com/playlist?list=${playlistId}&gl=US&hl=en`, 5000).then(html => {
+        proxyScrapeRace(`https://www.youtube.com/playlist?list=${playlistId}&gl=US&hl=en`, 7000).then(html => {
             const ytData = extractJSONFromHTML(html, ['ytInitialData', 'initialData']);
             if (!ytData) throw new Error("Could not parse playlist JSON.");
-
             let globalAuthor = validateText(knownPlaylistAuthor) || "Unknown";
             const items = []; const uniqueIds = new Set();
-
             function extractPlaylistRecursive(obj) {
                 if (!obj || typeof obj !== 'object') return;
                 const v = obj.playlistVideoRenderer || obj.playlistItemVideoRenderer || obj.videoRenderer || obj.compactVideoRenderer || obj.gridVideoRenderer;
-
                 if (v && v.videoId && v.isPlayable !== false && !uniqueIds.has(v.videoId)) {
                     uniqueIds.add(v.videoId);
                     let durSeconds = 0; let lengthText = getYTText(v.lengthText);
-                    if (lengthText) {
-                        const parts = lengthText.split(':').reverse();
-                        durSeconds += parseInt(parts[0] || 0); durSeconds += parseInt(parts[1] || 0) * 60;
-                        if (parts[2]) durSeconds += parseInt(parts[2]) * 3600;
-                    }
+                    if (lengthText) { const parts = lengthText.split(':').reverse(); durSeconds += parseInt(parts[0] || 0); durSeconds += parseInt(parts[1] || 0) * 60; if (parts[2]) durSeconds += parseInt(parts[2]) * 3600; }
                     const thumbs = extractValidThumbnails(v.thumbnail);
                     const finalThumb = thumbs.length > 0 ? thumbs[0] : `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`;
                     items.push({ id: v.videoId, title: getYTText(v.title) || "Unknown Title", author: findAuthorName(v) || globalAuthor, thumbnail: finalThumb, duration: durSeconds, isMusic: isMusicMode, year: v.publishedTimeText ? parseYearFromText(getYTText(v.publishedTimeText)) : '' });
@@ -439,12 +547,11 @@ async function fetchPlaylistItems(playlistId, isMusicMode = false, knownPlaylist
         })
     ];
 
-    const strictTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout fetching playlist")), 10000));
-
+    const strictTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout fetching playlist")), 13000));
     try {
         return await Promise.race([Promise.any(promises), strictTimeout]);
     } catch(e) {
-        throw new Error("Could not fetch playlist. APIs failed or timed out.");
+        throw new Error("Could not fetch playlist. All sources failed or timed out.");
     }
 }
 
@@ -455,18 +562,13 @@ async function fetchVideoMeta(id) {
     ];
 
     const promises = [
-        fetchFastest(endpoints, 3500).then(data => {
+        fetchFastest(endpoints, 5000).then(data => {
             if (data.title) {
-                return {
-                    id, title: data.title, author: data.author || data.uploader || 'Unknown',
-                    thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
-                    isMusic: false, duration: data.lengthSeconds || data.duration || 0,
-                    year: data.publishedText ? parseYearFromText(data.publishedText) : (data.uploadDate ? data.uploadDate.split('-')[0] : '')
-                };
+                return { id, title: data.title, author: data.author || data.uploader || 'Unknown', thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`, isMusic: false, duration: data.lengthSeconds || data.duration || 0, year: data.publishedText ? parseYearFromText(data.publishedText) : (data.uploadDate ? data.uploadDate.split('-')[0] : '') };
             }
             throw new Error("Invalid format");
         }),
-        proxyScrapeRace(`https://www.youtube.com/watch?v=${id}&gl=US&hl=en`, 4500).then(html => {
+        proxyScrapeRace(`https://www.youtube.com/watch?v=${id}&gl=US&hl=en`, 6000).then(html => {
             const data = extractJSONFromHTML(html, ['ytInitialPlayerResponse']);
             if (data) {
                 const details = data.videoDetails || {};
@@ -478,8 +580,7 @@ async function fetchVideoMeta(id) {
         })
     ];
 
-    const strictTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout fetching metadata")), 8000));
-
+    const strictTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout fetching metadata")), 11000));
     try {
         return await Promise.race([Promise.any(promises), strictTimeout]);
     } catch(err) {
@@ -489,7 +590,6 @@ async function fetchVideoMeta(id) {
             return { id, title: data.title, author: validateText(data.author_name) || 'Unknown', thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`, isMusic: false, duration: 0, year: '' };
         } catch(e) {}
     }
-
     return { id, title: `Video ID: ${id}`, author: 'Unknown', thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`, isMusic: false, duration: 0, year: '' };
 }
 
@@ -500,29 +600,18 @@ function renderSearchGrids(filter) {
     const renderCard = (item) => {
         const thumbArray = Array.isArray(item.thumbnail) ? item.thumbnail : [item.thumbnail];
         let thumb = thumbArray.find(t => typeof t === 'string' && t && !t.includes('/vi/PL') && !t.includes('/vi/RD') && !t.includes('/vi/OL'));
-
-        const colors = [
-            ['#ff758c', '#ff7eb3'], ['#a18cd1', '#fbc2eb'], ['#fa709a', '#fee140'],
-            ['#84fab0', '#8fd3f4'], ['#a1c4fd', '#c2e9fb'], ['#fccb90', '#d57eeb'],
-            ['#e0c3fc', '#8ec5fc'], ['#4facfe', '#00f2fe']
-        ];
-        let hash = 0;
-        for (let i = 0; i < item.title.length; i++) hash = item.title.charCodeAt(i) + ((hash << 5) - hash);
+        const colors = [['#ff758c','#ff7eb3'],['#a18cd1','#fbc2eb'],['#fa709a','#fee140'],['#84fab0','#8fd3f4'],['#a1c4fd','#c2e9fb'],['#fccb90','#d57eeb'],['#e0c3fc','#8ec5fc'],['#4facfe','#00f2fe']];
+        let hash = 0; for (let i = 0; i < item.title.length; i++) hash = item.title.charCodeAt(i) + ((hash << 5) - hash);
         const pair = colors[Math.abs(hash) % colors.length];
-
         const durationStr = item.duration ? formatTime(item.duration) : (item.type === 'playlist' ? 'Playlist' : '');
         const badge = durationStr ? `<div class="absolute bottom-1 right-1 z-20 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded shadow">${durationStr}</div>` : '';
-
         return `
         <div class="flex flex-col gap-2 group relative">
             <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-800 border border-slate-700/50 shadow-md">
-
                 <div class="absolute inset-0 z-0 flex items-center justify-center p-3 text-center" style="background: linear-gradient(135deg, ${pair[0]}, ${pair[1]});">
                     <span class="text-white font-bold text-[13px] md:text-sm drop-shadow-md leading-tight line-clamp-3">${item.title.replace(/"/g, '&quot;')}</span>
                 </div>
-
                 ${thumb ? `<img src="${thumb}" onerror="this.style.display='none';" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 z-10 bg-slate-800">` : ''}
-
                 ${badge}
                 <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm z-30">
                     <button class="bg-white hover:bg-slate-200 text-slate-900 p-2 rounded-full transform hover:scale-110 transition-all shadow-lg flex items-center justify-center" onclick='handleSearchResultClick(${item.originalIndex}, true)' title="Play Now">
@@ -541,28 +630,24 @@ function renderSearchGrids(filter) {
     };
 
     ui.secMusic.classList.add('hidden'); ui.secVideos.classList.add('hidden'); ui.secPlaylists.classList.add('hidden');
-
     if (filter === 'all' || filter === 'music') {
         ui.secMusic.classList.remove('hidden');
         if (currentCategorizedResults.music.length > 0) ui.gridMusic.innerHTML = currentCategorizedResults.music.map(renderCard).join('');
         else if (filter === 'music') ui.gridMusic.innerHTML = `<div class="col-span-full text-center text-slate-500 text-sm py-8">No audio tracks found.</div>`;
         else ui.secMusic.classList.add('hidden');
     }
-
     if (filter === 'all' || filter === 'videos') {
         ui.secVideos.classList.remove('hidden');
         if (currentCategorizedResults.videos.length > 0) ui.gridVideos.innerHTML = currentCategorizedResults.videos.map(renderCard).join('');
         else if (filter === 'videos') ui.gridVideos.innerHTML = `<div class="col-span-full text-center text-slate-500 text-sm py-8">No videos found.</div>`;
         else ui.secVideos.classList.add('hidden');
     }
-
     if (filter === 'all' || filter === 'playlists') {
         ui.secPlaylists.classList.remove('hidden');
         if (currentCategorizedResults.playlists.length > 0) ui.gridPlaylists.innerHTML = currentCategorizedResults.playlists.map(renderCard).join('');
         else if (filter === 'playlists') ui.gridPlaylists.innerHTML = `<div class="col-span-full text-center text-slate-500 text-sm py-8">No playlists found.</div>`;
         else ui.secPlaylists.classList.add('hidden');
     }
-
     const totalItems = currentCategorizedResults.music.length + currentCategorizedResults.videos.length + currentCategorizedResults.playlists.length;
     if (filter === 'all' && totalItems === 0) {
         ui.secVideos.classList.remove('hidden');
@@ -575,13 +660,10 @@ function sortResultsByRelevance(items, query) {
     items.forEach((item, idx) => {
         let score = 1000 - idx;
         const t = (item.title || '').toLowerCase(); const a = (item.author || '').toLowerCase();
-
         if (t === q) score += 5000; else if (t.startsWith(q)) score += 3000; else if (t.includes(q)) score += 1000;
         if (a === q || a.startsWith(q)) score += 2000; else if (a.includes(q)) score += 500;
-
         let wordMatches = 0; qWords.forEach(w => { if (t.includes(w) || a.includes(w)) wordMatches++; });
         if (qWords.length > 0 && wordMatches === qWords.length) score += 800;
-
         item._sortScore = score;
     });
     return items.sort((a, b) => b._sortScore - a._sortScore);
@@ -589,18 +671,12 @@ function sortResultsByRelevance(items, query) {
 
 function showSearchSkeletons() {
     if (ui.gridVideos.querySelector('.animate-pulse')) return;
-
     ui.searchOverlay.classList.remove('hidden');
     if (!isPlayerCollapsed) togglePlayerExpand();
-
     document.querySelectorAll('.filter-chip').forEach(c => { c.classList.remove('bg-slate-700', 'text-white'); c.classList.add('bg-slate-800/80', 'text-slate-400'); });
     const chips = document.querySelectorAll('.filter-chip');
     if(chips.length > 0) { chips[0].classList.remove('bg-slate-800/80', 'text-slate-400'); chips[0].classList.add('bg-slate-700', 'text-white'); }
-
-    ui.secMusic.classList.remove('hidden');
-    ui.secVideos.classList.remove('hidden');
-    ui.secPlaylists.classList.remove('hidden');
-
+    ui.secMusic.classList.remove('hidden'); ui.secVideos.classList.remove('hidden'); ui.secPlaylists.classList.remove('hidden');
     const skeletonHTML = Array(4).fill(`
         <div class="flex flex-col gap-2 animate-pulse">
             <div class="w-full aspect-video rounded-xl bg-slate-800 border border-slate-700/50 shadow-md"></div>
@@ -610,24 +686,18 @@ function showSearchSkeletons() {
             </div>
         </div>
     `).join('');
-
-    ui.gridMusic.innerHTML = skeletonHTML;
-    ui.gridVideos.innerHTML = skeletonHTML;
-    ui.gridPlaylists.innerHTML = skeletonHTML;
+    ui.gridMusic.innerHTML = skeletonHTML; ui.gridVideos.innerHTML = skeletonHTML; ui.gridPlaylists.innerHTML = skeletonHTML;
 }
 
 async function performSearch(force = false) {
     const rawQuery = ui.searchInput.value.trim();
     if (!rawQuery) { ui.searchOverlay.classList.add('hidden'); return; }
 
-    if (!force && rawQuery === currentSearchQuery && !ui.searchOverlay.classList.contains('hidden') && !isSearching) {
-        return;
-    }
+    if (!force && rawQuery === currentSearchQuery && !ui.searchOverlay.classList.contains('hidden') && !isSearching) return;
 
     if (SearchCache.has(rawQuery.toLowerCase())) {
         showSearchSkeletons();
         const cached = SearchCache.get(rawQuery.toLowerCase());
-
         setTimeout(() => {
             AppState.lastSearchResults = cached.raw;
             currentCategorizedResults = cached.categorized;
@@ -640,107 +710,100 @@ async function performSearch(force = false) {
     }
 
     if (globalSearchController) globalSearchController.abort();
-
     globalSearchController = new AbortController();
     const currentSignal = globalSearchController.signal;
-
     const searchId = ++currentSearchId;
     currentSearchQuery = rawQuery;
     isSearching = true;
 
     showSearchSkeletons();
-
     ui.searchOverlay.classList.remove('hidden'); ui.loaderSearch.classList.remove('hidden');
     if (!isPlayerCollapsed) togglePlayerExpand();
 
     try {
-        console.log(`\n[Search] 🚀 Omniracing fast APIs & Scrapers concurrently for: "${rawQuery}"`);
+        console.log(`\n[Search] 🚀 Searching for: "${rawQuery}"`);
 
-        const [videoItems, playlistItems, musicItems] = await Promise.all([
+        const [musicItems, videoItems, playlistItems] = await Promise.all([
+            searchCategory(rawQuery, 'music', currentSignal),
             searchCategory(rawQuery, 'video', currentSignal),
-            searchCategory(rawQuery, 'playlist', currentSignal),
-            searchCategory(rawQuery, 'music', currentSignal)
+            searchCategory(rawQuery, 'playlist', currentSignal)
         ]);
 
         if (searchId !== currentSearchId || currentSignal.aborted) return;
 
-        let combinedResults = [...musicItems, ...videoItems, ...playlistItems];
+        // Strict post-filter
+        const strictMusic = musicItems.filter(i => i.type !== 'playlist' && (i.isSong || i._detectedCategory === 'music'));
+        const strictVideos = videoItems.filter(i => i.type !== 'playlist' && !i.isSong && i._detectedCategory !== 'music');
+        const strictPlaylists = playlistItems.filter(i => i.type === 'playlist' || i.isPlaylist);
 
-        if (combinedResults.length === 0) {
-            console.warn(`[Search] ⚠️ Zero results found. All APIs and Scrapers completely failed.`);
-        }
+        // Cross-bucket dedup: music IDs take priority over videos
+        const musicIds = new Set(strictMusic.map(i => i.id));
+        const playlistIds = new Set(strictPlaylists.map(i => i.id));
+        const dedupedVideos = strictVideos.filter(i => !musicIds.has(i.id) && !playlistIds.has(i.id));
+        const dedupedPlaylists = strictPlaylists.filter(i => !musicIds.has(i.id));
 
-        combinedResults.forEach((item, index) => item.originalIndex = index);
+        const sortedMusic = sortResultsByRelevance(strictMusic, rawQuery);
+        const sortedVideos = sortResultsByRelevance(dedupedVideos, rawQuery);
+        const sortedPlaylists = sortResultsByRelevance(dedupedPlaylists, rawQuery);
+
+        currentCategorizedResults.music = sortedMusic;
+        currentCategorizedResults.videos = sortedVideos;
+        currentCategorizedResults.playlists = sortedPlaylists;
+
+        // Build flat combined list with correct originalIndex for click handlers
+        let combinedResults = [];
+        sortedMusic.forEach((item, i) => { item.originalIndex = i; combinedResults.push(item); });
+        const videoOffset = sortedMusic.length;
+        sortedVideos.forEach((item, i) => { item.originalIndex = videoOffset + i; combinedResults.push(item); });
+        const playlistOffset = videoOffset + sortedVideos.length;
+        sortedPlaylists.forEach((item, i) => { item.originalIndex = playlistOffset + i; combinedResults.push(item); });
+
         AppState.lastSearchResults = combinedResults;
-
-        currentCategorizedResults.music = sortResultsByRelevance(musicItems, rawQuery);
-        currentCategorizedResults.videos = sortResultsByRelevance(videoItems, rawQuery);
-        currentCategorizedResults.playlists = sortResultsByRelevance(playlistItems, rawQuery);
 
         if (combinedResults.length > 0) {
             SearchCache.set(rawQuery.toLowerCase(), {
                 raw: combinedResults,
-                categorized: {
-                    music: currentCategorizedResults.music,
-                    videos: currentCategorizedResults.videos,
-                    playlists: currentCategorizedResults.playlists
-                }
+                categorized: { music: sortedMusic, videos: sortedVideos, playlists: sortedPlaylists }
             });
         }
 
+        console.log(`[Search] ✅ Music: ${sortedMusic.length}, Videos: ${sortedVideos.length}, Playlists: ${sortedPlaylists.length}`);
         renderSearchGrids('all');
 
     } catch (err) {
         if (searchId === currentSearchId && !currentSignal.aborted) {
-            ui.secVideos.classList.remove('hidden');
-            ui.secMusic.classList.add('hidden');
-            ui.secPlaylists.classList.add('hidden');
+            ui.secVideos.classList.remove('hidden'); ui.secMusic.classList.add('hidden'); ui.secPlaylists.classList.add('hidden');
             ui.gridVideos.innerHTML = `<div class="col-span-full text-center text-red-400 text-sm mt-8">Search error. ${err.message}</div>`;
         }
     } finally {
-        if (searchId === currentSearchId) {
-            ui.loaderSearch.classList.add('hidden');
-            isSearching = false;
-        }
+        if (searchId === currentSearchId) { ui.loaderSearch.classList.add('hidden'); isSearching = false; }
     }
 }
 
 var debouncedSearch = debounce(() => performSearch(false), 1000);
 
-ui.searchForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    debouncedSearch.cancel();
-    performSearch(true);
-});
+ui.searchForm.addEventListener('submit', (e) => { e.preventDefault(); debouncedSearch.cancel(); performSearch(true); });
 
 ui.searchInput.addEventListener('input', (e) => {
     const val = e.target.value.trim();
     if (val) {
         ui.btnClearSearch.classList.remove('hidden');
-        if (val !== currentSearchQuery) {
-            showSearchSkeletons();
-        }
+        if (val !== currentSearchQuery) showSearchSkeletons();
         debouncedSearch();
-    }
-    else {
-        ui.btnClearSearch.classList.add('hidden');
-        ui.searchOverlay.classList.add('hidden');
-        ui.loaderSearch.classList.add('hidden');
-        isSearching = false;
+    } else {
+        ui.btnClearSearch.classList.add('hidden'); ui.searchOverlay.classList.add('hidden');
+        ui.loaderSearch.classList.add('hidden'); isSearching = false;
         if (globalSearchController) globalSearchController.abort();
         debouncedSearch.cancel();
     }
 });
 
 let isSearchFocused = false;
-
 ui.searchInput.addEventListener('focus', (e) => {
     isSearchFocused = true; const val = e.target.value.trim();
     if (val && AppState.lastSearchResults.length > 0) { ui.searchOverlay.classList.remove('hidden'); if (!isPlayerCollapsed) togglePlayerExpand(); }
 });
-
 ui.searchInput.addEventListener('blur', () => { isSearchFocused = false; });
-
 ui.searchInput.addEventListener('mousedown', (e) => {
     if (isSearchFocused) {
         const val = e.target.value.trim();
@@ -765,40 +828,23 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
 });
 
 window.handleSearchResultClick = async (index, playNow) => {
-    if (AppState.myRole === ROLES.MEMBER) {
-        return showToast('Only Admins can manage the queue.', 'error');
-    }
-
+    if (AppState.myRole === ROLES.MEMBER) return showToast('Only Admins can manage the queue.', 'error');
     const itemObj = AppState.lastSearchResults[index];
+    if (!itemObj) return showToast('Result not found. Please search again.', 'error');
     showToast(`Loading ${itemObj.title.substring(0, 20)}...`, 'info');
-
     try {
         if (itemObj.type === 'playlist') {
             const items = await fetchPlaylistItems(itemObj.id, itemObj.isMusic, itemObj.author);
             if (items.length === 0) return showToast("Empty playlist.", "error");
-
-            if (playNow) {
-                executeCommand('REPLACE_QUEUE', { items, playIndex: 0 });
-            } else {
-                executeCommand('ADD_TO_QUEUE', { items, playNow: false });
-            }
+            if (playNow) executeCommand('REPLACE_QUEUE', { items, playIndex: 0 });
+            else executeCommand('ADD_TO_QUEUE', { items, playNow: false });
         } else {
-            const mappedItem = {
-                id: itemObj.id, title: itemObj.title, author: itemObj.author,
-                thumbnail: itemObj.thumbnail, duration: itemObj.duration,
-                isMusic: itemObj.isMusic, year: itemObj.year
-            };
-
-            if (playNow) {
-                executeCommand('PLAY_DIRECT', { video: mappedItem });
-            } else {
-                executeCommand('ADD_TO_QUEUE', { items: [mappedItem], playNow: false });
-            }
+            const mappedItem = { id: itemObj.id, title: itemObj.title, author: itemObj.author, thumbnail: itemObj.thumbnail, duration: itemObj.duration, isMusic: itemObj.isMusic, year: itemObj.year };
+            if (playNow) executeCommand('PLAY_DIRECT', { video: mappedItem });
+            else executeCommand('ADD_TO_QUEUE', { items: [mappedItem], playNow: false });
         }
-
         if (playNow && !itemObj.isMusic && isPlayerCollapsed) togglePlayerExpand();
         else if (!playNow) showToast("Added to queue", "success");
-
     } catch (err) { showToast(`Error: ${err.message}`, 'error'); }
 };
 
@@ -809,7 +855,6 @@ ui.btnAddLink.addEventListener('click', async () => {
     const playlistId = extractPlaylistID(url);
     const videoId = extractVideoID(url);
     if (!playlistId && !videoId) return showToast('Invalid YouTube URL', 'error');
-
     ui.videoInput.value = 'Loading...'; ui.videoInput.disabled = true; ui.btnAddLink.disabled = true;
     try {
         const isMusic = document.querySelector('input[name="search-type"]:checked')?.value === 'music' || true;

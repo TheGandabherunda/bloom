@@ -1,35 +1,125 @@
+// ─────────────────────────────────────────────────────────────
+//  peer.js  —  WebRTC / PeerJS connection management
+// ─────────────────────────────────────────────────────────────
+
 let isConnecting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+let hostConnectAttempts = 0;
+const MAX_HOST_CONNECT_ATTEMPTS = 25;
 
-function initializeWebRTC() {
+// Incremented each time a new conn attempt starts — lets stale timeouts self-invalidate
+let activeConnAttemptId = 0;
+
+// TRUE while we are waiting for the PeerJS signaling 'open' to re-fire after a drop.
+// connectToHost() returns immediately when this is set, preventing wasted attempts
+// against a signaling server we are not yet connected to.
+let waitingForSignalingReconnect = false;
+
+// TRUE after initializeWebRTC(true) has been called once — avoids re-escalating
+// to relay mode endlessly when relay itself is timing out.
+let relayModeActive = false;
+
+// ─── ICE / TURN configuration ────────────────────────────────
+// Dynamic Fetching from Metered.live API directly in frontend.
+// ─────────────────────────────────────────────────────────────
+
+const METERED_API_KEY = 'f76e5b2098fdbbbe6631dfca0301739d9eac';
+const METERED_API_URL = `https://bloom-p2p.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`;
+
+// Fetches the ICE servers directly from Metered API.
+async function fetchIceServers(relayOnly = false) {
+    try {
+        const response = await fetch(METERED_API_URL);
+        let iceServers = await response.json();
+
+        // In relay-only mode skip STUN (no point gathering host/srflx candidates)
+        if (relayOnly) {
+            iceServers = iceServers.filter(server => {
+                const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+                return urls.some(url => url.startsWith('turn:') || url.startsWith('turns:'));
+            });
+        }
+
+        return iceServers;
+    } catch (err) {
+        sysLog('ERROR', 'Failed to fetch Metered TURN credentials', err);
+
+        // Fallback to basic Google STUN if fetch fails
+        const stunFallback = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ];
+        return relayOnly ? [] : stunFallback;
+    }
+}
+
+function buildPeerConfig(iceServers, forceRelay = false) {
+    return {
+        debug: 2,
+        config: {
+            iceServers: iceServers,
+            iceCandidatePoolSize: 10,
+            iceTransportPolicy: forceRelay ? 'relay' : 'all',
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require',
+        }
+    };
+}
+
+// ─── Core init ───────────────────────────────────────────────
+
+async function initializeWebRTC(forceRelay = false) {
     updateStatus('Initializing WebRTC', 'yellow');
+    relayModeActive = forceRelay;
 
-    // The Host MUST use the roomId as their Peer ID so others can find them.
     const requestedId = AppState.isHost ? AppState.roomId : undefined;
 
+    // ── Tear down the old peer cleanly FIRST ──────────────────────
+    const oldPeer = peer;
+    peer = null;  // disarm all stale event callbacks immediately
+
+    if (oldPeer && !oldPeer.destroyed) {
+        try { oldPeer.destroy(); } catch(e) {}
+    }
+
+    // Reset handshake guards
+    isConnecting = false;
+    waitingForSignalingReconnect = false;
+    activeConnAttemptId++;
+
+    // Save current attempt ID to prevent race conditions during the async fetch
+    const currentAttemptId = activeConnAttemptId;
+
+    // Wait for the Metered API to give us the servers
+    const iceServers = await fetchIceServers(forceRelay);
+
+    // If another initializeWebRTC call happened while we were waiting, abort this one
+    if (currentAttemptId !== activeConnAttemptId) {
+        sysLog('WEBRTC', 'Aborting stale init after API fetch');
+        return;
+    }
+
+    let newPeer;
     try {
-        // We use PeerJS's default cloud server for signaling.
-        // We increase debug levels to see granular details of the WebRTC handshake.
-        peer = new Peer(requestedId, {
-            ...AppState.peerConfig,
-            debug: 3,
-            config: {
-                ...AppState.peerConfig.config,
-                iceCandidatePoolSize: 10 // Pre-fetch candidates for faster connection
-            }
-        });
+        newPeer = new Peer(requestedId, buildPeerConfig(iceServers, forceRelay));
     } catch (err) {
         sysLog('ERROR', 'Peer construction failed', err);
         return updateStatus('Failed', 'red');
     }
 
+    peer = newPeer;
+
+    // ── open ────────────────────────────────────────────────
     peer.on('open', (id) => {
+        if (peer !== newPeer) return; // a newer reinit happened — discard
         AppState.peerId = id;
-        sysLog('WEBRTC', `Connected to Signaling Server. My ID: ${id}`);
+        reconnectAttempts = 0;
+        sysLog('WEBRTC', `Connected to Signaling Server. My ID: ${id}${forceRelay ? ' [RELAY MODE]' : ''}`);
 
         if (AppState.isHost) {
-            // Safety check: ensure the signaling server hasn't assigned a random ID to the host.
             if (id !== AppState.roomId) {
-                sysLog('ERROR', `ID Mismatch! Wanted ${AppState.roomId} but got ${id}. Someone may be hosting this room.`);
+                sysLog('ERROR', `ID Mismatch! Wanted ${AppState.roomId} but got ${id}.`);
                 showToast('Room ID already taken. Try a different name.', 'error');
                 updateStatus('ID Conflict', 'red');
                 return;
@@ -42,26 +132,65 @@ function initializeWebRTC() {
             startSyncLoop();
         } else {
             updateStatus('Connecting...', 'yellow');
-            // Give the signaling server a moment to propagate the Host ID.
+
+            if (waitingForSignalingReconnect) {
+                // Signaling came back after a mid-handshake drop — resume
+                waitingForSignalingReconnect = false;
+                sysLog('WEBRTC', 'Signaling reconnected — resuming host connection');
+                setTimeout(() => connectToHost(), 500);
+                return;
+            }
+
+            if (!forceRelay) hostConnectAttempts = 0;
             setTimeout(() => connectToHost(), 1500);
         }
     });
 
+    // ── disconnected ────────────────────────────────────────
     peer.on('disconnected', () => {
-        sysLog('WEBRTC', 'Disconnected from signaling server. Reconnecting...');
+        if (peer !== newPeer) return; // stale — ignore
+        sysLog('WEBRTC', 'Disconnected from signaling server. Attempting reconnect...');
+
         isConnecting = false;
-        peer.reconnect();
+        waitingForSignalingReconnect = true;
+        activeConnAttemptId++;
+
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !newPeer.destroyed) {
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts - 1), 15000);
+            sysLog('WEBRTC', `Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay / 1000)}s`);
+            setTimeout(() => {
+                // Only reconnect if this is still the active peer AND it is
+                // genuinely disconnected (not open, not destroyed).
+                if (peer === newPeer && !newPeer.destroyed && newPeer.disconnected) {
+                    newPeer.reconnect();
+                }
+            }, delay);
+        } else {
+            sysLog('ERROR', 'Max reconnect attempts reached or peer destroyed.');
+            waitingForSignalingReconnect = false;
+            updateStatus('Offline', 'red');
+        }
     });
 
+    // ── error ────────────────────────────────────────────────
     peer.on('error', (err) => {
+        if (peer !== newPeer) return; // stale
         sysLog('ERROR', `PeerJS Error: ${err.type}`, err);
 
         if (err.type === 'peer-unavailable') {
             isConnecting = false;
             if (!AppState.isHost) {
-                updateStatus('Host offline', 'red');
-                showToast('Host is not online yet. Retrying...', 'info');
-                setTimeout(() => connectToHost(), 5000);
+                if (hostConnectAttempts < MAX_HOST_CONNECT_ATTEMPTS) {
+                    hostConnectAttempts++;
+                    const delay = Math.min(2000 + (hostConnectAttempts * 800), 12000);
+                    updateStatus('Waiting for host...', 'yellow');
+                    if (hostConnectAttempts <= 3) showToast('Host not online yet. Retrying...', 'info');
+                    setTimeout(() => connectToHost(), delay);
+                } else {
+                    updateStatus('Host not found', 'red');
+                    showToast('Could not connect to host after multiple attempts.', 'error');
+                }
             }
         }
 
@@ -69,31 +198,63 @@ function initializeWebRTC() {
             showToast('Room name already in use.', 'error');
             updateStatus('ID Taken', 'red');
         }
+
+        if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+            isConnecting = false;
+            activeConnAttemptId++;
+            waitingForSignalingReconnect = true;
+            sysLog('WEBRTC', `Signaling lost mid-handshake (${err.type}) — pausing until reconnect`);
+        }
+
+        if (err.type === 'webrtc') {
+            isConnecting = false;
+            sysLog('ERROR', 'WebRTC ICE/DTLS failure', err);
+            if (!AppState.isHost && hostConnectAttempts < MAX_HOST_CONNECT_ATTEMPTS) {
+                hostConnectAttempts++;
+                if (!relayModeActive) {
+                    sysLog('WEBRTC', 'Switching to relay-only mode after ICE failure');
+                    showToast('Trying relay connection...', 'info');
+                    setTimeout(() => initializeWebRTC(true), 1000);
+                } else {
+                    const delay = Math.min(3000 + (hostConnectAttempts * 1000), 15000);
+                    setTimeout(() => connectToHost(), delay);
+                }
+            }
+        }
+    });
+
+    // ── close ────────────────────────────────────────────────
+    peer.on('close', () => {
+        if (peer !== newPeer) return; // stale
+        sysLog('WEBRTC', 'Peer destroyed/closed.');
+        isConnecting = false;
+        waitingForSignalingReconnect = false;
+        updateStatus('Disconnected', 'red');
     });
 }
+
+// ─── Host-side listener setup ────────────────────────────────
 
 function setupHostListeners() {
     peer.on('connection', (conn) => {
         sysLog('WEBRTC', `Incoming handshake from: ${conn.peer}`);
 
-        // Timeout if connection doesn't open within 15 seconds.
-        // This clears "zombie" handshakes where candidates never match.
+        // 90 s — generous enough for TURN relay on slow mobile networks.
+        // Fires only if the data channel never opens.
         const failTimeout = setTimeout(() => {
             if (!conn.open) {
-                sysLog('WARN', `Handshake with ${conn.peer} timed out. Cleaning up.`);
-                conn.close();
+                sysLog('WARN', `Handshake with ${conn.peer} timed out (90s). Cleaning up.`);
+                try { conn.close(); } catch(e) {}
             }
-        }, 15000);
+        }, 90000);
 
         conn.on('open', () => {
             clearTimeout(failTimeout);
-            sysLog('WEBRTC', `Data channel fully established with: ${conn.peer}`);
+            sysLog('WEBRTC', `Data channel established with: ${conn.peer}`);
 
-            // Clean up stale connections from the same peer (e.g. after a refresh)
             if (AppState.peers.has(conn.peer)) {
-                try { AppState.peers.get(conn.peer).close(); } catch(e){}
+                try { AppState.peers.get(conn.peer).close(); } catch(e) {}
             }
-
             AppState.peers.set(conn.peer, conn);
 
             conn.on('close', () => handlePeerDisconnect(conn.peer));
@@ -103,14 +264,20 @@ function setupHostListeners() {
             });
             conn.on('data', (data) => handleIncomingData(data, conn.peer));
         });
+
+        conn.on('error', (err) => {
+            clearTimeout(failTimeout);
+            sysLog('ERROR', `Pre-open handshake error with ${conn.peer}:`, err);
+            try { conn.close(); } catch(e) {}
+        });
     });
 
-    // Cleanup interval to remove stale peer objects from memory.
     setInterval(() => {
         if (!AppState.isHost) return;
         for (const [peerId, conn] of AppState.peers.entries()) {
-            if (!conn.open || (conn.peerConnection && ['disconnected', 'failed', 'closed'].includes(conn.peerConnection.iceConnectionState))) {
-                sysLog('WEBRTC', `Cleaning up dead peer: ${peerId}`);
+            const iceState = conn.peerConnection?.iceConnectionState;
+            if (!conn.open || (iceState && ['disconnected', 'failed', 'closed'].includes(iceState))) {
+                sysLog('WEBRTC', `Cleaning up dead peer: ${peerId} (ICE: ${iceState})`);
                 handlePeerDisconnect(peerId);
             }
         }
@@ -119,9 +286,7 @@ function setupHostListeners() {
 
 function handlePeerDisconnect(peerId) {
     if (!AppState.isHost) return;
-
-    const hadPeer = AppState.peers.has(peerId);
-    if (!hadPeer) return;
+    if (!AppState.peers.has(peerId)) return;
 
     sysLog('WEBRTC', `Peer disconnected: ${peerId}`);
     AppState.peers.delete(peerId);
@@ -130,50 +295,131 @@ function handlePeerDisconnect(peerId) {
     updateMembersList();
 }
 
+// ─── Guest-side host connection ──────────────────────────────
+
 function connectToHost() {
-    if (!peer || peer.destroyed || isConnecting) return;
+    if (!peer || peer.destroyed) {
+        sysLog('WARN', 'connectToHost: peer is gone — reinitializing');
+        initializeWebRTC(relayModeActive);
+        return;
+    }
+
+    if (isConnecting) return;
+
+    if (peer.disconnected || waitingForSignalingReconnect) {
+        sysLog('WARN', 'connectToHost: signaling not ready — will retry after reconnect');
+        return;
+    }
 
     isConnecting = true;
-    sysLog('WEBRTC', `Initiating connection to host: ${AppState.roomId}`);
+    const thisAttemptId = ++activeConnAttemptId;
+    sysLog('WEBRTC', `Initiating connection to host: ${AppState.roomId} (attempt ${hostConnectAttempts + 1})`);
 
-    // Explicitly request reliable data channels to prevent message drops.
-    const conn = peer.connect(AppState.roomId, {
-        reliable: true,
-        serialization: 'json'
-    });
+    let conn;
+    try {
+        conn = peer.connect(AppState.roomId, {
+            reliable: true,
+            serialization: 'json',
+        });
+    } catch (err) {
+        sysLog('ERROR', 'peer.connect() threw synchronously', err);
+        isConnecting = false;
+        return;
+    }
+
+    // Guest timeout = 45 s.  Host timeout = 90 s.
+    // Guest always closes first, so the host can still accept a late open event.
+    const CONN_TIMEOUT_MS = 45000;
 
     const connTimeout = setTimeout(() => {
-        if (!conn.open) {
-            sysLog('ERROR', 'Handshake timed out. Retrying...');
-            isConnecting = false;
-            conn.close();
-            setTimeout(() => connectToHost(), 3000);
+        if (thisAttemptId !== activeConnAttemptId) return;
+        if (conn.open) return;
+
+        sysLog('ERROR', `Handshake timed out (attempt ${hostConnectAttempts + 1})`);
+        isConnecting = false;
+        try { conn.close(); } catch(e) {}
+
+        if (hostConnectAttempts >= MAX_HOST_CONNECT_ATTEMPTS) {
+            updateStatus('Connection failed', 'red');
+            showToast('Could not connect. Please check your network or ask the host to refresh.', 'error');
+            return;
         }
-    }, 15000);
+
+        hostConnectAttempts++;
+
+        if (!relayModeActive) {
+            sysLog('WEBRTC', 'Switching to relay-only mode after ICE timeout');
+            showToast('Switching to relay mode...', 'info');
+            setTimeout(() => initializeWebRTC(true), 500);
+        } else {
+            // Already in relay mode — TURN server may be overloaded, back off
+            const delay = Math.min(3000 + (hostConnectAttempts * 1000), 15000);
+            sysLog('WEBRTC', `Relay timeout — retrying in ${Math.round(delay / 1000)}s`);
+            setTimeout(() => connectToHost(), delay);
+        }
+    }, CONN_TIMEOUT_MS);
 
     conn.on('open', () => {
+        if (thisAttemptId !== activeConnAttemptId) {
+            sysLog('WARN', 'Stale conn opened — discarding');
+            try { conn.close(); } catch(e) {}
+            return;
+        }
         clearTimeout(connTimeout);
         isConnecting = false;
+        hostConnectAttempts = 0;
         sysLog('WEBRTC', 'Data channel established with Host!');
         AppState.hostConnection = conn;
         updateStatus('Connected', 'green');
 
-        // Immediately identify so the Host can send current Room State.
         sendToHost({ type: 'IDENTITY', name: AppState.displayName });
         conn.on('data', (data) => handleIncomingData(data, 'host'));
+
+        // Watch ICE health post-connect; reconnect if it degrades
+        const pc = conn.peerConnection;
+        if (pc) {
+            pc.addEventListener('iceconnectionstatechange', () => {
+                const state = pc.iceConnectionState;
+                sysLog('WEBRTC', `ICE state changed: ${state}`);
+                if ((state === 'failed' || state === 'disconnected') && AppState.hostConnection === conn) {
+                    sysLog('WEBRTC', 'ICE degraded post-connect — scheduling reconnect');
+                    AppState.hostConnection = null;
+                    updateStatus('Reconnecting...', 'yellow');
+                    showToast('Connection interrupted. Reconnecting...', 'info');
+                    if (hostConnectAttempts < MAX_HOST_CONNECT_ATTEMPTS) {
+                        hostConnectAttempts++;
+                        setTimeout(() => connectToHost(), 3000);
+                    }
+                }
+            });
+        }
     });
 
     conn.on('close', () => {
+        if (thisAttemptId !== activeConnAttemptId) return;
+        clearTimeout(connTimeout);
         isConnecting = false;
-        updateStatus('Disconnected', 'red');
-        showToast("Lost connection to host.", "error");
+
+        if (AppState.hostConnection === conn) {
+            AppState.hostConnection = null;
+            updateStatus('Disconnected', 'red');
+            showToast('Lost connection to host. Reconnecting...', 'error');
+            if (hostConnectAttempts < MAX_HOST_CONNECT_ATTEMPTS) {
+                hostConnectAttempts++;
+                setTimeout(() => connectToHost(), 3000);
+            }
+        }
     });
 
     conn.on('error', (err) => {
+        if (thisAttemptId !== activeConnAttemptId) return;
+        clearTimeout(connTimeout);
         isConnecting = false;
-        sysLog('ERROR', 'Handshake failed', err);
+        sysLog('ERROR', 'Conn handshake error', err);
     });
 }
+
+// ─── Data handling ───────────────────────────────────────────
 
 function handleIncomingData(data, sourceId) {
     if (data.type === 'CHAT') {
@@ -188,7 +434,6 @@ function handleIncomingData(data, sourceId) {
             AppState.members.push({ id: sourceId, name: data.name, role: ROLES.MEMBER });
             updateMembersList();
 
-            // Send current playback position and queue ONLY to the joining user.
             const guestConn = AppState.peers.get(sourceId);
             if (guestConn && guestConn.open) {
                 guestConn.send({
@@ -197,18 +442,17 @@ function handleIncomingData(data, sourceId) {
                     queue: AppState.queue,
                     currentIndex: AppState.currentIndex,
                     isShuffled: AppState.isShuffled,
-                    time: (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0,
+                    time:  (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0,
                     state: (ytPlayer && typeof ytPlayer.getPlayerState === 'function') ? ytPlayer.getPlayerState() : -1,
                     members: AppState.members
                 });
             }
-            // Notify others of the new user.
             broadcast({ type: 'MEMBERS_UPDATE', members: AppState.members }, [sourceId]);
         }
         if (data.type === 'COMMAND') processCommandLocally(data.action, data.payload, sourceId);
     } else {
         switch (data.type) {
-            case 'INIT_STATE':
+            case 'INIT_STATE': {
                 sysLog('WEBRTC', 'Room state synchronized');
                 AppState.members = data.members;
                 const meInit = AppState.members.find(m => m.id === AppState.peerId);
@@ -221,7 +465,8 @@ function handleIncomingData(data, sourceId) {
                 renderQueue();
                 if (data.currentVideo) loadVideoInternal(data.currentVideo, data.time, data.state);
                 break;
-            case 'MEMBERS_UPDATE':
+            }
+            case 'MEMBERS_UPDATE': {
                 AppState.members = data.members;
                 const meUpdate = AppState.members.find(m => m.id === AppState.peerId);
                 if (meUpdate && meUpdate.role !== AppState.myRole) {
@@ -231,6 +476,7 @@ function handleIncomingData(data, sourceId) {
                 }
                 updateMembersList();
                 break;
+            }
             case 'SYNC_QUEUE':
                 AppState.queue = data.queue;
                 AppState.currentIndex = data.currentIndex;
@@ -244,24 +490,30 @@ function handleIncomingData(data, sourceId) {
                 enforceHostState(data);
                 break;
             case 'KICKED':
-                showToast("Removed from room.", 'error');
+                showToast('Removed from room.', 'error');
                 setTimeout(() => { window.location.hash = ''; window.location.reload(); }, 2000);
                 break;
         }
     }
 }
 
+// ─── Broadcast helpers ───────────────────────────────────────
+
 function broadcast(data, excludeIds = []) {
     if (!AppState.isHost) return;
     for (const [peerId, conn] of AppState.peers.entries()) {
         if (!excludeIds.includes(peerId) && conn.open) {
-            try { conn.send(data); } catch(e) {}
+            try { conn.send(data); } catch(e) {
+                sysLog('WARN', `Failed to send to ${peerId}`, e);
+            }
         }
     }
 }
 
 function sendToHost(data) {
     if (AppState.hostConnection && AppState.hostConnection.open) {
-        try { AppState.hostConnection.send(data); } catch(e) {}
+        try { AppState.hostConnection.send(data); } catch(e) {
+            sysLog('WARN', 'Failed to send to host', e);
+        }
     }
 }
