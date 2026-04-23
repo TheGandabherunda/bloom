@@ -678,7 +678,9 @@ function showSearchSkeletons() {
     if (ui.secSearchPlaceholder) ui.secSearchPlaceholder.classList.add('hidden');
 
     ui.searchOverlay.classList.remove('hidden');
-    if (!isPlayerCollapsed) togglePlayerExpand();
+
+    // Removed logic that forcefully collapses player here! Let the ambient stay!
+
     document.querySelectorAll('.filter-chip').forEach(c => { c.classList.remove('bg-slate-700', 'text-white'); c.classList.add('bg-slate-800/80', 'text-slate-400'); });
     const chips = document.querySelectorAll('.filter-chip');
     if(chips.length > 0) { chips[0].classList.remove('bg-slate-800/80', 'text-slate-400'); chips[0].classList.add('bg-slate-700', 'text-white'); }
@@ -726,7 +728,6 @@ async function performSearch(force = false) {
 
     showSearchSkeletons();
     ui.searchOverlay.classList.remove('hidden'); ui.loaderSearch.classList.remove('hidden');
-    if (!isPlayerCollapsed) togglePlayerExpand();
 
     try {
         console.log(`\n[Search] 🚀 Searching for: "${rawQuery}"`);
@@ -815,7 +816,7 @@ ui.searchInput.addEventListener('focus', (e) => {
     const val = e.target.value.trim();
     if (val && AppState.lastSearchResults.length > 0) {
         ui.searchOverlay.classList.remove('hidden');
-        if (!isPlayerCollapsed) togglePlayerExpand();
+        // Let the player stay expanded!
     }
 });
 
@@ -853,6 +854,14 @@ window.handleSearchResultClick = async (index, playNow) => {
     if (AppState.myRole === ROLES.MEMBER) return showToast('Only Admins can manage the queue.', 'error');
     const itemObj = AppState.lastSearchResults[index];
     if (!itemObj) return showToast('Result not found. Please search again.', 'error');
+
+    // Automatically close search and blur input if they click Play Now (for better UX)
+    if (playNow) {
+        ui.searchOverlay.classList.add('hidden');
+        ui.searchInput.blur();
+        isSearchFocused = false;
+    }
+
     showToast(`Loading ${itemObj.title.substring(0, 20)}...`, 'info');
     try {
         if (itemObj.type === 'playlist') {
