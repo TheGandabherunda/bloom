@@ -322,7 +322,9 @@ async function proxyScrapeRace(url, timeoutMs = 9000, globalSignal) {
     const abortHandler = () => controller.abort();
     if (globalSignal) globalSignal.addEventListener('abort', abortHandler, { once: true });
 
-    const proxies = shuffleArray([...PROXY_LIST]);
+    // Keep allorigins first (most reliable); only shuffle the fallbacks
+    const [first, ...rest] = PROXY_LIST;
+    const proxies = [first, ...shuffleArray(rest)];
 
     const promises = proxies.map(async (makeUrl) => {
         const proxyUrl = makeUrl(url);
@@ -673,7 +675,6 @@ function sortResultsByRelevance(items, query) {
 }
 
 function showSearchSkeletons() {
-    if (ui.gridVideos.querySelector('.animate-pulse')) return;
     if (ui.secSearchPlaceholder) ui.secSearchPlaceholder.classList.add('hidden');
 
     ui.searchOverlay.classList.remove('hidden');
@@ -736,6 +737,7 @@ async function performSearch(force = false) {
             searchCategory(rawQuery, 'playlist', currentSignal)
         ]);
 
+        // Re-check after await — a new search may have started while we were waiting
         if (searchId !== currentSearchId || currentSignal.aborted) return;
 
         // Strict post-filter
