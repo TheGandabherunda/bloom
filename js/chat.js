@@ -135,11 +135,14 @@ ui.chatForm.addEventListener('submit', (e) => {
     if (AppState.isHost) broadcast(msgData); else sendToHost(msgData);
 });
 
-if(ui.btnCopyLink) {
-    ui.btnCopyLink.addEventListener('click', () => {
-        navigator.clipboard.writeText(window.location.href).then(() => {
-            const originalText = ui.btnCopyLink.innerHTML; ui.btnCopyLink.innerHTML = `<span class="material-symbols-rounded text-[16px]">check</span> <span class="hidden sm:inline">Copied!</span>`;
-            setTimeout(() => ui.btnCopyLink.innerHTML = originalText, 2000);
-        });
+// Dynamic Copy Link handling for both Chat and Member tabs
+const handleCopyLink = (btn) => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<span class="material-symbols-rounded text-[16px]">check</span> <span class="hidden xl:inline">Copied!</span>`;
+        setTimeout(() => btn.innerHTML = originalText, 2000);
     });
-}
+};
+
+if(ui.btnCopyLink) { ui.btnCopyLink.addEventListener('click', () => handleCopyLink(ui.btnCopyLink)); }
+if(ui.btnCopyLink2) { ui.btnCopyLink2.addEventListener('click', () => handleCopyLink(ui.btnCopyLink2)); }

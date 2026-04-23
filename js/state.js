@@ -194,6 +194,7 @@ var ui = {
     btnCloseGif: document.getElementById('btn-close-gif'),
 
     btnCopyLink: document.getElementById('btn-copy-link'),
+    btnCopyLink2: document.getElementById('btn-copy-link-2'),
 };
 
 // --- Utilities ---

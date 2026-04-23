@@ -386,12 +386,6 @@
 
     <!-- Sidebar (Chat/Peers - Overlays on mobile tab via CSS) -->
     <aside id="main-sidebar" class="absolute inset-0 lg:static lg:w-96 flex-col justify-end lg:justify-start z-50 pointer-events-auto bg-black/95 lg:bg-slate-900/40 backdrop-blur-3xl lg:border-l border-slate-700/50 shadow-xl max-lg:hidden flex transition-all duration-300">
-        <div class="pointer-events-auto mt-auto lg:mt-0 shrink-0 p-2 lg:p-3 border-b border-slate-700/50 bg-black/50 lg:bg-transparent z-[100] w-full">
-            <button id="btn-copy-link" class="w-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs lg:text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm" title="Copy Room Link">
-                <span class="material-symbols-rounded text-[18px]">link</span>
-                <span>Copy Room Link</span>
-            </button>
-        </div>
 
         <div id="aside-content" class="flex-1 relative overflow-hidden pointer-events-auto bg-transparent flex flex-col min-h-0">
             <div id="tab-chat" class="tab-content flex flex-col w-full h-full p-4 bg-transparent relative min-h-0">
@@ -399,15 +393,20 @@
                 <!-- Chat Header -->
                 <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700/50 shrink-0">
                     <div class="flex items-center gap-2">
-                        <!-- Old mobile close button safely hidden now -->
                         <button id="btn-close-mobile-chat" class="hidden text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-full p-1 border border-slate-700 transition-colors">
                             <span class="material-symbols-rounded text-[16px]">close</span>
                         </button>
                         <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Chat</h3>
                     </div>
-                    <button id="btn-show-peers" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 rounded-full p-2 border border-slate-700 shadow flex items-center justify-center" title="View Members">
-                        <span class="material-symbols-rounded text-[24px]">groups</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-copy-link" class="bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center justify-center gap-1.5 shadow-sm" title="Copy Room Link">
+                            <span class="material-symbols-rounded text-[16px]">link</span>
+                            <span class="hidden xl:inline">Copy Link</span>
+                        </button>
+                        <button id="btn-show-peers" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 rounded-full p-1.5 border border-slate-700 shadow flex items-center justify-center" title="View Members">
+                            <span class="material-symbols-rounded text-[20px]">groups</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="chat-messages" class="flex-1 overflow-y-auto flex flex-col gap-1.5 mb-2 pr-2"></div>
@@ -448,13 +447,17 @@
 
             <div id="tab-peers" class="tab-content hidden flex-col w-full h-full p-4 bg-transparent min-h-0">
                 <div class="flex items-center gap-3 mb-3 border-b border-slate-700/50 pb-2 shrink-0">
-                    <button id="btn-back-chat" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 rounded-full p-1.5 border border-slate-700 shadow flex items-center justify-center">
+                    <button id="btn-back-chat" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 rounded-full p-1.5 border border-slate-700 shadow flex items-center justify-center" title="Back to Chat">
                         <span class="material-symbols-rounded text-[20px]">arrow_back</span>
                     </button>
-                    <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex-1 flex justify-between items-center">
+                    <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex-1 flex items-center gap-2">
                         <span>Members</span>
                         <span id="peer-count" class="bg-slate-700 text-slate-300 px-1.5 text-xs rounded-full">1</span>
                     </h3>
+                    <button id="btn-copy-link-2" class="bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center justify-center gap-1.5 shadow-sm" title="Copy Room Link">
+                        <span class="material-symbols-rounded text-[16px]">link</span>
+                        <span class="hidden xl:inline">Copy Link</span>
+                    </button>
                 </div>
                 <ul id="members-list" class="space-y-2 flex-1 overflow-y-auto pr-2"></ul>
             </div>
