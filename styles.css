@@ -345,9 +345,19 @@ input[type=range]::-webkit-slider-thumb {
         display: flex !important;
     }
 
-    /* Pad search overlay so items don't hide behind mini player */
+    /* Fix search overlay on mobile: make it fixed so it anchors to viewport edges exactly */
+    #search-overlay {
+        position: fixed !important;
+        top: var(--header-height, 72px) !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 124px !important; /* 60px bottom nav + 64px mini-player */
+        z-index: 160 !important;
+    }
+
+    /* Pad search overlay inner scroll so last items aren't clipped */
     #search-overlay .overflow-y-auto {
-        padding-bottom: 140px !important;
+        padding-bottom: 16px !important;
     }
 
     /* Ensure the main grid also has padding so the last item isn't covered */
@@ -415,7 +425,7 @@ input[type=range]::-webkit-slider-thumb {
         top: var(--header-height, 72px) !important; /* Starts exactly below Top App Bar */
         bottom: 60px !important; /* Ends exactly above Bottom Nav */
         height: auto !important;
-        z-index: 150 !important;
+        z-index: 165 !important; /* Above search overlay (160) so player sits on top */
         background-color: transparent !important; /* Ambient layer shines completely through! */
         border-top: none !important;
     }
@@ -498,6 +508,86 @@ body.fullscreen-idle header {
 /* Enforce smooth layout transitions for the hide/show and space collapsing */
 header, #queue-panel, #player-controls {
     transition: margin 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* =========================================
+   PLAYER OVER SEARCH RESULTS (DESKTOP)
+   =========================================
+   On desktop, #video-wrapper is in normal flow inside <main>.
+   #search-overlay is absolute with z-[160].
+   When the player is expanded we raise video-wrapper above it
+   so the player overlays the search panel rather than hiding behind it.
+   The search overlay stays open — the player just covers it visually.
+   ========================================= */
+@media (min-width: 1024px) {
+    body.player-expanded #video-wrapper {
+        position: relative;
+        z-index: 165 !important;
+    }
+}
+
+/* =========================================
+   MOBILE FULLSCREEN SPECIFIC OVERRIDES
+   ========================================= */
+
+/* Hide collapse button when in fullscreen (mobile) - hide button but keep slot for centering */
+body.is-fullscreen #btn-collapse-mobile {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Auto-hide all UI on mobile fullscreen idle */
+@media (max-width: 1024px) {
+    body.is-fullscreen.fullscreen-idle #mobile-bottom-nav {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    body.is-fullscreen.fullscreen-idle #mobile-player-topbar {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    body.is-fullscreen.fullscreen-idle header {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        margin-top: 0 !important;
+    }
+    body.is-fullscreen.fullscreen-idle #player-controls {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* Exit fullscreen button is ALWAYS visible and tappable — never hidden by idle */
+    body.is-fullscreen #btn-exit-fullscreen-mobile {
+        display: flex !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+    body.is-fullscreen.fullscreen-idle #btn-exit-fullscreen-mobile {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    #mobile-bottom-nav, #mobile-player-topbar {
+        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+}
+
+/* =========================================
+   MOBILE SEARCH TILE TAP OVERLAY
+   ========================================= */
+
+@media (max-width: 1024px) {
+    /* Disable hover-based reveal, use tap class instead */
+    .search-tile-wrap .tile-action-overlay {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+    }
+    .search-tile-wrap.mobile-tile-active .tile-action-overlay {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
 }
 
 /* =========================================

@@ -117,6 +117,7 @@ function setupProgressLoop() {
 // ---------------------------------------------------------
 ui.btnPlayPause.addEventListener('click', () => executeCommand('TOGGLE_PLAY'));
 ui.mediaPlaybackArea.addEventListener('click', () => {
+    if (isExpanding) return; // suppress phantom play/pause overlay during expand animation
     if (isPlayerCollapsed) togglePlayerExpand();
     else executeCommand('TOGGLE_PLAY');
 });
@@ -164,13 +165,18 @@ document.addEventListener('fullscreenchange', () => {
     const icon = ui.btnFullscreen.querySelector('.material-symbols-rounded');
     if (document.fullscreenElement) {
         icon.textContent = 'fullscreen_exit';
+        document.body.classList.add('is-fullscreen');
         if (isPlayerCollapsed) {
             isPlayerCollapsed = false;
             ui.videoWrapper.classList.remove('is-collapsed');
             ui.playerToggleIcon.textContent = 'expand_more';
             document.body.classList.add('player-expanded');
         }
-    } else { icon.textContent = 'fullscreen'; }
+    } else {
+        icon.textContent = 'fullscreen';
+        document.body.classList.remove('is-fullscreen');
+        document.body.classList.remove('fullscreen-idle');
+    }
 });
 
 function loadVideoInternal(videoObj, startSeconds = 0, targetState = 1) {

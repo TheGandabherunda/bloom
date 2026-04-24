@@ -222,6 +222,8 @@ function showLyricsPanel() {
     if (AppState.currentVideo && AppState.lastFetchedLyricsId !== AppState.currentVideo.id) fetchAndRenderLyrics();
 }
 
+var isExpanding = false;
+
 function togglePlayerExpand() {
     isPlayerCollapsed = !isPlayerCollapsed;
     if (isPlayerCollapsed) {
@@ -230,6 +232,10 @@ function togglePlayerExpand() {
         document.body.classList.remove('player-expanded');
     }
     else {
+        // Set expanding guard to suppress phantom overlay trigger
+        isExpanding = true;
+        setTimeout(() => { isExpanding = false; }, 400);
+
         ui.videoWrapper.classList.remove('is-collapsed');
         if(ui.playerToggleIcon) ui.playerToggleIcon.textContent = 'expand_more';
         document.body.classList.add('player-expanded');
@@ -282,6 +288,7 @@ document.addEventListener('fullscreenchange', () => {
     const icon = ui.btnFullscreen.querySelector('.material-symbols-rounded');
     if (document.fullscreenElement) {
         icon.textContent = 'fullscreen_exit';
+        document.body.classList.add('is-fullscreen');
         if (isPlayerCollapsed) {
             isPlayerCollapsed = false;
             ui.videoWrapper.classList.remove('is-collapsed');
@@ -293,6 +300,7 @@ document.addEventListener('fullscreenchange', () => {
         resetFullscreenIdle();
     } else {
         icon.textContent = 'fullscreen';
+        document.body.classList.remove('is-fullscreen');
         if (ui.btnToggleFsQueue) ui.btnToggleFsQueue.classList.add('hidden');
         if (ui.queuePanel) ui.queuePanel.style.display = ''; // Reset display logic when exiting
 
@@ -382,3 +390,81 @@ function startSyncLoop() {
 }
 
 window.addEventListener('DOMContentLoaded', initFlow);
+
+// ---------------------------------------------------------
+// MOBILE: SWIPE DOWN TO COLLAPSE PLAYER
+// ---------------------------------------------------------
+(function setupSwipeToCollapse() {
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    ui.videoWrapper.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+        touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    ui.videoWrapper.addEventListener('touchend', (e) => {
+        if (document.fullscreenElement) return; // no swipe collapse in fullscreen
+        if (isPlayerCollapsed) return;          // already collapsed
+
+        const deltaY = e.changedTouches[0].clientY - touchStartY;
+        const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartX);
+
+        // Swipe down: at least 60px vertically, and more vertical than horizontal
+        if (deltaY > 60 && deltaY > deltaX * 1.5) {
+            togglePlayerExpand();
+        }
+    }, { passive: true });
+})();
+
+// ---------------------------------------------------------
+// MOBILE: FULLSCREEN BUTTON
+// ---------------------------------------------------------
+(function setupMobileFullscreen() {
+    const btn = document.getElementById('btn-fullscreen-mobile');
+    const icon = document.getElementById('icon-fullscreen-mobile');
+    const exitBtn = document.getElementById('btn-exit-fullscreen-mobile');
+    if (!btn) return;
+
+    function enterFullscreen() {
+        ui.videoWrapper.requestFullscreen().catch(err => console.error(err));
+    }
+    function exitFullscreen() {
+        document.exitFullscreen();
+    }
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!document.fullscreenElement) enterFullscreen(); else exitFullscreen();
+    });
+
+    if (exitBtn) {
+        exitBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exitFullscreen();
+        });
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+            icon.textContent = 'fullscreen_exit';
+            if (exitBtn) exitBtn.classList.remove('hidden');
+            document.body.classList.add('is-fullscreen');
+            // Auto-expand player if collapsed
+            if (isPlayerCollapsed) {
+                isPlayerCollapsed = false;
+                ui.videoWrapper.classList.remove('is-collapsed');
+                document.body.classList.add('player-expanded');
+                adjustMobileLayout();
+            }
+            // Start idle timer for mobile fullscreen
+            resetFullscreenIdle();
+        } else {
+            icon.textContent = 'fullscreen';
+            if (exitBtn) exitBtn.classList.add('hidden');
+            document.body.classList.remove('is-fullscreen');
+            document.body.classList.remove('fullscreen-idle');
+            clearTimeout(fullscreenIdleTimeout);
+        }
+    });
+})();

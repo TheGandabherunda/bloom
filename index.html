@@ -173,22 +173,34 @@
                 <div id="video-container" class="w-full bg-black/60 relative group pointer-events-auto border-b border-slate-700/50 flex flex-col lg:flex-row">
 
                     <!-- Mobile Expanded Player Top Bar -->
-                    <div id="mobile-player-topbar" class="absolute top-0 left-0 right-0 p-4 z-[60] flex items-center justify-between lg:hidden hidden">
-                        <button id="btn-collapse-mobile" class="text-white p-2 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-slate-700/50 shadow-lg cursor-pointer">
-                            <span class="material-symbols-rounded text-[28px]">keyboard_arrow_down</span>
-                        </button>
-
-                        <div class="bg-black/50 backdrop-blur-md rounded-full p-1 flex items-center border border-slate-700/50 shadow-lg">
-                            <button id="btn-mobile-mode-video" class="px-5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-700 text-white transition-all flex items-center justify-center">
-                                Video
-                            </button>
-                            <button id="btn-mobile-mode-audio" class="px-5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-transparent text-slate-400 transition-all flex items-center justify-center">
-                                Song
+                    <div id="mobile-player-topbar" class="absolute top-0 left-0 right-0 p-4 z-[60] flex items-center lg:hidden hidden">
+                        <!-- Left slot: collapse button (hidden in fullscreen via CSS) -->
+                        <div class="w-10 flex items-center justify-start shrink-0">
+                            <button id="btn-collapse-mobile" class="text-white p-2 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-slate-700/50 shadow-lg cursor-pointer">
+                                <span class="material-symbols-rounded text-[28px]">keyboard_arrow_down</span>
                             </button>
                         </div>
 
-                        <div class="w-10"></div> <!-- Spacer for flex-between alignment -->
+                        <!-- Center slot: always truly centered -->
+                        <div class="flex-1 flex items-center justify-center">
+                            <div class="bg-black/50 backdrop-blur-md rounded-full p-1 flex items-center border border-slate-700/50 shadow-lg">
+                                <button id="btn-mobile-mode-video" class="px-5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-700 text-white transition-all flex items-center justify-center">
+                                    Video
+                                </button>
+                                <button id="btn-mobile-mode-audio" class="px-5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-transparent text-slate-400 transition-all flex items-center justify-center">
+                                    Song
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right slot: spacer to balance layout -->
+                        <div class="w-10 shrink-0"></div>
                     </div>
+
+                    <!-- Mobile Fullscreen Exit Button (always visible in fullscreen, above idle overlay) -->
+                    <button id="btn-exit-fullscreen-mobile" class="hidden absolute top-4 right-4 z-[70] text-white p-2 bg-black/60 rounded-full backdrop-blur-md border border-slate-700/50 shadow-lg lg:hidden">
+                        <span class="material-symbols-rounded text-[24px]">fullscreen_exit</span>
+                    </button>
 
                     <!-- Media Playback Area -->
                     <div id="media-playback-area" class="flex-1 relative min-w-0 cursor-pointer" title="Click to Play/Pause">
@@ -353,6 +365,13 @@
                                 </div>
                                 <span class="text-[10px] lg:text-xs text-slate-500 hidden lg:inline">Admin control</span>
                             </div>
+                        </div>
+
+                        <!-- UTILS BLOCK: Mobile Fullscreen [Order 3 Mobile] -->
+                        <div class="flex lg:hidden items-center justify-end gap-1 flex-shrink-0 w-auto order-3" onclick="event.stopPropagation()">
+                            <button id="btn-fullscreen-mobile" class="text-slate-400 hover:text-white transition-colors p-2 flex items-center justify-center">
+                                <span id="icon-fullscreen-mobile" class="material-symbols-rounded text-[22px]">fullscreen</span>
+                            </button>
                         </div>
 
                         <!-- UTILS BLOCK: Desktop Right Only [Order 3] -->

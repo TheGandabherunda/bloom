@@ -611,14 +611,14 @@ function renderSearchGrids(filter) {
         const durationStr = item.duration ? formatTime(item.duration) : (item.type === 'playlist' ? 'Playlist' : '');
         const badge = durationStr ? `<div class="absolute bottom-1 right-1 z-20 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded shadow">${durationStr}</div>` : '';
         return `
-        <div class="flex flex-col gap-2 group relative">
+        <div class="flex flex-col gap-2 group search-tile-wrap relative" ontouchstart="handleTileTap(event, this)" onclick="">
             <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-800 border border-slate-700/50 shadow-md">
                 <div class="absolute inset-0 z-0 flex items-center justify-center p-3 text-center" style="background: linear-gradient(135deg, ${pair[0]}, ${pair[1]});">
                     <span class="text-white font-bold text-[13px] md:text-sm drop-shadow-md leading-tight line-clamp-3">${item.title.replace(/"/g, '&quot;')}</span>
                 </div>
                 ${thumb ? `<img src="${thumb}" onerror="this.style.display='none';" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 z-10 bg-slate-800">` : ''}
                 ${badge}
-                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm z-30">
+                <div class="tile-action-overlay absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm z-30">
                     <button class="bg-white hover:bg-slate-200 text-slate-900 p-2 rounded-full transform hover:scale-110 transition-all shadow-lg flex items-center justify-center" onclick='handleSearchResultClick(${item.originalIndex}, true)' title="Play Now">
                         <span class="material-symbols-rounded icon-fill text-[24px]">play_arrow</span>
                     </button>
@@ -790,6 +790,45 @@ async function performSearch(force = false) {
     }
 }
 
+// ---------------------------------------------------------
+// MOBILE TILE TAP HANDLER
+// ---------------------------------------------------------
+window.handleTileTap = function(e, tileEl) {
+    // Only intercept on touch (mobile). On desktop hover handles it.
+    if (window.matchMedia('(min-width: 1025px)').matches) return;
+
+    // If the tap landed directly on a Play/Add button inside an already-active tile,
+    // let the event pass through so the button click fires normally.
+    if (tileEl.classList.contains('mobile-tile-active') && e.target.closest('button')) {
+        return;
+    }
+
+    const isActive = tileEl.classList.contains('mobile-tile-active');
+
+    // Always dismiss every other active tile first
+    document.querySelectorAll('.search-tile-wrap.mobile-tile-active').forEach(el => {
+        if (el !== tileEl) el.classList.remove('mobile-tile-active');
+    });
+
+    if (isActive) {
+        // Tapped tile body while already active — dismiss
+        tileEl.classList.remove('mobile-tile-active');
+    } else {
+        // First tap on an inactive tile — reveal the overlay, swallow this touch
+        // so it doesn't immediately trigger a click on whatever is underneath.
+        e.preventDefault();
+        tileEl.classList.add('mobile-tile-active');
+    }
+};
+
+// Dismiss all active tiles when the user taps anywhere outside a search tile
+document.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.search-tile-wrap')) {
+        document.querySelectorAll('.search-tile-wrap.mobile-tile-active')
+            .forEach(el => el.classList.remove('mobile-tile-active'));
+    }
+}, { passive: true });
+
 var debouncedSearch = debounce(() => performSearch(false), 1000);
 
 ui.searchForm.addEventListener('submit', (e) => { e.preventDefault(); debouncedSearch.cancel(); performSearch(true); });
@@ -812,26 +851,16 @@ let isSearchFocused = false;
 
 ui.searchInput.addEventListener('focus', (e) => {
     isSearchFocused = true;
-
     const val = e.target.value.trim();
     if (val && AppState.lastSearchResults.length > 0) {
         ui.searchOverlay.classList.remove('hidden');
-        // Let the player stay expanded!
     }
 });
 
 ui.searchInput.addEventListener('blur', () => { isSearchFocused = false; });
 
-// Close search overlay if clicking completely outside the search bar and overlay
-document.addEventListener('mousedown', (e) => {
-    if (!ui.searchOverlay.classList.contains('hidden') &&
-        !ui.searchForm.contains(e.target) &&
-        !ui.searchOverlay.contains(e.target)) {
-        ui.searchOverlay.classList.add('hidden');
-        isSearchFocused = false;
-        ui.searchInput.blur();
-    }
-});
+// Search results stay visible until explicitly closed via X or clear button.
+// Removed the outside-click dismiss so results persist when user taps elsewhere.
 
 ui.btnClearSearch.addEventListener('click', () => {
     ui.searchInput.value = ''; ui.btnClearSearch.classList.add('hidden');
@@ -855,13 +884,6 @@ window.handleSearchResultClick = async (index, playNow) => {
     const itemObj = AppState.lastSearchResults[index];
     if (!itemObj) return showToast('Result not found. Please search again.', 'error');
 
-    // Automatically close search and blur input if they click Play Now (for better UX)
-    if (playNow) {
-        ui.searchOverlay.classList.add('hidden');
-        ui.searchInput.blur();
-        isSearchFocused = false;
-    }
-
     showToast(`Loading ${itemObj.title.substring(0, 20)}...`, 'info');
     try {
         if (itemObj.type === 'playlist') {
@@ -874,8 +896,7 @@ window.handleSearchResultClick = async (index, playNow) => {
             if (playNow) executeCommand('PLAY_DIRECT', { video: mappedItem });
             else executeCommand('ADD_TO_QUEUE', { items: [mappedItem], playNow: false });
         }
-        if (playNow && !itemObj.isMusic && isPlayerCollapsed) togglePlayerExpand();
-        else if (!playNow) showToast("Added to queue", "success");
+        if (!playNow) showToast("Added to queue", "success");
     } catch (err) { showToast(`Error: ${err.message}`, 'error'); }
 };
 
