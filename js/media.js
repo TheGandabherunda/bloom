@@ -88,6 +88,11 @@ function setupProgressLoop() {
         if (total > 0 && document.activeElement !== ui.progressBar) {
             const percent = (current / total) * 100;
             ui.progressBar.value = percent; ui.progressBar.style.setProperty('--range-progress', `${percent}%`);
+
+            // Sync the collapsed progress bar explicitly when present
+            if (ui.collapsedProgressFill) {
+                ui.collapsedProgressFill.style.width = `${percent}%`;
+            }
         }
 
         if (isLyricsMode && AppState.currentLyrics && AppState.currentLyrics.length > 0) {

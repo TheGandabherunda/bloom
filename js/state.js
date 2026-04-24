@@ -122,6 +122,8 @@ var ui = {
     playerToggleIcon: document.getElementById('player-toggle-icon'),
     playerControls: document.getElementById('player-controls'),
 
+    collapsedProgress: document.getElementById('mobile-collapsed-progress'),
+    collapsedProgressFill: document.getElementById('mobile-collapsed-progress-fill'),
     progressBar: document.getElementById('progress-bar'),
     timeCurrent: document.getElementById('time-current'),
     timeTotal: document.getElementById('time-total'),

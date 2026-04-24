@@ -59,18 +59,18 @@
 
         <div class="space-y-5">
             <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Display Name</label>
-                <input type="text" id="setup-name" autocomplete="off" class="w-full h-[52px] bg-black border border-slate-700 rounded-xl px-4 text-lg sm:text-base text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors shadow-inner" placeholder="e.g., Alice">
+                <label class="block text-sm font-medium text-slate-300 mb-1.5 ml-2">Display Name</label>
+                <input type="text" id="setup-name" autocomplete="off" class="w-full h-[48px] bg-black border border-slate-700 rounded-full px-6 text-lg sm:text-base text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors shadow-inner" placeholder="e.g., Alice">
             </div>
 
             <div id="host-setup-fields" class="hidden space-y-5">
                 <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Room Name (Optional)</label>
-                    <input type="text" id="setup-room" autocomplete="off" class="w-full h-[52px] bg-black border border-slate-700 rounded-xl px-4 text-lg sm:text-base text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors shadow-inner" placeholder="e.g., movie-night">
+                    <label class="block text-sm font-medium text-slate-300 mb-1.5 ml-2">Room Name (Optional)</label>
+                    <input type="text" id="setup-room" autocomplete="off" class="w-full h-[48px] bg-black border border-slate-700 rounded-full px-6 text-lg sm:text-base text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors shadow-inner" placeholder="e.g., movie-night">
                 </div>
             </div>
 
-            <button id="setup-btn" class="w-full bg-pink-600 hover:bg-pink-500 text-slate-900 font-bold rounded-xl h-[52px] mt-6 transition-colors flex items-center justify-center text-lg shadow-lg">
+            <button id="setup-btn" class="w-full bg-pink-600 hover:bg-pink-500 text-slate-900 font-bold rounded-full h-[48px] mt-6 transition-colors flex items-center justify-center text-lg shadow-lg">
                 Continue
             </button>
         </div>
@@ -312,7 +312,12 @@
                 </div>
 
                 <!-- Custom Player Controls -->
-                <div id="player-controls" class="w-full bg-slate-900/90 lg:bg-slate-900/80 backdrop-blur-2xl border-t border-slate-700/50 p-2 lg:p-3 flex flex-col z-30 pointer-events-auto cursor-pointer rounded-none transition-all duration-300">
+                <div id="player-controls" class="w-full bg-slate-900/90 lg:bg-slate-900/80 backdrop-blur-2xl border-t border-slate-700/50 p-2 lg:p-3 flex flex-col z-30 pointer-events-auto cursor-pointer rounded-none transition-all duration-300 relative">
+
+                    <!-- Minimal Collapsed Progress Bar (Mobile Only) -->
+                    <div id="mobile-collapsed-progress" class="absolute top-0 left-0 right-0 h-[2px] bg-white/10 hidden z-50">
+                        <div id="mobile-collapsed-progress-fill" class="h-full bg-white transition-all duration-200" style="width: 0%; box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
+                    </div>
 
                     <!-- Progress Bar (Hidden automatically via CSS on mobile collapse) -->
                     <div id="mobile-progress-container" class="flex items-center gap-3 lg:gap-4 w-full px-2 cursor-auto" onclick="event.stopPropagation()">
