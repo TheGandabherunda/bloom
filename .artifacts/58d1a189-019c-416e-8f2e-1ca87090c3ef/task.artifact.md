@@ -1,0 +1,6 @@
+- [ ] Implement robust P2P initialization in `OrbitContext.jsx`
+    - [ ] Add `useRef` to track initialization state
+    - [ ] Manage Helia lifecycle explicitly
+    - [ ] Implement cleanup function
+- [ ] Refine `Layout.jsx` interaction with P2P initialization
+- [ ] Verify fix by checking logs and UI status
