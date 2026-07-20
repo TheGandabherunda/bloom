@@ -49,7 +49,7 @@ const RoomSetup = ({ config, onComplete }) => {
   return (
     <div className="fixed inset-0 bg-black z-[200] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 bloom-enter-wrap">
-        <img src="/assets/Bloom.svg" className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
+        <img src="./assets/Bloom.svg" className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
       </div>
 
       <div className="bg-black border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md mx-4 transform transition-all pointer-events-auto relative z-10">
