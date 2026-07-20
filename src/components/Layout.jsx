@@ -57,7 +57,7 @@ const Layout = ({ config }) => {
 
 
   return (
-    <div className={`h-screen w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
+    <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
       {status !== 'connected' && (
         <AppInitSkeleton status={status} />
       )}
@@ -79,7 +79,7 @@ const Layout = ({ config }) => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full pb-[60px] lg:pb-0 z-10">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full pb-[137px] lg:pb-0 z-10">
         <main className={`w-full h-full flex-1 flex flex-col bg-transparent min-w-0 relative overflow-hidden ${activeMobileView !== 'home' ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
           <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
