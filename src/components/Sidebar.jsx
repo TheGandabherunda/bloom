@@ -5,7 +5,7 @@ import PeersList from './PeersList';
 
 const Sidebar = ({ activeTab = 'queue', setActiveTab, className = '' }) => {
   return (
-    <aside className={`w-full lg:w-[400px] flex flex-col bg-black/30 backdrop-blur-3xl border-l border-white/10 shadow-2xl relative z-20 ${className}`}>
+    <aside className={`w-full h-full lg:w-[400px] flex flex-col bg-black/30 backdrop-blur-3xl border-l border-white/10 shadow-2xl relative z-20 ${className}`}>
       <div className="hidden lg:flex items-center gap-1 p-3 border-b border-white/[0.06] shrink-0">
         <button
           onClick={() => setActiveTab('queue')}
