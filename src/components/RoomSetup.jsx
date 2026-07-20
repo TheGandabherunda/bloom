@@ -47,7 +47,7 @@ const RoomSetup = ({ config, onComplete }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex flex-col lg:flex-row items-end lg:items-center justify-center overflow-hidden pb-4 lg:pb-0">
+    <div className="fixed inset-0 bg-black z-[200] flex flex-col justify-end items-center lg:justify-center overflow-hidden pb-4 lg:pb-0">
       
       {/* Mobile Background and Top Title */}
       <div className="lg:hidden absolute inset-0 flex items-center justify-center pointer-events-none z-0 bloom-enter-wrap">
