@@ -1,13 +1,6 @@
 // The backend proxy now handles all high-res streams natively via Jiosaavn CDN.
 // External monochrome mirrors are permanently stripped.
 
-export const findBestMirror = async () => {
-  return "proxy"; 
-};
-
-export const getApiBase = () => "proxy";
-export const getMirrorStatus = () => ({ "proxy": "healthy" });
-
 const fetchJSONP = (url) => new Promise((resolve, reject) => {
   const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
   window[callbackName] = (data) => {
@@ -25,25 +18,34 @@ const fetchJSONP = (url) => new Promise((resolve, reject) => {
   document.body.appendChild(script);
 });
 
+export const findBestMirror = async () => {
+  return "proxy"; 
+};
+
+export const getApiBase = () => "proxy";
+export const getMirrorStatus = () => ({ "proxy": "healthy" });
+
 export const searchTracks = async (query) => {
   try {
     const q = query.replace(/\baudio\b/ig, '').trim();
-    const url = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}`;
+    // iTunes Search API is robust, fast, and supports JSONP properly without nosniff headers blocking it.
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&country=in&limit=20`;
     
     const data = await fetchJSONP(url);
     if (!data.results || data.results.length === 0) return [];
     
     return data.results.map(song => {
-      const decode = (str) => (str || '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-      const primaryArtists = song.more_info?.artistMap?.primary_artists?.map(a => a.name).join(', ') || 'Unknown Artist';
+      // iTunes provides a 100x100 image, we replace it with 600x600 for high quality
+      const highResImage = (song.artworkUrl100 || '').replace('100x100bb', '600x600bb');
       return {
-        id: song.id,
-        title: decode(song.title),
-        author: primaryArtists,
-        thumbnail: (song.image || '').replace('150x150', '500x500'),
-        duration: parseInt(song.more_info?.duration || 0) * 1000,
+        id: song.trackId.toString(),
+        title: song.trackName,
+        author: song.artistName,
+        thumbnail: highResImage,
+        duration: parseInt(song.trackTimeMillis || 0),
         isMusic: true,
-        audioQuality: song.more_info?.['320kbps'] === 'true' || song.more_info?.['320kbps'] === true ? 'HD' : 'SD'
+        audioQuality: 'HD',
+        _resolveQuery: `${song.trackName} ${song.artistName} song audio` // Used later for YT audio resolution
       };
     });
   } catch (e) {
@@ -53,29 +55,31 @@ export const searchTracks = async (query) => {
 };
 
 export const getRecommendations = async (track) => {
-  if (!track || !track.id) return [];
+  if (!track || !track.title) return [];
   try {
-    const url = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=reco.getreco&pid=${track.id}`;
+    // iTunes doesn't have a direct recommendation API, but we can search for the artist's top tracks
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(track.author || track.title)}&entity=song&country=in&limit=15`;
     const data = await fetchJSONP(url);
-    if (!data || data.length === 0) throw new Error('No reco');
+    if (!data.results || data.results.length === 0) throw new Error('No reco');
     
-    return data.map(song => {
-      const decode = (str) => (str || '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-      const primaryArtists = song.more_info?.artistMap?.primary_artists?.map(a => a.name).join(', ') || 'Unknown Artist';
-      return {
-        id: song.id,
-        title: decode(song.title),
-        author: primaryArtists,
-        thumbnail: (song.image || '').replace('150x150', '500x500'),
-        duration: parseInt(song.more_info?.duration || 0) * 1000,
-        isMusic: true,
-        audioQuality: song.more_info?.['320kbps'] === 'true' || song.more_info?.['320kbps'] === true ? 'HD' : 'SD'
-      };
-    });
+    return data.results
+      .filter(song => song.trackId.toString() !== track.id) // Filter out the current track
+      .map(song => {
+        const highResImage = (song.artworkUrl100 || '').replace('100x100bb', '600x600bb');
+        return {
+          id: song.trackId.toString(),
+          title: song.trackName,
+          author: song.artistName,
+          thumbnail: highResImage,
+          duration: parseInt(song.trackTimeMillis || 0),
+          isMusic: true,
+          audioQuality: 'HD',
+          _resolveQuery: `${song.trackName} ${song.artistName} song audio`
+        };
+      });
   } catch (e) {
     console.error('Reco failed:', e);
-    const q = track?.author || track?.title || "popular";
-    return searchTracks(`${q} top songs`);
+    return [];
   }
 };
 

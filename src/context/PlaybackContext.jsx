@@ -83,7 +83,20 @@ export const PlaybackProvider = ({ children }) => {
       
       let videoId = track.id;
       
-      if (!videoId) {
+      if (track._resolveQuery) {
+        console.log(`[Playback] Resolving audio via YouTube for query: ${track._resolveQuery}`);
+        const resolveRes = await fetch(`/api/yt/resolve?q=${encodeURIComponent(track._resolveQuery)}`);
+        if (!resolveRes.ok) {
+          throw new Error('Failed to resolve audio for track');
+        }
+        const resolveData = await resolveRes.json();
+        if (resolveData.videoId) {
+          videoId = resolveData.videoId;
+          console.log(`[Playback] Resolved to Video ID: ${videoId}`);
+        } else {
+          throw new Error('Audio stream not found');
+        }
+      } else if (!videoId) {
         throw new Error('No audio ID found for this track');
       }
 
