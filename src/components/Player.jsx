@@ -174,10 +174,10 @@ const Player = () => {
             style={{ backgroundImage: `url(${currentTrack.thumbnail})` }} 
           />
           
-          {/* Top Right Buttons (Desktop Only for Lyrics unless active, Minimize for all) */}
+          {/* Top Right Buttons (Lyrics and Minimize) */}
           <div className="absolute top-8 right-8 z-20 flex gap-2">
               <button 
-                className={`${showLyrics ? 'flex' : 'hidden lg:flex'} w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full items-center justify-center transition-colors ${showLyrics ? 'text-[var(--color-primary)] bg-white/20' : 'text-white/70 hover:text-white'}`}
+                className={`flex w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full items-center justify-center transition-colors ${showLyrics ? 'text-[var(--color-primary)] bg-white/20' : 'text-white/70 hover:text-white'}`}
                 onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
                 title="Lyrics"
               >
@@ -218,15 +218,6 @@ const Player = () => {
                 className={`w-[80vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
                 alt=""
               />
-              
-              {/* Mobile Lyrics Button on top of cover */}
-              <button 
-                className={`lg:hidden absolute top-4 right-4 z-30 w-10 h-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center transition-colors ${showLyrics ? 'text-[var(--color-primary)] bg-black/60' : 'text-white/70 hover:text-white'}`}
-                onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
-                title="Lyrics"
-              >
-                <span className="material-symbols-rounded text-[20px] leading-none">lyrics</span>
-              </button>
 
               {showPlayAnim && (
                 <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
