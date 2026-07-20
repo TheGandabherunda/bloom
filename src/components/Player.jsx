@@ -152,16 +152,43 @@ const Player = () => {
   };
 
   const [touchStartY, setTouchStartY] = useState(0);
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const maxDragRef = useRef(0);
 
   const handleTouchStart = (e) => {
     setTouchStartY(e.touches[0].clientY);
+    setIsDragging(true);
+    maxDragRef.current = 0;
   };
 
-  const handleTouchEnd = (e) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    if (touchEndY - touchStartY > 100) {
-      setIsExpanded(false);
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY;
+    maxDragRef.current = Math.max(maxDragRef.current, Math.abs(deltaY));
+    
+    // Expanded player: allow dragging DOWN
+    if (isExpanded && deltaY > 0) {
+      setDragY(deltaY);
+    } 
+    // Miniplayer: allow dragging UP
+    else if (!isExpanded && deltaY < 0) {
+      setDragY(deltaY);
     }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    if (typeof window === 'undefined') return;
+    const threshold = window.innerHeight * 0.2;
+    
+    if (isExpanded && dragY > threshold) {
+      setIsExpanded(false);
+    } else if (!isExpanded && dragY < -threshold) {
+      setIsExpanded(true);
+    }
+    setDragY(0);
   };
 
   const formatTime = (seconds) => {
@@ -183,7 +210,14 @@ const Player = () => {
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isFullscreen && setShowFsControls(false)}
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          style={{
+            transform: isDragging ? (isExpanded ? `translateY(${dragY}px)` : `translateY(calc(100% + ${dragY}px))`) : undefined,
+            transition: isDragging ? 'none' : undefined,
+            opacity: isDragging ? (isExpanded ? Math.max(0.5, 1 - dragY / (typeof window !== 'undefined' ? window.innerHeight : 800)) : Math.max(0, -dragY / (typeof window !== 'undefined' ? window.innerHeight : 800))) : undefined,
+            pointerEvents: isDragging ? 'auto' : undefined
+          }}
         >
           {/* Background blur */}
           <div 
@@ -325,7 +359,14 @@ const Player = () => {
       {/* Main Player Bar (Collapsed Miniplayer & Desktop Expanded) */}
       <div 
         className={`absolute bottom-[60px] lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 transition-transform duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => {
+          if (maxDragRef.current < 10) {
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
       
       {/* Progress Bar (Top Edge) */}
