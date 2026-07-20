@@ -53,7 +53,7 @@ const TileVisualizer = ({ playerRef, cardColor }) => {
   );
 };
 
-const QueueItem = ({ track, idx, isActive, isPlaying, isLoading, canControl, loadTrack, removeFromQueue, hoveredIdx, setHoveredIdx, playerRef }) => {
+const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canControl, loadTrack, removeFromQueue, hoveredIdx, setHoveredIdx, playerRef }) => {
   const [cardColor, setCardColor] = useState('var(--color-primary)');
   const isAnyHovered = hoveredIdx !== -1;
   const isHovered = hoveredIdx === idx;
@@ -114,7 +114,14 @@ const QueueItem = ({ track, idx, isActive, isPlaying, isLoading, canControl, loa
       )}
     </div>
   );
-};
+}, (prev, next) => {
+  return prev.isActive === next.isActive &&
+         prev.isLoading === next.isLoading &&
+         (!prev.isActive || prev.isPlaying === next.isPlaying) &&
+         prev.canControl === next.canControl &&
+         prev.hoveredIdx === next.hoveredIdx &&
+         prev.track.id === next.track.id;
+});
 
 const Queue = () => {
   const { queue, currentIndex, loadTrack, isPlaying, isLoading, removeFromQueue, playerRef, addToQueue } = usePlayback();

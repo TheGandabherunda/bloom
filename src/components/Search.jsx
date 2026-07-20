@@ -6,7 +6,7 @@ import TrackCard from './TrackCard';
 import { TrackGridSkeleton } from './Skeleton';
 
 const Search = ({ query, onClose }) => {
-  const { loadTrack } = usePlayback();
+  const { loadTrack, addToQueue } = usePlayback();
   const { peerId, peerRoles } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
   const canControl = role === 'owner' || role === 'admin';
@@ -61,7 +61,7 @@ const Search = ({ query, onClose }) => {
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
               {results.map(track => (
                 <div key={track.id} className={!canControl ? 'opacity-50 pointer-events-none' : ''}>
-                  <TrackCard track={track} onClick={() => { if (canControl) { loadTrack(track, -1); onClose(); } }} />
+                  <TrackCard track={track} addToQueue={addToQueue} onClick={() => { if (canControl) { loadTrack(track, -1); onClose(); } }} />
                 </div>
               ))}
             </div>

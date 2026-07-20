@@ -229,6 +229,7 @@ const Layout = ({ config }) => {
 
 const TrendingSection = () => {
   const [items, setItems] = useState([]);
+  const { loadTrack, addToQueue } = usePlayback();
   useEffect(() => {
     const fetch = async () => {
       try {
@@ -241,13 +242,13 @@ const TrendingSection = () => {
     fetch();
   }, []);
   if (items.length === 0) return null;
-  return <HomeSection title="Trending Now" icon="trending_up" items={items} />;
+  return <HomeSection title="Trending Now" icon="trending_up" items={items} onItemClick={(track) => loadTrack(track, -1)} addToQueue={addToQueue} />;
 };
 
 const RecommendationsFeed = ({ track }) => {
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { loadTrack } = usePlayback();
+  const { loadTrack, addToQueue } = usePlayback();
 
   useEffect(() => {
     setLoading(true);
@@ -276,12 +277,12 @@ const RecommendationsFeed = ({ track }) => {
 
   return (
     <div className="space-y-12">
-      <HomeSection title={`Because you like ${track.title}`} icon="music_note" items={recs} onItemClick={loadTrack} />
+      <HomeSection title={`Because you like ${track.title}`} icon="music_note" items={recs} onItemClick={loadTrack} addToQueue={addToQueue} />
     </div>
   );
 };
 
-const HomeSection = ({ title, icon, items, onItemClick }) => (
+const HomeSection = ({ title, icon, items, onItemClick, addToQueue }) => (
   <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
     <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-6 flex items-center gap-2">
       <span className="material-symbols-rounded text-[var(--color-primary)] text-[20px]">{icon}</span>
@@ -289,7 +290,7 @@ const HomeSection = ({ title, icon, items, onItemClick }) => (
     </h3>
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
       {items.map(track => (
-        <TrackCard key={track.id} track={track} onClick={onItemClick ? () => onItemClick(track) : undefined} />
+        <TrackCard key={track.id} track={track} addToQueue={addToQueue} onClick={onItemClick ? () => onItemClick(track) : undefined} />
       ))}
     </div>
   </section>

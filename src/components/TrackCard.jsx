@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { extractPrimaryColor } from '../utils/colorExtractor';
-import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 
-const TrackCard = ({ track, onClick }) => {
+const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
   const [cardColor, setCardColor] = useState('rgb(255, 255, 255)');
   const [hovered, setHovered] = useState(false);
-  const { addToQueue } = usePlayback();
   const { chatDb, peerNames, peerId } = useOrbit();
 
   useEffect(() => {
@@ -106,6 +104,6 @@ const TrackCard = ({ track, onClick }) => {
       </div>
     </div>
   );
-};
+});
 
 export default TrackCard;
