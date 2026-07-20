@@ -5,7 +5,9 @@ const jioSaavnHeaders = {
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9',
   'Referer': 'https://www.jiosaavn.com/',
-  'Origin': 'https://www.jiosaavn.com'
+  'Origin': 'https://www.jiosaavn.com',
+  'X-Forwarded-For': '103.21.124.50',
+  'X-Real-IP': '103.21.124.50'
 };
 
 export const handler = async (event) => {
