@@ -55,7 +55,7 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
   }, [isExpanded, playerRef]);
 
   return (
-    <div className={`absolute left-0 right-0 h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-opacity duration-1000 pointer-events-none ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-[82px]'}`}>
+    <div className={`absolute left-0 right-0 h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-opacity duration-1000 pointer-events-none ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-[180px] lg:bottom-[82px]'}`}>
       {Array.from({ length: 48 }).map((_, i) => (
         <div 
           key={i} 
@@ -198,8 +198,8 @@ const Player = () => {
               )}
           </div>
           
-          {/* Bottom Right Fullscreen Button */}
-          <div className={`absolute right-8 flex justify-end gap-4 z-20 transition-all duration-500 ${isFullscreen ? 'bottom-8' : 'bottom-[100px]'} ${isFullscreen && !showFsControls ? 'opacity-0' : 'opacity-100'}`}>
+          {/* Bottom Right Fullscreen Button (Desktop Only) */}
+          <div className={`hidden lg:flex absolute right-8 justify-end gap-4 z-20 transition-all duration-500 ${isFullscreen ? 'bottom-8' : 'bottom-[100px]'} ${isFullscreen && !showFsControls ? 'opacity-0' : 'opacity-100'}`}>
             <button 
               className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
               onClick={toggleFullscreen}
