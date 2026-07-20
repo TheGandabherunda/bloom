@@ -120,7 +120,7 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
                 className="fixed inset-0 z-40" 
                 onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(false); }} 
               />
-              <div className="absolute right-0 top-full mt-2 bg-[#1a1a1a]/95 backdrop-blur-3xl border border-white/10 rounded-full shadow-2xl z-50 py-1.5 px-2 min-w-[150px] animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute right-0 top-full mt-2 bg-[#1a1a1a]/95 backdrop-blur-3xl border border-white/10 rounded-full shadow-2xl z-50 py-1.5 px-2 min-w-[100px] animate-in fade-in zoom-in-95 duration-200">
                 <button 
                   className="w-full text-left px-3 py-2 text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 active:bg-white/10 rounded-full transition-colors flex items-center justify-center gap-2"
                   onClick={async (e) => {
@@ -136,7 +136,7 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
                   }}
                 >
                   <span className="material-symbols-rounded text-[18px]">playlist_add</span>
-                  Add to queue
+                  Queue
                 </button>
               </div>
             </>
