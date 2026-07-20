@@ -120,12 +120,39 @@ export const getTenorGifs = async (query = 'trending') => {
 
 export const importPlaylist = async (url) => {
   try {
-    const res = await fetch(`/api/yt/playlist?url=${encodeURIComponent(url)}`);
-    if (!res.ok) throw new Error('Failed to import playlist');
-    const tracks = await res.json();
-    return tracks;
+    // JioSaavn Playlist Support (Unlimited songs natively via Vercel API)
+    if (url.includes('jiosaavn.com/')) {
+      const res = await fetch(`https://jiosaavn-api-one-rho.vercel.app/api/playlists?link=${encodeURIComponent(url)}`);
+      if (!res.ok) throw new Error('Failed to fetch JioSaavn playlist');
+      const data = await res.json();
+      if (!data.success || !data.data || !data.data.songs) return [];
+      
+      return data.data.songs.map(song => ({
+        title: song.name,
+        author: song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist'
+      }));
+    }
+
+    // YouTube Playlist Support (Independent client-side fallback via RSS, max 15 songs)
+    const match = url.match(/[?&]list=([^&]+)/);
+    if (match && match[1]) {
+      const playlistId = match[1];
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
+      const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`);
+      
+      if (!res.ok) throw new Error('Failed to fetch YouTube playlist');
+      const data = await res.json();
+      if (data.status !== 'ok' || !data.items) return [];
+      
+      return data.items.map(item => ({
+        title: item.title,
+        author: item.author
+      }));
+    }
+
+    throw new Error('Unsupported playlist URL format');
   } catch (e) {
-    console.error(e);
+    console.error('[importPlaylist Error]', e);
     return [];
   }
 };
