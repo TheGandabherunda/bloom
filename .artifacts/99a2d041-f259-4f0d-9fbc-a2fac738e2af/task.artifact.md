@@ -1,5 +1,0 @@
-- [ ] Refactor `monochromeApi.js` to export API base
-- [ ] Update `PlaybackContext.jsx` to use centralized API base
-- [ ] Implement fallback mechanism for lower qualities in `PlaybackContext.jsx`
-- [ ] Enhance error logging in `loadTrack`
-- [ ] (Optional) Add API URL configuration in `RoomSetup.jsx`
