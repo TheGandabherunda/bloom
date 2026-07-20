@@ -144,10 +144,24 @@ const Player = () => {
 
   const handleExpandedClick = (e) => {
     e.stopPropagation();
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return; // Disable tap-to-pause on mobile
     togglePlay();
     setShowPlayAnim(!isPlaying ? 'play_arrow' : 'pause');
     if (animTimeout.current) clearTimeout(animTimeout.current);
     animTimeout.current = setTimeout(() => setShowPlayAnim(null), 700);
+  };
+
+  const [touchStartY, setTouchStartY] = useState(0);
+
+  const handleTouchStart = (e) => {
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = (e) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    if (touchEndY - touchStartY > 100) {
+      setIsExpanded(false);
+    }
   };
 
   const formatTime = (seconds) => {
@@ -168,6 +182,8 @@ const Player = () => {
           onClick={handleExpandedClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isFullscreen && setShowFsControls(false)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Background blur */}
           <div 
