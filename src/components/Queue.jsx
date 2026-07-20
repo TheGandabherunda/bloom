@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import { extractPrimaryColor } from '../utils/colorExtractor';
+import { importPlaylist, searchTracks } from '../services/monochromeApi';
 
 const formatTime = (seconds) => {
   if (isNaN(seconds)) return "0:00";
@@ -110,15 +111,101 @@ const QueueItem = ({ track, idx, isActive, isPlaying, canControl, loadTrack, rem
 };
 
 const Queue = () => {
-  const { queue, currentIndex, loadTrack, isPlaying, removeFromQueue, playerRef } = usePlayback();
-  const { peerId, peerRoles } = useOrbit();
+  const { queue, currentIndex, loadTrack, isPlaying, removeFromQueue, playerRef, addToQueue } = usePlayback();
+  const { peerId, peerRoles, peerNames, chatDb } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
   const canControl = role === 'owner' || role === 'admin';
   const [hoveredIdx, setHoveredIdx] = useState(-1);
+  const [importUrl, setImportUrl] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleImport = async (e) => {
+    e.preventDefault();
+    if (!importUrl.trim() || !canControl) return;
+    
+    setIsImporting(true);
+    const urlToImport = importUrl;
+    setImportUrl('');
+
+    try {
+      const parsedTracks = await importPlaylist(urlToImport);
+      if (parsedTracks.length === 0) {
+        setIsImporting(false);
+        return;
+      }
+      
+      let importedCount = 0;
+      for (const t of parsedTracks) {
+        // Clean up common YouTube noise to improve JioSaavn search match rate
+        const cleanTitle = t.title.replace(/[\(\[].*?[\)\]]|official|video|audio|lyric|mv/ig, '').trim();
+        const cleanAuthor = t.author.replace(/- Topic|VEVO|music/ig, '').trim();
+        const query = (cleanTitle + ' ' + cleanAuthor).trim();
+
+        // Silently search JioSaavn for the high-res stream
+        try {
+          const results = await searchTracks(query);
+          if (results && results.length > 0) {
+            addToQueue(results[0]);
+            importedCount++;
+          } else {
+            // Fallback: search just the title if author + title failed
+            const fallbackResults = await searchTracks(cleanTitle);
+            if (fallbackResults && fallbackResults.length > 0) {
+              addToQueue(fallbackResults[0]);
+              importedCount++;
+            }
+          }
+        } catch (err) {
+          console.log(`Failed to match track: ${t.title}`);
+        }
+      }
+
+      if (importedCount > 0) {
+        const userName = peerNames[peerId] || localStorage.getItem('bloom_name') || 'Someone';
+        const systemMsg = { 
+          text: `${userName} imported ${importedCount} songs from a playlist.`, 
+          type: 'system', 
+          sender: 'System', 
+          timestamp: Date.now() 
+        };
+        window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
+        if (chatDb) {
+          try { await chatDb.add(systemMsg); } catch(err) {}
+        }
+      }
+    } catch (error) {
+      console.error('Failed to import playlist:', error);
+    }
+    setIsImporting(false);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0" onMouseLeave={() => setHoveredIdx(-1)}>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      {/* Import Playlist Bar */}
+      {canControl && (
+        <div className="px-4 pt-4 pb-2 shrink-0">
+          <form onSubmit={handleImport} className="relative flex items-center">
+            <span className="material-symbols-rounded absolute left-3 text-white/40 text-lg pointer-events-none">link</span>
+            <input 
+              type="text" 
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="Paste YouTube or Spotify Playlist Link..." 
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-[13px] text-white placeholder-white/40 focus:outline-none focus:bg-white/10 transition-colors"
+              disabled={isImporting}
+            />
+            {isImporting ? (
+              <span className="material-symbols-rounded absolute right-3 text-white/50 text-lg animate-spin pointer-events-none">progress_activity</span>
+            ) : importUrl ? (
+              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-black w-7 h-7 rounded-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                <span className="material-symbols-rounded text-[16px] font-bold">add</span>
+              </button>
+            ) : null}
+          </form>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-4 pt-2 space-y-2">
         {queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20 group-hover/queue:opacity-100">
              <span className="material-symbols-rounded text-5xl">music_note</span>

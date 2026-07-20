@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useOrbit } from '../context/OrbitContext';
 import { usePlayback } from '../context/PlaybackContext';
+import Lyrics from './Lyrics';
 
 const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
   const barsRef = useRef([]);
@@ -79,6 +80,7 @@ const Player = () => {
   // Fullscreen states
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFsControls, setShowFsControls] = useState(true);
+  const [showLyrics, setShowLyrics] = useState(false);
   const fsTimeoutRef = useRef(null);
 
   // Sync fullscreen exit via Escape key or browser back
@@ -147,21 +149,29 @@ const Player = () => {
             style={{ backgroundImage: `url(${currentTrack.thumbnail})` }} 
           />
           
-          {/* Top Right Minimize Button (Hidden in Fullscreen) */}
-          {!isFullscreen && (
-            <div className="absolute top-8 right-8 z-20">
+          {/* Top Right Buttons */}
+          <div className="absolute top-8 right-8 z-20 flex gap-2">
               <button 
-                className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setIsExpanded(false); 
-                }}
-                title="Minimize"
+                className={`w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors ${showLyrics ? 'text-white bg-white/20' : 'text-white/70 hover:text-white'}`}
+                onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
+                title="Lyrics"
               >
-                <span className="material-symbols-rounded text-[32px] leading-none">keyboard_arrow_down</span>
+                <span className="material-symbols-rounded text-[24px] leading-none">lyrics</span>
               </button>
-            </div>
-          )}
+              
+              {!isFullscreen && (
+                <button 
+                  className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setIsExpanded(false); 
+                  }}
+                  title="Minimize"
+                >
+                  <span className="material-symbols-rounded text-[32px] leading-none">keyboard_arrow_down</span>
+                </button>
+              )}
+          </div>
           
           {/* Bottom Right Fullscreen Button */}
           <div className={`absolute right-8 flex justify-end gap-4 z-20 transition-all duration-500 ${isFullscreen ? 'bottom-8' : 'bottom-[100px]'} ${isFullscreen && !showFsControls ? 'opacity-0' : 'opacity-100'}`}>
@@ -176,23 +186,27 @@ const Player = () => {
             </button>
           </div>
           
-          <div className="relative">
-            <img 
-              src={currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault')}
-              className={`w-[80vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
-              alt=""
-            />
-            
-            {showPlayAnim && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                <div className="bg-black/50 backdrop-blur-md rounded-full w-24 h-24 flex items-center justify-center animate-play-pause-pop">
-                  <span className="material-symbols-rounded text-white text-5xl icon-fill">
-                    {showPlayAnim}
-                  </span>
+          {!showLyrics ? (
+            <div className="relative">
+              <img 
+                src={currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault')}
+                className={`w-[80vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
+                alt=""
+              />
+              
+              {showPlayAnim && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                  <div className="bg-black/50 backdrop-blur-md rounded-full w-24 h-24 flex items-center justify-center animate-play-pause-pop">
+                    <span className="material-symbols-rounded text-white text-5xl icon-fill">
+                      {showPlayAnim}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : (
+            <Lyrics currentTrack={currentTrack} currentTime={currentTime} />
+          )}
           
           <Visualizer playerRef={playerRef} isExpanded={isExpanded} isFullscreen={isFullscreen} />
         </div>
@@ -285,6 +299,21 @@ const Player = () => {
         {/* Right Side: Shuffle, Repeat, Volume */}
         <div className="flex items-center justify-end gap-6 w-1/3">
           <div className={`flex items-center gap-4 ${!canControl ? 'opacity-50 pointer-events-none' : ''}`}>
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                if (!isExpanded) {
+                  setIsExpanded(true);
+                  setShowLyrics(true);
+                } else {
+                  setShowLyrics(!showLyrics);
+                }
+              }} 
+              className={`transition-colors flex items-center justify-center ${showLyrics && isExpanded ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white'}`}
+              title="Lyrics"
+            >
+              <span className="material-symbols-rounded text-[24px] leading-none">lyrics</span>
+            </button>
             <button 
               onClick={(e) => { e.stopPropagation(); setIsShuffled(!isShuffled); }} 
               className={`transition-colors flex items-center justify-center ${isShuffled ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white'}`}

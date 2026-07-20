@@ -76,3 +76,33 @@ export const getTenorGifs = async (query = 'trending') => {
   } catch (err) { return []; }
 };
 
+export const importPlaylist = async (url) => {
+  try {
+    const res = await fetch(`/api/yt/playlist?url=${encodeURIComponent(url)}`);
+    if (!res.ok) throw new Error('Failed to import playlist');
+    const tracks = await res.json();
+    return tracks;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+};
+
+export const getLyrics = async (track, artist) => {
+  try {
+    const query = new URLSearchParams({ track });
+    if (artist) query.append('artist', artist);
+    
+    // Call the local vite proxy
+    const response = await fetch(`/api/lyrics?${query.toString()}`);
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    return await response.json(); // { lyrics, isSynced }
+  } catch (error) {
+    console.error('Failed to fetch lyrics:', error);
+    return null;
+  }
+};

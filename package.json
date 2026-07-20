@@ -25,15 +25,18 @@
     "crypto-js": "^4.2.0",
     "datastore-core": "^12.0.1",
     "datastore-idb": "^5.0.1",
+    "fast-xml-parser": "^5.10.1",
     "helia": "^7.1.0",
     "libp2p": "^1.0.0",
     "lucide-react": "^0.263.1",
     "play-dl": "^1.9.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "spotify-url-info": "^3.3.1",
     "tailwind-merge": "^1.14.0",
     "youtube-sr": "^4.3.12",
-    "youtubei.js": "^17.2.0"
+    "youtubei.js": "^17.2.0",
+    "ytpl": "^2.3.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",

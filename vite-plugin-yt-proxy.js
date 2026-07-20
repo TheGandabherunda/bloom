@@ -1,4 +1,9 @@
 import CryptoJS from 'crypto-js';
+import { XMLParser } from 'fast-xml-parser';
+import spotifyUrlInfo from 'spotify-url-info';
+import { execFile } from 'child_process';
+import path from 'path';
+const spotify = spotifyUrlInfo(fetch);
 
 function decryptUrl(encryptedUrl, forceHQ = false) {
   try {
@@ -91,7 +96,7 @@ export function ytProxyPlugin() {
         }
 
         // API Route for Recommendations
-        if (req.url.startsWith('/api/yt/recommend?')) {
+        else if (req.url.startsWith('/api/yt/recommend?')) {
           const url = new URL(req.url, `http://${req.headers.host}`);
           const songId = url.searchParams.get('id');
           
@@ -147,7 +152,7 @@ export function ytProxyPlugin() {
         }
 
         // API Route for Streaming Audio
-        if (req.url.startsWith('/api/yt/stream/')) {
+        else if (req.url.startsWith('/api/yt/stream/')) {
           const videoId = req.url.split('/api/yt/stream/')[1].split('?')[0];
           
           if (!videoId) {
@@ -204,7 +209,7 @@ export function ytProxyPlugin() {
         }
 
         // API Route for Image Proxy (CORS bypass for Color Extraction)
-        if (req.url.startsWith('/api/yt/image?')) {
+        else if (req.url.startsWith('/api/yt/image?')) {
           const url = new URL(req.url, `http://${req.headers.host}`);
           const targetUrl = url.searchParams.get('url');
           if (!targetUrl) {
@@ -228,8 +233,154 @@ export function ytProxyPlugin() {
           return;
         }
 
-        // Pass to the next middleware if not an API route
-        next();
+        // API Route for YouTube Playlist Import
+        else if (req.url.startsWith('/api/yt/playlist?')) {
+          const url = new URL(req.url, `http://${req.headers.host}`);
+          const playlistUrl = url.searchParams.get('url');
+          
+          if (!playlistUrl) {
+            res.statusCode = 400;
+            return res.end(JSON.stringify({ error: 'Missing playlist url' }));
+          }
+
+          try {
+            // --- Spotify Playlist Support ---
+            if (playlistUrl.includes('spotify.com/playlist/')) {
+              try {
+                const spotifyTracks = await spotify.getTracks(playlistUrl);
+                if (!spotifyTracks || spotifyTracks.length === 0) {
+                  res.statusCode = 404;
+                  return res.end(JSON.stringify({ error: 'Spotify playlist not found or empty' }));
+                }
+                const tracks = spotifyTracks.map(item => {
+                  const title = item.name || 'Unknown Title';
+                  const author = item.artists && item.artists[0] ? item.artists[0].name : 'Unknown Artist';
+                  return { title, author };
+                }).filter(t => t.title !== 'Unknown Title');
+                
+                res.setHeader('Content-Type', 'application/json');
+                return res.end(JSON.stringify(tracks));
+              } catch (err) {
+                console.error('[Spotify Proxy Error]', err);
+                res.statusCode = 500;
+                return res.end(JSON.stringify({ error: 'Failed to parse Spotify playlist' }));
+              }
+            }
+
+              // Extract Playlist ID from URL
+              const match = playlistUrl.match(/[?&]list=([^&]+)/);
+              if (!match || !match[1]) {
+                res.statusCode = 400;
+                return res.end(JSON.stringify({ error: 'Invalid YouTube playlist URL' }));
+              }
+              const playlistId = match[1];
+  
+              // --- YouTube Playlist Support (yt-dlp for full playlist) ---
+              try {
+                const ytDlpPath = path.resolve(process.cwd(), 'yt-dlp.exe');
+                const tracks = await new Promise((resolve, reject) => {
+                  execFile(ytDlpPath, ['-J', '--flat-playlist', playlistUrl], { maxBuffer: 1024 * 1024 * 50 }, (error, stdout) => {
+                    if (error) return reject(error);
+                    try {
+                      let cleanStdout = stdout;
+                      if (cleanStdout.charCodeAt(0) === 0xFEFF) {
+                        cleanStdout = cleanStdout.slice(1);
+                      }
+                      const data = JSON.parse(cleanStdout);
+                      if (!data.entries) return reject(new Error('No entries'));
+                      const results = data.entries.map(item => ({
+                        title: item.title || 'Unknown Title',
+                        author: item.uploader || 'Unknown Artist'
+                      })).filter(t => t.title !== 'Unknown Title');
+                      resolve(results);
+                    } catch (e) {
+                      reject(e);
+                    }
+                  });
+                });
+                
+                res.setHeader('Content-Type', 'application/json');
+                return res.end(JSON.stringify(tracks));
+              } catch (ytDlpError) {
+                console.log('[yt-dlp failed, falling back to RSS]', ytDlpError.message);
+                
+                // Fallback to RSS (limited to 15 items)
+                const ytFeedUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
+                const rssRes = await fetch(ytFeedUrl);
+                if (!rssRes.ok) {
+                  res.statusCode = 404;
+                  return res.end(JSON.stringify({ error: 'Playlist not found or empty' }));
+                }
+                const xmlData = await rssRes.text();
+                
+                const parser = new XMLParser();
+                const jObj = parser.parse(xmlData);
+                
+                if (!jObj || !jObj.feed || !jObj.feed.entry) {
+                  res.statusCode = 404;
+                  return res.end(JSON.stringify({ error: 'Playlist not found or empty' }));
+                }
+                
+                const entries = Array.isArray(jObj.feed.entry) ? jObj.feed.entry : [jObj.feed.entry];
+    
+                const tracks = entries.map(item => {
+                  const title = item.title || 'Unknown Title';
+                  const author = item.author?.name || 'Unknown Artist';
+                  return { title, author };
+                }).filter(t => t.title !== 'Unknown Title');
+    
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(tracks));
+              }
+          } catch (error) {
+            console.error('[JioSaavn Proxy Playlist Error]', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: 'Internal server error' }));
+          }
+        }
+        else if (req.url.startsWith('/api/lyrics')) {
+          const urlObj = new URL(req.url, `http://${req.headers.host}`);
+          const track = urlObj.searchParams.get('track');
+          const artist = urlObj.searchParams.get('artist');
+          
+          if (!track) {
+            res.statusCode = 400;
+            return res.end(JSON.stringify({ error: 'Missing track parameter' }));
+          }
+
+          try {
+            const query = new URLSearchParams({ track_name: track });
+            if (artist) query.append('artist_name', artist);
+            
+            const lrcUrl = `https://lrclib.net/api/search?${query.toString()}`;
+            const lrcRes = await fetch(lrcUrl);
+            
+            if (!lrcRes.ok) {
+              res.statusCode = 404;
+              return res.end(JSON.stringify({ error: 'Lyrics not found' }));
+            }
+            
+            const data = await lrcRes.json();
+            if (data && data.length > 0) {
+              // Prefer synced lyrics, fallback to plain
+              const lyrics = data[0].syncedLyrics || data[0].plainLyrics || null;
+              if (lyrics) {
+                res.setHeader('Content-Type', 'application/json');
+                return res.end(JSON.stringify({ lyrics, isSynced: !!data[0].syncedLyrics }));
+              }
+            }
+            
+            res.statusCode = 404;
+            res.end(JSON.stringify({ error: 'Lyrics not found' }));
+          } catch (error) {
+            console.error('[Lyrics Proxy Error]', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: 'Failed to fetch lyrics' }));
+          }
+        }
+        else {
+          next();
+        }
       });
     }
   };
