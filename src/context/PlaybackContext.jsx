@@ -93,10 +93,10 @@ export const PlaybackProvider = ({ children }) => {
       if (!playerRef.current) throw new Error('Player not initialized');
 
       await playerRef.current.load(streamUrl, null, startTime);
-      console.log(`[Playback] player load finished for videoId: ${videoId}`);
+      console.log(`[Playback] player load finished for trackId: ${track.id}`);
       
       if (loadingTrackId.current !== currentLoadId) {
-        console.log(`[Playback] loadTrack superseded for videoId: ${videoId}, aborting state update.`);
+        console.log(`[Playback] loadTrack superseded for trackId: ${track.id}, aborting state update.`);
         return;
       }
       
