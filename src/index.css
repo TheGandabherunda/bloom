@@ -152,10 +152,10 @@ input[type=range]::-webkit-slider-thumb {
   animation-play-state: running;
 }
 
-.blob-1 { top: -10vh; left: -10vw; width: 75vmax; height: 75vmax; background: var(--color-1, transparent); animation: float1 25s infinite alternate ease-in-out; }
-.blob-2 { top: -10vh; right: -10vw; width: 65vmax; height: 65vmax; background: var(--color-2, transparent); animation: float2 20s infinite alternate-reverse ease-in-out; }
-.blob-3 { bottom: -10vh; left: -10vw; width: 70vmax; height: 70vmax; background: var(--color-3, transparent); animation: float3 22s infinite alternate ease-in-out; }
-.blob-4 { bottom: -10vh; right: -10vw; width: 80vmax; height: 80vmax; background: var(--color-4, transparent); animation: float4 28s infinite alternate-reverse ease-in-out; }
+.blob-1 { top: -10vh; left: -10vw; width: 75vmax; height: 75vmax; background: radial-gradient(circle, var(--color-1, transparent) 0%, transparent 65%); animation: float1 25s infinite alternate ease-in-out; }
+.blob-2 { top: -10vh; right: -10vw; width: 65vmax; height: 65vmax; background: radial-gradient(circle, var(--color-2, transparent) 0%, transparent 65%); animation: float2 20s infinite alternate-reverse ease-in-out; }
+.blob-3 { bottom: -10vh; left: -10vw; width: 70vmax; height: 70vmax; background: radial-gradient(circle, var(--color-3, transparent) 0%, transparent 65%); animation: float3 22s infinite alternate ease-in-out; }
+.blob-4 { bottom: -10vh; right: -10vw; width: 80vmax; height: 80vmax; background: radial-gradient(circle, var(--color-4, transparent) 0%, transparent 65%); animation: float4 28s infinite alternate-reverse ease-in-out; }
 
 @keyframes float1 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(20vw, 20vh) scale(1.1); } }
 @keyframes float2 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-20vw, 20vh) scale(1.05); } }
