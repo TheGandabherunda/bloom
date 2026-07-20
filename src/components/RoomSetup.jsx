@@ -47,14 +47,11 @@ const RoomSetup = ({ config, onComplete }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex flex-col justify-end items-center lg:justify-center overflow-hidden pb-4 lg:pb-0">
+    <div className="fixed inset-0 bg-black z-[200] flex flex-col justify-end items-center lg:justify-center overflow-hidden pb-8 px-4 lg:pb-0 lg:px-0">
       
-      {/* Mobile Background and Top Title */}
+      {/* Mobile Background */}
       <div className="lg:hidden absolute inset-0 flex items-center justify-center pointer-events-none z-0 bloom-enter-wrap">
         <img src="./assets/Bloom.svg" className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
-      </div>
-      <div className="lg:hidden absolute top-12 left-0 right-0 text-center z-10 pointer-events-none">
-        <h1 className="text-4xl font-bold text-white tracking-tight">Bloom</h1>
       </div>
 
       {/* Desktop Background */}
@@ -62,7 +59,12 @@ const RoomSetup = ({ config, onComplete }) => {
         <img src="./assets/Bloom.svg" className="w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
       </div>
 
-      <div className="bg-black/90 lg:bg-black lg:backdrop-blur-none backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md mx-4 transform transition-all pointer-events-auto relative z-10">
+      {/* Mobile Title (Above Input Container) */}
+      <div className="lg:hidden w-full max-w-md text-center z-10 mb-6">
+        <h1 className="text-5xl font-bold text-white tracking-tight">Bloom</h1>
+      </div>
+
+      <div className="bg-black/90 lg:bg-black lg:backdrop-blur-none backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md transform transition-all pointer-events-auto relative z-10">
         <div className="text-center mb-6">
           <h1 className="hidden lg:block text-4xl font-bold text-white mb-2 tracking-tight">Bloom</h1>
           <p className="text-white/50 text-base">
