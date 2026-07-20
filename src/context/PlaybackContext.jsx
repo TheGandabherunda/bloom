@@ -356,6 +356,54 @@ export const PlaybackProvider = ({ children }) => {
     }
   }, [currentIndex, originalQueue]);
 
+  // Media Session API for mobile notifications and OS lock screen
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrack) {
+      // Use higher res thumbnail if possible
+      const hdThumbnail = currentTrack.thumbnail ? currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault') : './assets/Bloom.svg';
+      
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentTrack.title || 'Unknown Title',
+        artist: currentTrack.author || 'Unknown Artist',
+        album: 'Bloom',
+        artwork: [
+          { src: currentTrack.thumbnail || './assets/Bloom.svg', sizes: '96x96', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail || './assets/Bloom.svg', sizes: '128x128', type: 'image/jpeg' },
+          { src: hdThumbnail, sizes: '256x256', type: 'image/jpeg' },
+          { src: hdThumbnail, sizes: '512x512', type: 'image/jpeg' },
+        ]
+      });
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (!isPlayingRef.current) togglePlay();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (isPlayingRef.current) togglePlay();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
+        navigator.mediaSession.setActionHandler('nexttrack', () => playNext(true));
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime !== undefined) {
+            seek(details.seekTime);
+          }
+        });
+      } catch (err) {
+        console.warn("MediaSession action handlers not supported", err);
+      }
+    }
+  }, [togglePlay, playPrev, playNext, seek]);
+
   const value = {
       isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
       currentTime, duration, loadTrack, togglePlay, seek,
