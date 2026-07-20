@@ -42,6 +42,12 @@
   to = "/.netlify/functions/yt-playlist"
   status = 200
 
+# Redirect /api/yt/resolve → function
+[[redirects]]
+  from = "/api/yt/resolve"
+  to = "/.netlify/functions/yt-resolve"
+  status = 200
+
 # Redirect /api/lyrics → function
 [[redirects]]
   from = "/api/lyrics"
