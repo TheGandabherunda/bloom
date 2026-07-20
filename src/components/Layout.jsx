@@ -178,9 +178,10 @@ const Layout = ({ config }) => {
                </div>
              )}
 
-             <Player />
-          </div>
+           </div>
         </main>
+        
+        <Player />
 
         <Sidebar 
           activeTab={activeSidebarTab} 
