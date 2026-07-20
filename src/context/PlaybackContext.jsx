@@ -154,6 +154,7 @@ export const PlaybackProvider = ({ children }) => {
   const isPlayingRef = useRef(false);
   const isRepeatRef = useRef(false);
   const peerRolesRef = useRef({});
+  const mediaSessionSyncRef = useRef({ time: 0, isPlaying: false, duration: 0 });
 
   useEffect(() => {
     currentTrackRef.current = currentTrack;
@@ -403,6 +404,28 @@ export const PlaybackProvider = ({ children }) => {
       }
     }
   }, [togglePlay, playPrev, playNext, seek]);
+
+  // Sync Media Session Position State (Progress Bar)
+  useEffect(() => {
+    if ('mediaSession' in navigator && duration > 0) {
+      const lastSync = mediaSessionSyncRef.current;
+      const isSignificantJump = Math.abs(currentTime - lastSync.time) > 2;
+      const stateChanged = lastSync.isPlaying !== isPlaying || lastSync.duration !== duration;
+      
+      if (isSignificantJump || stateChanged) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: Math.max(0, duration),
+            playbackRate: isPlaying ? 1 : 0,
+            position: Math.max(0, Math.min(currentTime, duration))
+          });
+          mediaSessionSyncRef.current = { time: currentTime, isPlaying, duration };
+        } catch (e) {
+          console.warn("MediaSession setPositionState error:", e);
+        }
+      }
+    }
+  }, [currentTime, duration, isPlaying]);
 
   const value = {
       isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
