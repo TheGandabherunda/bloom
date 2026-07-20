@@ -132,17 +132,26 @@ export const importPlaylist = async (url) => {
 
 export const getLyrics = async (track, artist) => {
   try {
-    const query = new URLSearchParams({ track });
-    if (artist) query.append('artist', artist);
-    
-    // Call the local vite proxy
-    const response = await fetch(`/api/lyrics?${query.toString()}`);
-    
-    if (!response.ok) {
-      return null;
+    const query = new URLSearchParams({ track_name: track });
+    if (artist) {
+      // Get primary artist only for better match
+      const primaryArtist = artist.split(',')[0].trim();
+      query.append('artist_name', primaryArtist);
     }
     
-    return await response.json(); // { lyrics, isSynced }
+    const response = await fetch(`https://lrclib.net/api/get?${query.toString()}`);
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    
+    if (data.syncedLyrics) {
+      return { lyrics: data.syncedLyrics, isSynced: true };
+    } else if (data.plainLyrics) {
+      return { lyrics: data.plainLyrics, isSynced: false };
+    }
+    
+    return null;
   } catch (error) {
     console.error('Failed to fetch lyrics:', error);
     return null;
