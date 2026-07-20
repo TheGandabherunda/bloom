@@ -164,7 +164,7 @@ const Layout = ({ config }) => {
              {showSearch ? (
                <Search query={searchQuery} onClose={() => { setShowSearch(false); setSearchQuery(''); }} />
              ) : (
-               <div className="flex-1 overflow-y-auto p-6 space-y-12">
+               <div className="flex-1 overflow-y-auto p-6 pb-[90px] space-y-12">
                   {!currentTrack ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white/20 pointer-events-none">
                       <span className="material-symbols-rounded text-6xl">search</span>

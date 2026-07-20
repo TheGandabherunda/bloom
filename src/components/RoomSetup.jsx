@@ -47,12 +47,13 @@ const RoomSetup = ({ config, onComplete }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 bloom-enter-wrap">
-        <img src="./assets/Bloom.svg" className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
+    <div className="fixed inset-0 bg-black z-[200] flex items-end justify-center overflow-hidden pb-4 sm:pb-0 sm:items-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0 bloom-enter-wrap overflow-hidden">
+        <h1 className="text-[28vw] font-black text-white/[0.04] leading-none select-none tracking-tighter absolute top-[-5vh]">BLOOM</h1>
+        <img src="./assets/Bloom.svg" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
       </div>
 
-      <div className="bg-black border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md mx-4 transform transition-all pointer-events-auto relative z-10">
+      <div className="bg-black/90 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md mx-4 transform transition-all pointer-events-auto relative z-10">
         <div className="text-center mb-6">
           <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Bloom</h1>
           <p className="text-white/50 text-base">
