@@ -15,6 +15,12 @@ export const handler = async (event) => {
     if (!query) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Missing query' }) };
     }
+    
+    let isDebug = false;
+    if (query.startsWith('DEBUG_')) {
+       isDebug = true;
+       query = query.replace('DEBUG_', '');
+    }
 
     query = query.replace(/\baudio\b/ig, '').trim();
 
@@ -41,6 +47,11 @@ export const handler = async (event) => {
     }
 
     const data = await res.json();
+    
+    if (isDebug) {
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(data) };
+    }
+
     const sections = data.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
     
     let songs = [];
