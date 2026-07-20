@@ -3,12 +3,10 @@ import Queue from './Queue';
 import Chat from './Chat';
 import PeersList from './PeersList';
 
-const Sidebar = () => {
-  const [activeTab, setActiveTab] = useState('queue');
-
+const Sidebar = ({ activeTab = 'queue', setActiveTab, className = '' }) => {
   return (
-    <aside className="w-full lg:w-[400px] flex flex-col bg-black/30 backdrop-blur-3xl border-l border-white/10 shadow-2xl relative z-20">
-      <div className="flex items-center gap-1 p-3 border-b border-white/[0.06] shrink-0">
+    <aside className={`w-full lg:w-[400px] flex flex-col bg-black/30 backdrop-blur-3xl border-l border-white/10 shadow-2xl relative z-20 ${className}`}>
+      <div className="hidden lg:flex items-center gap-1 p-3 border-b border-white/[0.06] shrink-0">
         <button
           onClick={() => setActiveTab('queue')}
           className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'queue' ? 'bg-white/10 text-white shadow-inner' : 'text-white/40 hover:text-white/70'}`}

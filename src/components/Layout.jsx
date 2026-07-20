@@ -14,6 +14,8 @@ const Layout = ({ config }) => {
   const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
   const [showSearch, setShowSearch] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeMobileView, setActiveMobileView] = useState('home');
+  const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
 
   useEffect(() => {
     initP2P(config.roomId, config.displayName, config.isHost);
@@ -78,7 +80,7 @@ const Layout = ({ config }) => {
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full pb-[60px] lg:pb-0 z-10">
-        <main className="w-full h-full flex-1 flex flex-col bg-transparent min-w-0 relative overflow-hidden">
+        <main className={`w-full h-full flex-1 flex flex-col bg-transparent min-w-0 relative overflow-hidden ${activeMobileView !== 'home' ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
           <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
             <div className="flex items-center gap-3">
@@ -151,7 +153,43 @@ const Layout = ({ config }) => {
           </div>
         </main>
 
-        <Sidebar />
+        <Sidebar 
+          activeTab={activeSidebarTab} 
+          setActiveTab={setActiveSidebarTab} 
+          className={activeMobileView !== 'home' ? 'flex' : 'hidden lg:flex'} 
+        />
+        
+        {/* Bottom Navigation for Mobile */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-black/80 backdrop-blur-3xl border-t border-white/10 z-[100] flex items-center justify-around px-2">
+          <button 
+            onClick={() => setActiveMobileView('home')} 
+            className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'home' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <span className="material-symbols-rounded text-[24px]">home</span>
+            <span className="text-[9px] font-bold tracking-widest mt-1">HOME</span>
+          </button>
+          <button 
+            onClick={() => { setActiveMobileView('queue'); setActiveSidebarTab('queue'); }} 
+            className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'queue' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <span className="material-symbols-rounded text-[24px]">queue_music</span>
+            <span className="text-[9px] font-bold tracking-widest mt-1">QUEUE</span>
+          </button>
+          <button 
+            onClick={() => { setActiveMobileView('chat'); setActiveSidebarTab('chat'); }} 
+            className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'chat' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <span className="material-symbols-rounded text-[24px]">chat</span>
+            <span className="text-[9px] font-bold tracking-widest mt-1">CHAT</span>
+          </button>
+          <button 
+            onClick={() => { setActiveMobileView('peers'); setActiveSidebarTab('peers'); }} 
+            className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'peers' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <span className="material-symbols-rounded text-[24px]">people</span>
+            <span className="text-[9px] font-bold tracking-widest mt-1">PEERS</span>
+          </button>
+        </div>
       </div>
     </div>
   );
