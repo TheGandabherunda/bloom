@@ -4,7 +4,7 @@ export const extractDominantColors = (imageUrl) => {
     img.crossOrigin = "Anonymous";
     
     // Proxy the image URL to avoid CORS
-    img.src = `/api/yt/image?url=${encodeURIComponent(imageUrl)}`;
+    img.src = imageUrl;
     
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -96,7 +96,7 @@ export const extractPrimaryColor = (imageUrl) => {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
-    img.src = `/api/yt/image?url=${encodeURIComponent(imageUrl)}`;
+    img.src = imageUrl;
 
     img.onload = () => {
       try {
