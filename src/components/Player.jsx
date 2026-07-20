@@ -56,7 +56,7 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
   }, [isExpanded, playerRef]);
 
   return (
-    <div className={`absolute left-0 right-0 h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-opacity duration-1000 pointer-events-none ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-0 lg:bottom-[82px]'}`}>
+    <div className={`absolute left-0 right-0 h-[25vh] lg:h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-opacity duration-1000 pointer-events-none ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-[160px] lg:bottom-[82px]'}`}>
       {Array.from({ length: 48 }).map((_, i) => (
         <div 
           key={i} 
@@ -213,11 +213,11 @@ const Player = () => {
           </div>
           
           {!showLyrics ? (
-            <div className="relative flex flex-col items-center w-full mt-8 lg:mt-0">
+            <div className="relative flex flex-col items-center w-full mt-4 lg:mt-0">
               <div className="relative">
                 <img 
                   src={currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault')}
-                  className={`w-[90vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
+                  className={`w-[80vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
                   alt=""
                 />
 
@@ -233,9 +233,9 @@ const Player = () => {
               </div>
               
               {/* Mobile Title and Artist (Below Cover Art) */}
-              <div className="lg:hidden w-full flex flex-col items-center mt-6 px-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <h2 className="text-xl font-bold text-white w-full truncate">{currentTrack.title}</h2>
-                <p className="text-sm font-medium text-white/50 w-full truncate mt-1">{currentTrack.author}</p>
+              <div className="lg:hidden w-full flex flex-col items-center mt-6 px-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-40">
+                <h2 className="text-2xl font-extrabold text-white w-full truncate drop-shadow-lg">{currentTrack.title}</h2>
+                <p className="text-base font-semibold text-white/70 w-full truncate mt-1 drop-shadow-md">{currentTrack.author}</p>
               </div>
             </div>
           ) : (
