@@ -7,6 +7,7 @@ import Sidebar from './Sidebar';
 import { getRecommendations, getTopVideos, getMix } from '../services/monochromeApi';
 import { extractDominantColors } from '../utils/colorExtractor';
 import TrackCard from './TrackCard';
+import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config }) => {
   const { initP2P, status } = useOrbit();
@@ -56,13 +57,7 @@ const Layout = ({ config }) => {
   return (
     <div className={`h-screen w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
       {status !== 'connected' && (
-        <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center gap-6">
-          <div className="w-16 h-16 border-4 border-white/10 border-t-white rounded-full animate-spin"></div>
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Initializing P2P Swarm</h2>
-            <p className="text-white/40 text-sm font-medium uppercase tracking-widest animate-pulse">{status}...</p>
-          </div>
-        </div>
+        <AppInitSkeleton status={status} />
       )}
 
       {/* Ambient Background — hidden until a track plays */}
@@ -181,19 +176,31 @@ const TrendingSection = () => {
 
 const RecommendationsFeed = ({ track }) => {
   const [recs, setRecs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { loadTrack } = usePlayback();
 
   useEffect(() => {
+    setLoading(true);
+    setRecs([]);
     const fetch = async () => {
       try {
         const data = await getRecommendations(track);
         setRecs(data.slice(0, 10));
       } catch (e) {
         // Fallback or silent fail
+      } finally {
+        setLoading(false);
       }
     };
     fetch();
   }, [track.id]);
+
+  if (loading) return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="h-4 w-56 shimmer rounded-lg" />
+      <TrackGridSkeleton count={10} />
+    </div>
+  );
 
   if (recs.length === 0) return null;
 

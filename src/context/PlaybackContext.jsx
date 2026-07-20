@@ -17,6 +17,7 @@ export const PlaybackProvider = ({ children }) => {
   const [volume, setVolumeState] = useState(1);
   const [isRepeat, setIsRepeat] = useState(false);
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const playerRef = useRef(null);
@@ -73,6 +74,7 @@ export const PlaybackProvider = ({ children }) => {
 
     try {
       setError(null);
+      setIsLoading(true);
       // Reset playing state immediately so button reflects loading
       setIsPlaying(false);
       isPlayingRef.current = false;
@@ -130,6 +132,7 @@ export const PlaybackProvider = ({ children }) => {
         } catch (e) { /* silent — no peers */ }
       }
 
+      setIsLoading(false);
       if (autoPlay) {
         // play() will fire onPlayStateChange(true) which updates isPlaying + ref
         await playerRef.current.play();
@@ -137,6 +140,7 @@ export const PlaybackProvider = ({ children }) => {
     } catch (err) {
       console.error('[Playback] Load Track Error:', err);
       setError(err.message || 'Failed to load track');
+      setIsLoading(false);
       setIsPlaying(false);
       isPlayingRef.current = false;
     } finally {
@@ -354,7 +358,7 @@ export const PlaybackProvider = ({ children }) => {
   }, [currentIndex, originalQueue]);
 
   const value = {
-      isPlaying, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
+      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
       currentTime, duration, loadTrack, togglePlay, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,

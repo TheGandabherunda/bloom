@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useOrbit } from '../context/OrbitContext';
 import { usePlayback } from '../context/PlaybackContext';
 import Lyrics from './Lyrics';
+import { PlayerTrackSkeleton } from './Skeleton';
 
 const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
   const barsRef = useRef([]);
@@ -16,11 +17,33 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
         data = playerRef.current.getFrequencyData();
       }
       
-      for (let i = 0; i < 48; i++) {
+      const numBars = 48;
+      
+      // We use 128 bins (from fftSize 256) and visualize the first 75% of them (0 to ~16kHz)
+      // This perfectly captures all musical energy while ignoring empty ultra-high frequencies.
+      const usableBins = data.length > 0 ? Math.floor(data.length * 0.75) : 0;
+      
+      for (let i = 0; i < numBars; i++) {
         if (barsRef.current[i]) {
-           const val = data.length > i ? data[i] : 0;
-           const normalized = Math.pow(val / 255, 1.4);
-           barsRef.current[i].style.height = `${Math.max(1, normalized * 100)}%`;
+           let val = 0;
+           if (usableBins > 0) {
+             // A smooth quadratic curve (1.5) spreads the bass out beautifully 
+             // without compressing the high-end too much.
+             const ratio = i / (numBars - 1);
+             const binIndex = Math.floor(Math.pow(ratio, 1.5) * (usableBins - 1));
+             
+             val = data[binIndex] || 0;
+             
+             // Gentle treble boost to keep the right side active and dancing
+             val = val * (1 + (ratio * 0.5));
+           }
+           
+           // Exponent 1.3 provides a snappy, rhythmic bounce to the bars.
+           // Multiplier 1.25 lets them hit the top of the container gracefully on loud beats.
+           const normalized = Math.min(1, Math.pow(val / 255, 1.3) * 1.25);
+           
+           // Use transform scaleY instead of height to prevent layout thrashing
+           barsRef.current[i].style.transform = `scaleY(${Math.max(0.01, normalized)})`;
         }
       }
       
@@ -32,14 +55,15 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
   }, [isExpanded, playerRef]);
 
   return (
-    <div className={`absolute left-0 right-0 h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-all duration-1000 ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-[82px]'}`}>
+    <div className={`absolute left-0 right-0 h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-opacity duration-1000 pointer-events-none ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-[82px]'}`}>
       {Array.from({ length: 48 }).map((_, i) => (
         <div 
           key={i} 
           ref={el => barsRef.current[i] = el}
-          className="flex-1 backdrop-blur-2xl rounded-t-md transition-all duration-75 ease-out will-change-[height]"
+          className="flex-1 backdrop-blur-2xl rounded-t-md origin-bottom will-change-transform"
           style={{ 
-            height: '1%', 
+            height: '100%', 
+            transform: 'scaleY(0.01)',
             backgroundColor: 'color-mix(in srgb, var(--color-1) 25%, transparent)' 
           }}
         />
@@ -51,6 +75,7 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
 const Player = () => {
   const {
     isPlaying,
+    isLoading,
     currentTrack,
     currentTime,
     duration,
@@ -267,7 +292,9 @@ const Player = () => {
 
         {/* Middle: Track Info */}
         <div className="flex items-center justify-center gap-4 w-1/3 min-w-0">
-          {error ? (
+          {isLoading ? (
+            <PlayerTrackSkeleton />
+          ) : error ? (
             <div className="flex items-center gap-3 text-red-400 bg-red-900/20 px-4 py-2 rounded-xl border border-red-500/20 max-w-sm animate-in fade-in">
               <span className="material-symbols-rounded text-2xl">error</span>
               <div className="min-w-0 flex-1">

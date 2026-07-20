@@ -133,10 +133,16 @@ const Lyrics = ({ currentTrack, currentTime }) => {
 
   if (loading) {
     return (
-      <div className="flex-1 w-full flex items-center justify-center text-white/50 text-sm z-10 relative">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin" />
-          <p>Fetching lyrics...</p>
+      <div className="flex-1 w-full px-6 md:px-12 lg:px-24 z-10 relative">
+        <div className="max-w-3xl mx-auto flex flex-col gap-8 text-center pt-32">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div 
+              key={i} 
+              className={`shimmer rounded-lg mx-auto ${
+                i % 2 === 0 ? 'h-8 md:h-10 w-3/4' : 'h-8 md:h-10 w-2/4'
+              }`}
+            />
+          ))}
         </div>
       </div>
     );

@@ -3,6 +3,7 @@ import { searchTracks } from '../services/monochromeApi';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import TrackCard from './TrackCard';
+import { TrackGridSkeleton } from './Skeleton';
 
 const Search = ({ query, onClose }) => {
   const { loadTrack } = usePlayback();
@@ -47,9 +48,9 @@ const Search = ({ query, onClose }) => {
   return (
     <div className="flex-1 overflow-y-auto p-6 animate-in fade-in duration-200 no-scrollbar pb-32 relative h-full">
         {loading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white/40 pointer-events-none">
-             <div className="w-12 h-12 border-4 border-white/10 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
-             <p className="text-sm font-bold uppercase tracking-widest">Searching...</p>
+          <div className="animate-in fade-in duration-300 w-full">
+            <div className="h-4 w-40 shimmer rounded-lg mb-6" />
+            <TrackGridSkeleton count={10} />
           </div>
         ) : results.length > 0 ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full">

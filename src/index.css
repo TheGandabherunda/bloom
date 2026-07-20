@@ -111,10 +111,11 @@ input[type=range]::-webkit-slider-thumb {
     radial-gradient(circle at 20% 80%, var(--color-3, transparent), transparent 60%),
     radial-gradient(circle at 80% 80%, var(--color-4, transparent), transparent 60%);
   animation: audio-ambient-spin 20s linear infinite;
-  filter: blur(50px) saturate(150%);
+  filter: saturate(150%);
   z-index: 0;
   opacity: 0.9;
   pointer-events: none;
+  will-change: transform;
 }
 
 .audio-mode::after {
@@ -203,3 +204,34 @@ input[type=range]::-webkit-slider-thumb {
   animation: eq 1s ease-in-out infinite;
   transform-origin: bottom;
 }
+
+/* ─── Shimmer Skeleton ─────────────────────────────────────── */
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.06);
+  isolation: isolate;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent       0%,
+    transparent      35%,
+    rgba(255,255,255,0.13) 50%,
+    transparent      65%,
+    transparent     100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer-sweep 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: transform;
+}
+

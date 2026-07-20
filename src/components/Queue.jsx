@@ -53,7 +53,7 @@ const TileVisualizer = ({ playerRef, cardColor }) => {
   );
 };
 
-const QueueItem = ({ track, idx, isActive, isPlaying, canControl, loadTrack, removeFromQueue, hoveredIdx, setHoveredIdx, playerRef }) => {
+const QueueItem = ({ track, idx, isActive, isPlaying, isLoading, canControl, loadTrack, removeFromQueue, hoveredIdx, setHoveredIdx, playerRef }) => {
   const [cardColor, setCardColor] = useState('var(--color-primary)');
   const isAnyHovered = hoveredIdx !== -1;
   const isHovered = hoveredIdx === idx;
@@ -79,12 +79,18 @@ const QueueItem = ({ track, idx, isActive, isPlaying, canControl, loadTrack, rem
       style={isActive ? { background: `linear-gradient(90deg, color-mix(in srgb, ${cardColor} 20%, transparent) 0%, transparent 100%)` } : {}}
     >
       <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-white/10 shrink-0 shadow-lg ml-1">
-        <img src={track.thumbnail} className="w-full h-full object-cover" alt="" />
-        {(isActive && isPlaying) && (
+        <img src={track.thumbnail} className={`w-full h-full object-cover transition-opacity ${isActive && isLoading ? 'opacity-50' : 'opacity-100'}`} alt="" />
+        {(isActive && isLoading) && (
+          <div className="absolute inset-0 z-20 shimmer" />
+        )}
+        {(isActive && isPlaying && !isLoading) && (
           <TileVisualizer playerRef={playerRef} cardColor={cardColor} />
         )}
       </div>
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 relative ${isActive && isLoading ? 'rounded overflow-hidden' : ''}`}>
+        {(isActive && isLoading) && (
+          <div className="absolute inset-0 z-20 shimmer mix-blend-overlay opacity-50" />
+        )}
         <h4 className={`text-xs font-bold truncate ${isActive ? '' : 'text-white/90'}`} style={{ color: isActive ? cardColor : undefined }}>{track.title}</h4>
         <p className="text-[10px] text-white/40 font-medium truncate mt-0.5">{track.author}</p>
       </div>
@@ -111,7 +117,7 @@ const QueueItem = ({ track, idx, isActive, isPlaying, canControl, loadTrack, rem
 };
 
 const Queue = () => {
-  const { queue, currentIndex, loadTrack, isPlaying, removeFromQueue, playerRef, addToQueue } = usePlayback();
+  const { queue, currentIndex, loadTrack, isPlaying, isLoading, removeFromQueue, playerRef, addToQueue } = usePlayback();
   const { peerId, peerRoles, peerNames, chatDb } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
   const canControl = role === 'owner' || role === 'admin';
@@ -219,6 +225,7 @@ const Queue = () => {
               idx={idx}
               isActive={idx === currentIndex}
               isPlaying={isPlaying}
+              isLoading={idx === currentIndex && isLoading}
               canControl={canControl}
               loadTrack={loadTrack}
               removeFromQueue={removeFromQueue}
