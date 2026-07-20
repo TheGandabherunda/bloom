@@ -81,28 +81,14 @@ export const PlaybackProvider = ({ children }) => {
       const currentLoadId = Symbol();
       loadingTrackId.current = currentLoadId;
       
-      let videoId = track.id;
+      let streamUrl = track.downloadUrl;
       
-      if (track._resolveQuery) {
-        console.log(`[Playback] Resolving audio via YouTube for query: ${track._resolveQuery}`);
-        const resolveRes = await fetch(`/api/yt/resolve?q=${encodeURIComponent(track._resolveQuery)}`);
-        if (!resolveRes.ok) {
-          throw new Error('Failed to resolve audio for track');
-        }
-        const resolveData = await resolveRes.json();
-        if (resolveData.videoId) {
-          videoId = resolveData.videoId;
-          console.log(`[Playback] Resolved to Video ID: ${videoId}`);
-        } else {
-          throw new Error('Audio stream not found');
-        }
-      } else if (!videoId) {
-        throw new Error('No audio ID found for this track');
+      if (!streamUrl) {
+        throw new Error('No audio stream URL found for this track');
       }
 
-      console.log(`[Playback] Loading direct stream for audioId: ${videoId}...`);
-      const streamUrl = `/api/yt/stream/${videoId}`;
-
+      console.log(`[Playback] Stream URL resolved: ${streamUrl}`);
+      
       // Ensure player is ready before loading
       if (!playerRef.current) throw new Error('Player not initialized');
 
