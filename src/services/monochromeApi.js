@@ -139,16 +139,20 @@ export const getLyrics = async (track, artist) => {
       query.append('artist_name', primaryArtist);
     }
     
-    const response = await fetch(`https://lrclib.net/api/get?${query.toString()}`);
+    // Use search instead of get for fuzzy matching (essential for titles with (From "Movie"))
+    const response = await fetch(`https://lrclib.net/api/search?${query.toString()}`);
     
     if (!response.ok) return null;
     
     const data = await response.json();
     
-    if (data.syncedLyrics) {
-      return { lyrics: data.syncedLyrics, isSynced: true };
-    } else if (data.plainLyrics) {
-      return { lyrics: data.plainLyrics, isSynced: false };
+    if (data && data.length > 0) {
+      const bestMatch = data[0];
+      if (bestMatch.syncedLyrics) {
+        return { lyrics: bestMatch.syncedLyrics, isSynced: true };
+      } else if (bestMatch.plainLyrics) {
+        return { lyrics: bestMatch.plainLyrics, isSynced: false };
+      }
     }
     
     return null;
