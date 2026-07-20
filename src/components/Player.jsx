@@ -174,10 +174,10 @@ const Player = () => {
             style={{ backgroundImage: `url(${currentTrack.thumbnail})` }} 
           />
           
-          {/* Top Right Buttons */}
+          {/* Top Right Buttons (Desktop Only for Lyrics, Minimize for all) */}
           <div className="absolute top-8 right-8 z-20 flex gap-2">
               <button 
-                className={`w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors ${showLyrics ? 'text-white bg-white/20' : 'text-white/70 hover:text-white'}`}
+                className={`hidden lg:flex w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full items-center justify-center transition-colors ${showLyrics ? 'text-white bg-white/20' : 'text-white/70 hover:text-white'}`}
                 onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
                 title="Lyrics"
               >
@@ -219,6 +219,15 @@ const Player = () => {
                 alt=""
               />
               
+              {/* Mobile Lyrics Button on top of cover */}
+              <button 
+                className={`lg:hidden absolute top-4 right-4 z-30 w-10 h-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center transition-colors ${showLyrics ? 'text-[var(--color-primary)] bg-black/60' : 'text-white/70 hover:text-white'}`}
+                onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
+                title="Lyrics"
+              >
+                <span className="material-symbols-rounded text-[20px] leading-none">lyrics</span>
+              </button>
+
               {showPlayAnim && (
                 <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
                   <div className="bg-black/50 backdrop-blur-md rounded-full w-24 h-24 flex items-center justify-center animate-play-pause-pop">
@@ -234,12 +243,72 @@ const Player = () => {
           )}
           
           <Visualizer playerRef={playerRef} isExpanded={isExpanded} isFullscreen={isFullscreen} />
+
+          {/* Mobile Expanded Bottom Sheet Controls */}
+          <div className="lg:hidden absolute bottom-12 left-0 right-0 px-8 flex flex-col z-30" onClick={(e) => e.stopPropagation()}>
+            {/* Progress Bar & Time */}
+            <div className="w-full flex flex-col mb-6">
+              <div 
+                className={`w-full h-1.5 bg-white/20 rounded-full mb-3 ${canControl ? 'cursor-pointer' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!canControl) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pos = (e.clientX - rect.left) / rect.width;
+                  seek(pos * duration);
+                }}
+              >
+                <div className="h-full bg-[var(--color-primary)] rounded-full relative" style={{ width: `${progress}%` }}>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full"></div>
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] font-mono text-white/50 tracking-wider">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+
+            {/* Playback Controls Row */}
+            <div className={`w-full flex items-center justify-between ${!canControl ? 'opacity-50 pointer-events-none' : ''}`}>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsShuffled(!isShuffled); }} 
+                className={`w-10 h-10 flex items-center justify-center transition-colors ${isShuffled ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white'}`}
+              >
+                <span className="material-symbols-rounded text-[26px] leading-none">shuffle</span>
+              </button>
+
+              <div className="flex items-center gap-4">
+                <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="text-white/70 hover:text-white flex items-center justify-center">
+                  <span className="material-symbols-rounded text-[36px] icon-fill leading-none">skip_previous</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                  className="w-16 h-16 bg-white text-slate-900 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl"
+                >
+                  <span className="material-symbols-rounded text-[42px] icon-fill leading-none">
+                    {isPlaying ? 'pause' : 'play_arrow'}
+                  </span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="text-white/70 hover:text-white flex items-center justify-center">
+                  <span className="material-symbols-rounded text-[36px] icon-fill leading-none">skip_next</span>
+                </button>
+              </div>
+
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsRepeat(!isRepeat); }} 
+                className={`w-10 h-10 flex items-center justify-center transition-colors ${isRepeat ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white'}`}
+              >
+                <span className="material-symbols-rounded text-[26px] leading-none">{isRepeat ? 'repeat_on' : 'repeat'}</span>
+              </button>
+            </div>
+          </div>
+
         </div>
       )}
 
-      {/* Main Player Bar */}
+      {/* Main Player Bar (Collapsed Miniplayer & Desktop Expanded) */}
       <div 
-        className={`absolute bottom-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-3xl border-t border-white/10 transition-transform duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'}`}
+        className={`absolute bottom-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-3xl border-t border-white/10 transition-transform duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
       
@@ -262,7 +331,7 @@ const Player = () => {
         </div>
       </div>
 
-      <div className="max-w-screen-2xl mx-auto flex items-center justify-between px-6 h-full pt-1">
+      <div className="max-w-screen-2xl mx-auto hidden lg:flex items-center justify-between px-6 h-full pt-1">
         
         {/* Left Side: Controls & Duration */}
         <div className="flex items-center gap-6 w-1/3">
@@ -378,6 +447,60 @@ const Player = () => {
               />
             </div>
           </div>
+        </div>
+
+      </div>
+
+      {/* Mobile Collapsed Miniplayer */}
+      <div className="max-w-screen-2xl mx-auto flex lg:hidden items-center justify-between px-4 h-full pt-1">
+        
+        {/* Left: Track Info */}
+        <div className="flex items-center gap-3 w-2/3 min-w-0 pointer-events-none">
+          {isLoading ? (
+            <PlayerTrackSkeleton />
+          ) : error ? (
+            <div className="flex items-center gap-2 text-red-400 min-w-0">
+              <span className="material-symbols-rounded text-xl">error</span>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-[11px] font-bold uppercase truncate">Error</h4>
+              </div>
+            </div>
+          ) : currentTrack ? (
+            <div className="flex items-center gap-3 w-full">
+              <img src={currentTrack.thumbnail} className="w-10 h-10 rounded-md object-cover shadow-lg border border-white/5 shrink-0" alt="" />
+              <div className="min-w-0 flex flex-col justify-center">
+                <h4 className="text-[12px] font-bold text-white truncate">{currentTrack.title}</h4>
+                <p className="text-[10px] text-white/50 font-medium truncate">{currentTrack.author}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 opacity-30">
+              <div className="w-10 h-10 bg-white/10 rounded-md flex items-center justify-center">
+                 <span className="material-symbols-rounded text-white/40 text-lg leading-none">music_note</span>
+              </div>
+              <div className="text-left">
+                 <h4 className="text-[12px] font-bold text-white">Not Playing</h4>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Controls */}
+        <div className={`flex items-center gap-2 shrink-0 ${!canControl ? 'opacity-50 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => playPrev()} className="w-10 h-10 text-white/70 hover:text-white flex items-center justify-center">
+            <span className="material-symbols-rounded text-[26px] icon-fill leading-none">skip_previous</span>
+          </button>
+          <button
+            onClick={() => togglePlay()}
+            className="w-11 h-11 bg-white text-slate-900 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-md"
+          >
+            <span className="material-symbols-rounded text-[28px] icon-fill leading-none">
+              {isPlaying ? 'pause' : 'play_arrow'}
+            </span>
+          </button>
+          <button onClick={() => playNext(true)} className="w-10 h-10 text-white/70 hover:text-white flex items-center justify-center">
+            <span className="material-symbols-rounded text-[26px] icon-fill leading-none">skip_next</span>
+          </button>
         </div>
 
       </div>

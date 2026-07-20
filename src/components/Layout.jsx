@@ -99,7 +99,7 @@ const Layout = ({ config }) => {
               </button>
             </div>
 
-            <div className="flex-1 max-w-xl mx-8">
+            <div className="flex-1 max-w-xl mx-8 hidden lg:block">
               <div className="w-full max-w-md relative group z-[50]">
                 <span className="material-symbols-rounded absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--color-primary)] transition-colors">search</span>
                 <input
@@ -127,9 +127,38 @@ const Layout = ({ config }) => {
               </div>
             </div>
 
-            {/* Spacer to keep search centered with flex justify-between */}
-            <div className="w-[120px] hidden md:block"></div>
+            {/* Spacer to keep search centered with flex justify-between on desktop */}
+            <div className="w-[120px] hidden lg:block"></div>
           </header>
+
+          {/* Mobile Search Bar (Below Header) */}
+          <div className="lg:hidden p-3 bg-black/20 border-b border-white/5 relative z-30 shrink-0">
+            <div className="w-full relative group">
+              <span className="material-symbols-rounded absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--color-primary)] transition-colors">search</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsExpanded(false);
+                }}
+                onFocus={() => {
+                  setShowSearch(true);
+                  setIsExpanded(false);
+                }}
+                placeholder="Search tracks, albums, videos..."
+                className="w-full h-11 bg-white/[0.06] border border-white/10 rounded-full pl-12 pr-10 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]/40 transition-all shadow-inner"
+              />
+              {showSearch && (
+                <button 
+                  onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 transition-colors"
+                >
+                  <span className="material-symbols-rounded text-sm">close</span>
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="flex-1 relative w-full flex flex-col min-h-0">
              {showSearch ? (
