@@ -40,8 +40,8 @@ export const handler = async (event) => {
       return {
         id: song.id,
         title: decode(song.title),
-        channel: { name: primaryArtists },
-        thumbnail: { url: song.image.replace('150x150', '500x500') },
+        author: primaryArtists,
+        thumbnail: song.image.replace('150x150', '500x500'),
         duration: parseInt(song.more_info?.duration || 0) * 1000,
         url: `https://jiosaavn.com/song/${song.id}`,
         hasHighRes: song.more_info?.['320kbps'] === 'true' || song.more_info?.['320kbps'] === true,
