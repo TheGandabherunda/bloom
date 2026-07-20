@@ -1,4 +1,4 @@
-import play from 'play-dl';
+import ytsr from 'youtube-sr';
 
 export const handler = async function (event, context) {
   const query = event.queryStringParameters.q;
@@ -8,7 +8,7 @@ export const handler = async function (event, context) {
   }
 
   try {
-    const results = await play.search(query, { limit: 1 });
+    const results = await ytsr.default.search(query, { limit: 1, type: 'video' });
     if (results && results.length > 0) {
       return {
         statusCode: 200,

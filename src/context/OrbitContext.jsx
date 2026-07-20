@@ -4,7 +4,7 @@ import { createHelia } from 'helia';
 import { createOrbitDB, Identities } from '@orbitdb/core';
 import { webSockets } from '@libp2p/websockets';
 import { webRTC } from '@libp2p/webrtc';
-import { all } from '@libp2p/websockets/filters';
+
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
 import { identify } from '@libp2p/identify';
 import { noise } from '@chainsafe/libp2p-noise';
@@ -67,7 +67,7 @@ export const OrbitProvider = ({ children }) => {
           listen: ['/webrtc']
         },
         transports: [
-          webSockets({ filter: all }),
+          webSockets(),
           webRTC(),
           circuitRelayTransport()
         ],
