@@ -8,45 +8,72 @@ export const findBestMirror = async () => {
 export const getApiBase = () => "proxy";
 export const getMirrorStatus = () => ({ "proxy": "healthy" });
 
+const fetchJSONP = (url) => new Promise((resolve, reject) => {
+  const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+  window[callbackName] = (data) => {
+    delete window[callbackName];
+    document.body.removeChild(script);
+    resolve(data);
+  };
+  const script = document.createElement('script');
+  script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
+  script.onerror = () => {
+    delete window[callbackName];
+    document.body.removeChild(script);
+    reject(new Error('JSONP failed'));
+  };
+  document.body.appendChild(script);
+});
+
 export const searchTracks = async (query) => {
   try {
-    const res = await fetch(`/api/yt/search?q=${encodeURIComponent(query)}`);
-    if (!res.ok) throw new Error('Search failed');
-    const data = await res.json();
-    return data.map(track => ({
-      id: track.id,
-      title: track.title,
-      author: track.channel?.name || 'Unknown Artist',
-      thumbnail: track.thumbnail?.url || '',
-      duration: track.duration || 0,
-      isMusic: true,
-      audioQuality: track.hasHighRes ? 'HD' : 'SD'
-    }));
+    const q = query.replace(/\baudio\b/ig, '').trim();
+    const url = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}`;
+    
+    const data = await fetchJSONP(url);
+    if (!data.results || data.results.length === 0) return [];
+    
+    return data.results.map(song => {
+      const decode = (str) => (str || '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+      const primaryArtists = song.more_info?.artistMap?.primary_artists?.map(a => a.name).join(', ') || 'Unknown Artist';
+      return {
+        id: song.id,
+        title: decode(song.title),
+        author: primaryArtists,
+        thumbnail: (song.image || '').replace('150x150', '500x500'),
+        duration: parseInt(song.more_info?.duration || 0) * 1000,
+        isMusic: true,
+        audioQuality: song.more_info?.['320kbps'] === 'true' || song.more_info?.['320kbps'] === true ? 'HD' : 'SD'
+      };
+    });
   } catch (e) {
-    console.error(e);
+    console.error('Search failed:', e);
     return [];
   }
 };
 
 export const getRecommendations = async (track) => {
   if (!track || !track.id) return [];
-  
   try {
-    const res = await fetch(`/api/yt/recommend?id=${track.id}`);
-    if (!res.ok) throw new Error('Reco failed');
-    const data = await res.json();
-    return data.map(song => ({
-      id: song.id,
-      title: song.title,
-      author: song.channel?.name || 'Unknown Artist',
-      thumbnail: song.thumbnail?.url || '',
-      duration: song.duration || 0,
-      isMusic: true,
-      audioQuality: song.hasHighRes ? 'HD' : 'SD'
-    }));
+    const url = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=reco.getreco&pid=${track.id}`;
+    const data = await fetchJSONP(url);
+    if (!data || data.length === 0) throw new Error('No reco');
+    
+    return data.map(song => {
+      const decode = (str) => (str || '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+      const primaryArtists = song.more_info?.artistMap?.primary_artists?.map(a => a.name).join(', ') || 'Unknown Artist';
+      return {
+        id: song.id,
+        title: decode(song.title),
+        author: primaryArtists,
+        thumbnail: (song.image || '').replace('150x150', '500x500'),
+        duration: parseInt(song.more_info?.duration || 0) * 1000,
+        isMusic: true,
+        audioQuality: song.more_info?.['320kbps'] === 'true' || song.more_info?.['320kbps'] === true ? 'HD' : 'SD'
+      };
+    });
   } catch (e) {
-    console.error(e);
-    // Fallback to searching if reco fails
+    console.error('Reco failed:', e);
     const q = track?.author || track?.title || "popular";
     return searchTracks(`${q} top songs`);
   }
