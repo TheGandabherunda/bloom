@@ -6,6 +6,7 @@ import { ytProxyPlugin } from './vite-plugin-yt-proxy.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     ytProxyPlugin(),
