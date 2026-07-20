@@ -213,22 +213,30 @@ const Player = () => {
           </div>
           
           {!showLyrics ? (
-            <div className="relative">
-              <img 
-                src={currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault')}
-                className={`w-[80vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
-                alt=""
-              />
+            <div className="relative flex flex-col items-center w-full mt-8 lg:mt-0">
+              <div className="relative">
+                <img 
+                  src={currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault')}
+                  className={`w-[90vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
+                  alt=""
+                />
 
-              {showPlayAnim && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                  <div className="bg-black/50 backdrop-blur-md rounded-full w-24 h-24 flex items-center justify-center animate-play-pause-pop">
-                    <span className="material-symbols-rounded text-white text-5xl icon-fill">
-                      {showPlayAnim}
-                    </span>
+                {showPlayAnim && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/50 backdrop-blur-md rounded-full w-24 h-24 flex items-center justify-center animate-play-pause-pop">
+                      <span className="material-symbols-rounded text-white text-5xl icon-fill">
+                        {showPlayAnim}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+              
+              {/* Mobile Title and Artist (Below Cover Art) */}
+              <div className="lg:hidden w-full flex flex-col items-center mt-6 px-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <h2 className="text-xl font-bold text-white w-full truncate">{currentTrack.title}</h2>
+                <p className="text-sm font-medium text-white/50 w-full truncate mt-1">{currentTrack.author}</p>
+              </div>
             </div>
           ) : (
             <Lyrics currentTrack={currentTrack} currentTime={currentTime} />
