@@ -5,6 +5,7 @@ import { useOrbit } from '../context/OrbitContext';
 const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
   const [cardColor, setCardColor] = useState('rgb(255, 255, 255)');
   const [hovered, setHovered] = useState(false);
+  const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const { chatDb, peerNames, peerId } = useOrbit();
 
   useEffect(() => {
@@ -88,19 +89,59 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
       </div>
 
       {/* Text — colors driven by CSS vars set on parent, guaranteed cascade */}
-      <div
-        className="px-1"
-        style={{
-          '--title-clr': hovered ? cardColor : 'rgba(255,255,255,0.95)',
-          '--desc-clr': hovered ? rgba(cardColor, 0.7) : 'rgba(255,255,255,0.4)',
-        }}
-      >
-        <h4 className="text-sm font-semibold truncate" style={{ color: 'var(--title-clr)', transition: 'color 0.2s ease' }}>
-          {track.title}
-        </h4>
-        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--desc-clr)', transition: 'color 0.2s ease' }}>
-          {track.author}
-        </p>
+      <div className="px-1 flex items-start justify-between gap-2">
+        <div
+          className="flex-1 min-w-0"
+          style={{
+            '--title-clr': hovered ? cardColor : 'rgba(255,255,255,0.95)',
+            '--desc-clr': hovered ? rgba(cardColor, 0.7) : 'rgba(255,255,255,0.4)',
+          }}
+        >
+          <h4 className="text-sm font-semibold truncate" style={{ color: 'var(--title-clr)', transition: 'color 0.2s ease' }}>
+            {track.title}
+          </h4>
+          <p className="text-xs truncate mt-0.5" style={{ color: 'var(--desc-clr)', transition: 'color 0.2s ease' }}>
+            {track.author}
+          </p>
+        </div>
+        
+        {/* Mobile Options Button */}
+        <div className="lg:hidden relative">
+          <button 
+            className="text-white/40 hover:text-white transition-colors p-1 rounded-full active:bg-white/10"
+            onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(!showMobileDropdown); }}
+          >
+            <span className="material-symbols-rounded text-[20px]">more_vert</span>
+          </button>
+          
+          {showMobileDropdown && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(false); }} 
+              />
+              <div className="absolute right-0 top-full mt-2 bg-[#1a1a1a]/95 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl z-50 p-1.5 min-w-[160px] animate-in fade-in zoom-in-95 duration-200">
+                <button 
+                  className="w-full text-left px-3 py-2.5 text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 active:bg-white/10 rounded-lg transition-colors flex items-center gap-3"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setShowMobileDropdown(false);
+                    addToQueue(track);
+                    const userName = peerNames[peerId] || localStorage.getItem('bloom_name') || 'Someone';
+                    const systemMsg = { text: `${userName} added "${track.title}" to the queue.`, type: 'system', sender: 'System', timestamp: Date.now() };
+                    window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
+                    if (chatDb) {
+                      try { await chatDb.add(systemMsg); } catch(err) {}
+                    }
+                  }}
+                >
+                  <span className="material-symbols-rounded text-[18px]">playlist_add</span>
+                  Add to queue
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
