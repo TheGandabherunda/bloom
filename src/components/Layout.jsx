@@ -69,7 +69,9 @@ const Layout = ({ config }) => {
           className="absolute inset-0 w-full h-full mix-blend-screen transition-opacity duration-[2000ms]"
           style={{
             opacity: currentTrack ? 0.55 : 0,
-            filter: 'blur(120px) saturate(150%)'
+            filter: typeof window !== 'undefined' && window.innerWidth < 768 ? 'blur(40px) saturate(150%)' : 'blur(120px) saturate(150%)',
+            transform: 'translateZ(0)',
+            willChange: 'opacity, filter'
           }}
         >
           <div className="blob blob-1"></div>

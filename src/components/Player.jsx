@@ -8,7 +8,8 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
   const barsRef = useRef([]);
 
   useEffect(() => {
-    if (!isExpanded) return;
+    if (!isExpanded) return; // Prevent heavy JS loop when visualizer is hidden!
+
     let animationFrameId;
     
     const renderLoop = () => {
@@ -170,7 +171,7 @@ const Player = () => {
         >
           {/* Background blur */}
           <div 
-            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 blur-[100px] scale-150 pointer-events-none opacity-70"
+            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 blur-[40px] lg:blur-[100px] scale-150 pointer-events-none opacity-70 transform-gpu"
             style={{ backgroundImage: `url(${currentTrack.thumbnail})` }} 
           />
           
