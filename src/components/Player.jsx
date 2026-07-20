@@ -174,10 +174,10 @@ const Player = () => {
             style={{ backgroundImage: `url(${currentTrack.thumbnail})` }} 
           />
           
-          {/* Top Right Buttons (Desktop Only for Lyrics, Minimize for all) */}
+          {/* Top Right Buttons (Desktop Only for Lyrics unless active, Minimize for all) */}
           <div className="absolute top-8 right-8 z-20 flex gap-2">
               <button 
-                className={`hidden lg:flex w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full items-center justify-center transition-colors ${showLyrics ? 'text-white bg-white/20' : 'text-white/70 hover:text-white'}`}
+                className={`${showLyrics ? 'flex' : 'hidden lg:flex'} w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full items-center justify-center transition-colors ${showLyrics ? 'text-[var(--color-primary)] bg-white/20' : 'text-white/70 hover:text-white'}`}
                 onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
                 title="Lyrics"
               >
