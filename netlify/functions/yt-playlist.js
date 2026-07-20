@@ -17,7 +17,7 @@ export const handler = async (event) => {
   const playlistUrl = event.queryStringParameters?.url;
 
   if (!playlistUrl) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing playlist url' }) };
+    return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Missing playlist url' }) };
   }
 
   try {
@@ -26,7 +26,7 @@ export const handler = async (event) => {
       try {
         const spotifyTracks = await spotify.getTracks(playlistUrl);
         if (!spotifyTracks || spotifyTracks.length === 0) {
-          return { statusCode: 404, body: JSON.stringify({ error: 'Spotify playlist not found or empty' }) };
+          return { statusCode: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Spotify playlist not found or empty' }) };
         }
         const tracks = spotifyTracks.map(item => ({
           title: item.name || 'Unknown Title',
@@ -35,19 +35,19 @@ export const handler = async (event) => {
 
         return {
           statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
           body: JSON.stringify(tracks),
         };
       } catch (err) {
         console.error('[Spotify Proxy Error]', err);
-        return { statusCode: 500, body: JSON.stringify({ error: 'Failed to parse Spotify playlist' }) };
+        return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Failed to parse Spotify playlist' }) };
       }
     }
 
     // --- YouTube Playlist Support via youtubei.js (full playlist, no API key) ---
     const match = playlistUrl.match(/[?&]list=([^&]+)/);
     if (!match || !match[1]) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Invalid YouTube playlist URL' }) };
+      return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Invalid YouTube playlist URL' }) };
     }
     const playlistId = match[1];
 
@@ -70,7 +70,7 @@ export const handler = async (event) => {
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify(tracks),
       };
     } catch (ytErr) {
@@ -81,7 +81,7 @@ export const handler = async (event) => {
       const rssRes = await fetch(ytFeedUrl);
 
       if (!rssRes.ok) {
-        return { statusCode: 404, body: JSON.stringify({ error: 'Playlist not found or empty' }) };
+        return { statusCode: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Playlist not found or empty' }) };
       }
 
       const xmlData = await rssRes.text();
@@ -89,7 +89,7 @@ export const handler = async (event) => {
       const jObj = parser.parse(xmlData);
 
       if (!jObj?.feed?.entry) {
-        return { statusCode: 404, body: JSON.stringify({ error: 'Playlist not found or empty' }) };
+        return { statusCode: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Playlist not found or empty' }) };
       }
 
       const entries = Array.isArray(jObj.feed.entry) ? jObj.feed.entry : [jObj.feed.entry];
@@ -99,12 +99,12 @@ export const handler = async (event) => {
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify(tracks),
       };
     }
   } catch (error) {
     console.error('[yt-playlist] Error:', error);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) };
+    return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Internal server error' }) };
   }
 };

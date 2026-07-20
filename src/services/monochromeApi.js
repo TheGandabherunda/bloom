@@ -133,21 +133,15 @@ export const importPlaylist = async (url) => {
       }));
     }
 
-    // YouTube Playlist Support (Independent client-side fallback via RSS, max 15 songs)
+    // YouTube Playlist Support (Full playlists via Netlify Serverless Proxy)
     const match = url.match(/[?&]list=([^&]+)/);
     if (match && match[1]) {
-      const playlistId = match[1];
-      const rssUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
-      const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`);
+      // Call the Netlify backend directly to scrape the full YouTube playlist (bypasses CORS)
+      const res = await fetch(`https://bloom-music-player.netlify.app/api/yt/playlist?url=${encodeURIComponent(url)}`);
       
-      if (!res.ok) throw new Error('Failed to fetch YouTube playlist');
-      const data = await res.json();
-      if (data.status !== 'ok' || !data.items) return [];
-      
-      return data.items.map(item => ({
-        title: item.title,
-        author: item.author
-      }));
+      if (!res.ok) throw new Error('Failed to fetch YouTube playlist from backend');
+      const tracks = await res.json();
+      return tracks;
     }
 
     throw new Error('Unsupported playlist URL format');
