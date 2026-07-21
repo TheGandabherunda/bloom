@@ -11,16 +11,26 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
     // Prevent heavy JS loop when visualizer is hidden OR when audio is paused!
     if (!isExpanded || !isPlaying) return;
 
+    // Precompute the logarithmic mapping for the 48 bars so we don't do Math.pow 1,152 times a second
+    const numBars = 48;
+    const ratioMap = new Array(numBars);
+    for (let i = 0; i < numBars; i++) {
+      const ratio = i / (numBars - 1);
+      ratioMap[i] = {
+        ratio: ratio,
+        powerRatio: Math.pow(ratio, 1.5)
+      };
+    }
+
     const handleVisualizerFrame = (data) => {
-      const numBars = 48;
       const usableBins = data.length > 0 ? Math.floor(data.length * 0.75) : 0;
       
       for (let i = 0; i < numBars; i++) {
         if (barsRef.current[i]) {
            let val = 0;
            if (usableBins > 0) {
-             const ratio = i / (numBars - 1);
-             const binIndex = Math.floor(Math.pow(ratio, 1.5) * (usableBins - 1));
+             const { ratio, powerRatio } = ratioMap[i];
+             const binIndex = Math.floor(powerRatio * (usableBins - 1));
              val = data[binIndex] || 0;
              val = val * (1 + (ratio * 0.5));
            }
