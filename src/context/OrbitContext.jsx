@@ -277,6 +277,12 @@ export const OrbitProvider = ({ children }) => {
             }
           });
         }
+
+        // If the owner leaves, kick everyone out to prevent the room from playing songs infinitely as a zombie room
+        if (peerRolesRef.current[pId] === 'owner' && !isHost) {
+          console.warn('[P2P] Owner has left the room. Redirecting to home...');
+          window.location.href = '/';
+        }
       };
 
       // State Synchronization Logic
