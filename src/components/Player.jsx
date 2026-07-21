@@ -74,7 +74,6 @@ const Player = () => {
     isPlaying,
     isLoading,
     currentTrack,
-    currentTime,
     duration,
     togglePlay,
     seek,
@@ -104,7 +103,18 @@ const Player = () => {
   const [showFsControls, setShowFsControls] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
   const [localProgress, setLocalProgress] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);
   const fsTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (playerRef?.current) {
+      const handleTime = (time) => setCurrentTime(time);
+      playerRef.current.addTimeListener(handleTime);
+      return () => {
+        if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
+      };
+    }
+  }, [playerRef]);
 
   // Sync fullscreen exit via Escape key or browser back
   useEffect(() => {

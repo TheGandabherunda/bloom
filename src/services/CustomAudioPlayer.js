@@ -41,10 +41,10 @@ export class CustomAudioPlayer {
     // Centralized Visualizer Engine
     this.visualizers = [];
     this.visualizerFrameId = null;
-    this.visualizerLastTime = 0;
+    // Centralized Time Engine
+    this.timeListeners = [];
 
     // Callbacks
-    this.onTimeUpdate = null;
     this.onDurationChange = null;
     this.onError = null;
     this.onEnded = null;
@@ -67,7 +67,11 @@ export class CustomAudioPlayer {
       lastTimeUpdate = now;
       lastAudioTime = this.audio.currentTime;
 
-      if (this.onTimeUpdate) this.onTimeUpdate(this.audio.currentTime);
+      // Dispatch single read to all subscribers
+      for (const callback of this.timeListeners) {
+        callback(this.audio.currentTime);
+      }
+      
       // Auto-recover AudioContext suspended in background
       if (this.isPlaying && this.audioContext && this.audioContext.state === 'suspended') {
         this.audioContext.resume().catch(() => {});
@@ -157,6 +161,16 @@ export class CustomAudioPlayer {
   removeVisualizer(callback) {
     this.visualizers = this.visualizers.filter(cb => cb !== callback);
     if (this.visualizers.length === 0) this._stopVisualizerLoop();
+  }
+
+  addTimeListener(callback) {
+    if (!this.timeListeners.includes(callback)) {
+      this.timeListeners.push(callback);
+    }
+  }
+
+  removeTimeListener(callback) {
+    this.timeListeners = this.timeListeners.filter(cb => cb !== callback);
   }
 
   _startVisualizerLoop() {

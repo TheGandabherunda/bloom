@@ -11,7 +11,6 @@ export const PlaybackProvider = ({ children }) => {
   const [queue, setQueueState] = useState([]);
   const [originalQueue, setOriginalQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isShuffled, setIsShuffledState] = useState(false);
   const [volume, setVolumeState] = useState(1);
@@ -35,7 +34,6 @@ export const PlaybackProvider = ({ children }) => {
     playerRef.current = player;
     player.setVolume(volume);
     
-    player.onTimeUpdate = (time) => setCurrentTime(time);
     player.onDurationChange = (dur) => setDuration(dur);
     player.onError = (e) => {
       console.error('[CustomPlayer] Error:', e);
@@ -291,7 +289,8 @@ export const PlaybackProvider = ({ children }) => {
   }, [playNext]);
 
   const playPrev = useCallback(() => {
-    if (currentTime > 3) {
+    const cTime = playerRef.current?.getCurrentTime() || 0;
+    if (cTime > 3) {
       seek(0);
       return;
     }
@@ -302,7 +301,7 @@ export const PlaybackProvider = ({ children }) => {
     }
     setCurrentIndex(prevIndex);
     loadTrack(queue[prevIndex], prevIndex, 0, true, peerId);
-  }, [queue, currentIndex, currentTime, seek, loadTrack, peerId]);
+  }, [queue, currentIndex, seek, loadTrack, peerId]);
 
   const addToQueue = useCallback((track) => {
     setOriginalQueue(prev => [...prev, track]);
@@ -408,29 +407,40 @@ export const PlaybackProvider = ({ children }) => {
   // Sync Media Session Position State (Progress Bar) — throttled to avoid per-frame calls
   useEffect(() => {
     if ('mediaSession' in navigator && duration > 0) {
-      const lastSync = mediaSessionSyncRef.current;
-      // Only update on significant time jump (seek) or play/pause state change
-      const isSignificantJump = Math.abs(currentTime - lastSync.time) > 5;
-      const stateChanged = lastSync.isPlaying !== isPlaying || lastSync.duration !== duration;
+      const syncMediaSession = (cTime) => {
+        const lastSync = mediaSessionSyncRef.current;
+        // Only update on significant time jump (seek) or play/pause state change
+        const isSignificantJump = Math.abs(cTime - lastSync.time) > 5;
+        const stateChanged = lastSync.isPlaying !== isPlaying || lastSync.duration !== duration;
 
-      if (isSignificantJump || stateChanged) {
-        try {
-          navigator.mediaSession.setPositionState({
-            duration: Math.max(0, duration),
-            playbackRate: isPlaying ? 1 : 0,
-            position: Math.max(0, Math.min(currentTime, duration))
-          });
-          mediaSessionSyncRef.current = { time: currentTime, isPlaying, duration };
-        } catch (e) {
-          console.warn("MediaSession setPositionState error:", e);
+        if (isSignificantJump || stateChanged) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: Math.max(0, duration),
+              playbackRate: isPlaying ? 1 : 0,
+              position: Math.max(0, Math.min(cTime, duration))
+            });
+            mediaSessionSyncRef.current = { time: cTime, isPlaying, duration };
+          } catch (e) {
+            console.warn("MediaSession setPositionState error:", e);
+          }
         }
+      };
+
+      if (playerRef.current) {
+        playerRef.current.addTimeListener(syncMediaSession);
+        // Initial sync
+        syncMediaSession(playerRef.current.getCurrentTime());
+        return () => {
+          if (playerRef.current) playerRef.current.removeTimeListener(syncMediaSession);
+        };
       }
     }
-  }, [isPlaying, duration]); // Removed currentTime — only sync on actual state changes
+  }, [isPlaying, duration, playerRef.current]);
 
   const value = {
       isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
-      currentTime, duration, loadTrack, togglePlay, seek,
+      duration, loadTrack, togglePlay, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
       playerRef
