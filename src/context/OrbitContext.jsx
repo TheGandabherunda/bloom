@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { joinRoom, selfId } from 'trystero/torrent';
+import { joinRoom, selfId } from 'trystero';
 
 const OrbitContext = createContext(null);
 
