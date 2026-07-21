@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { joinRoom, selfId } from 'trystero/torrent';
 
 const OrbitContext = createContext(null);
 
@@ -24,16 +25,10 @@ export const OrbitProvider = ({ children }) => {
   const [peers, setPeers] = useState([]);
   const [peerNames, setPeerNames] = useState({});
   const [peerRoles, setPeerRoles] = useState({});
-  const initializingRef = useRef(false);
+  
   const statusRef = useRef('disconnected');
+  const roomRef = useRef(null);
   
-  const workerRef = useRef(null);
-  const messageResolvers = useRef({});
-  const msgIdCounter = useRef(0);
-  const myPeerIdRef = useRef(null);
-  
-  const stateDbRef = useRef(null);
-  const chatDbRef = useRef(null);
   const [stateDbReady, setStateDbReady] = useState(null);
   const [chatDbReady, setChatDbReady] = useState(null);
 
@@ -42,119 +37,148 @@ export const OrbitProvider = ({ children }) => {
     setStatus(newStatus);
   };
 
-  const postMsg = useCallback((type, payload) => {
-    return new Promise((resolve, reject) => {
-      if (!workerRef.current) return reject(new Error('Worker not initialized'));
-      const id = ++msgIdCounter.current;
-      messageResolvers.current[id] = { resolve, reject };
-      workerRef.current.postMessage({ id, type, payload });
-    });
-  }, []);
-
   const stopP2P = useCallback(async () => {
-    if (workerRef.current) {
-      await postMsg('STOP', {}).catch(() => {});
-      workerRef.current.terminate();
-      workerRef.current = null;
+    if (roomRef.current) {
+      roomRef.current.leave();
+      roomRef.current = null;
     }
-    stateDbRef.current = null;
-    chatDbRef.current = null;
     setStateDbReady(null);
     setChatDbReady(null);
+    setPeers([]);
     setStatusWrapped('disconnected');
-    initializingRef.current = false;
-  }, [postMsg]);
+  }, []);
 
   const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null) => {
-    if (initializingRef.current || statusRef.current === 'connected') return;
+    if (statusRef.current === 'connected' || statusRef.current === 'initializing') return;
     
     try {
-      initializingRef.current = true;
       setStatusWrapped('initializing');
-      console.log('Starting P2P Worker initialization...');
+      console.log('Starting Trystero initialization...');
 
-      const worker = new Worker(new URL('../workers/p2pWorker.js', import.meta.url), { type: 'module' });
-      workerRef.current = worker;
+      const room = joinRoom({ appId: 'bloom-p2p' }, roomId);
+      roomRef.current = room;
+      setPeerId(selfId);
 
-      worker.onmessage = (e) => {
-        const { id, success, result, error, type, peerId: pId, payload, entry } = e.data;
-        
-        if (id && messageResolvers.current[id]) {
-          if (success) messageResolvers.current[id].resolve(result !== undefined ? result : pId);
-          else messageResolvers.current[id].reject(new Error(error));
-          delete messageResolvers.current[id];
-        }
-
-        if (type === 'PEER_CONNECT') setPeers(prev => [...new Set([...prev, pId])]);
-        else if (type === 'PEER_DISCONNECT') setPeers(prev => prev.filter(p => p !== pId));
-        else if (type === 'STATE_UPDATE') {
-          if (stateDbRef.current) stateDbRef.current.events.emit('update', entry);
-          const { key, value } = entry.payload;
-          if (key.startsWith('peer_name_')) setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: value}));
-          else if (key.startsWith('peer_role_')) setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: value}));
-          else if (key === 'banned') {
-             if (value === myPeerIdRef.current) window.location.reload();
-             else postMsg('CLOSE_CONNECTIONS', { peerId: value }).catch(()=>{});
-          }
-        }
-        else if (type === 'CHAT_UPDATE') {
-          if (chatDbRef.current) chatDbRef.current.events.emit('update', entry);
-        }
-      };
-
-      // Create dummy proxy objects so the rest of the UI doesn't crash
       const stateProxy = {
         events: new MiniEmitter(),
-        put: async (key, value) => postMsg('STATE_PUT', { key, value }),
-        get: async (key) => postMsg('STATE_GET', { key }),
-        all: async () => postMsg('STATE_ALL', {})
+        store: {},
+        put: async (key, value) => {
+          stateProxy.store[key] = value;
+          stateProxy.sendPut({ key, value });
+          stateProxy.events.emit('update', { payload: { key, value } });
+          
+          if (key === 'banned') {
+            room.leave();
+          }
+        },
+        get: async (key) => stateProxy.store[key],
+        all: async () => Object.entries(stateProxy.store).map(([key, value]) => ({ key, value }))
       };
 
       const chatProxy = {
         events: new MiniEmitter(),
-        add: async (msg) => postMsg('CHAT_ADD', { msg }),
-        all: async () => postMsg('CHAT_ALL', {})
+        arr: [],
+        add: async (msg) => {
+          chatProxy.arr.push(msg);
+          chatProxy.sendAdd({ msg });
+          chatProxy.events.emit('update', { payload: { value: msg } });
+        },
+        all: async () => chatProxy.arr.map(value => ({ payload: { value } }))
       };
 
-      stateDbRef.current = stateProxy;
-      chatDbRef.current = chatProxy;
+      // Trystero Actions
+      const [sendPut, getPut] = room.makeAction('statePut');
+      const [sendAdd, getAdd] = room.makeAction('chatAdd');
+      const [requestSync, getSyncRequest] = room.makeAction('reqSync');
+      const [sendFullSync, getFullSync] = room.makeAction('fullSync');
 
-      const myPeerId = await postMsg('INIT', { roomId, displayName, isHost, hostId });
-      myPeerIdRef.current = myPeerId;
-      setPeerId(myPeerId);
+      stateProxy.sendPut = sendPut;
+      chatProxy.sendAdd = sendAdd;
 
-      // Local state immediately
-      setPeerNames(prev => ({ ...prev, [myPeerId]: displayName }));
-      if (isHost) setPeerRoles(prev => ({ ...prev, [myPeerId]: 'owner' }));
-
-      // Sync initial history
-      const allState = await stateProxy.all();
-      const initialNames = { [myPeerId]: displayName };
-      const initialRoles = isHost ? { [myPeerId]: 'owner' } : {};
-      allState.forEach(entry => {
-        if (entry.key.startsWith('peer_name_')) initialNames[entry.key.replace('peer_name_', '')] = entry.value;
-        if (entry.key.startsWith('peer_role_')) initialRoles[entry.key.replace('peer_role_', '')] = entry.value;
+      getPut((data, pId) => {
+        stateProxy.store[data.key] = data.value;
+        stateProxy.events.emit('update', { payload: { key: data.key, value: data.value } });
+        
+        if (data.key.startsWith('peer_name_')) {
+          setPeerNames(prev => ({...prev, [data.key.replace('peer_name_', '')]: data.value}));
+        } else if (data.key.startsWith('peer_role_')) {
+          setPeerRoles(prev => ({...prev, [data.key.replace('peer_role_', '')]: data.value}));
+        } else if (data.key === 'banned' && data.value === selfId) {
+          window.location.reload();
+        }
       });
-      setPeerNames(initialNames);
-      setPeerRoles(initialRoles);
+
+      getAdd((data, pId) => {
+        chatProxy.arr.push(data.msg);
+        chatProxy.events.emit('update', { payload: { value: data.msg } });
+      });
+
+      // Peer Lifecycle
+      room.onPeerJoin = (pId) => {
+        setPeers(prev => [...new Set([...prev, pId])]);
+        // Request state sync from newly joined peer just in case they have history
+        if (!isHost) requestSync({}, pId);
+      };
+
+      room.onPeerLeave = (pId) => {
+        setPeers(prev => prev.filter(p => p !== pId));
+      };
+
+      // State Synchronization Logic
+      getSyncRequest((_, pId) => {
+        sendFullSync({
+          state: stateProxy.store,
+          chat: chatProxy.arr,
+          names: stateProxy.store,
+        }, { target: pId });
+      });
+
+      getFullSync((data) => {
+        stateProxy.store = { ...stateProxy.store, ...data.state };
+        chatProxy.arr = data.chat;
+        
+        const initialNames = { [selfId]: displayName };
+        const initialRoles = isHost ? { [selfId]: 'owner' } : {};
+        
+        Object.entries(stateProxy.store).forEach(([key, value]) => {
+          if (key.startsWith('peer_name_')) initialNames[key.replace('peer_name_', '')] = value;
+          if (key.startsWith('peer_role_')) initialRoles[key.replace('peer_role_', '')] = value;
+        });
+        
+        setPeerNames(initialNames);
+        setPeerRoles(initialRoles);
+      });
+
+      // Initial Local State Setup
+      setPeerNames(prev => ({ ...prev, [selfId]: displayName }));
+      if (isHost) setPeerRoles(prev => ({ ...prev, [selfId]: 'owner' }));
+
+      await stateProxy.put(`peer_name_${selfId}`, displayName);
+      if (isHost) {
+        await stateProxy.put(`peer_role_${selfId}`, 'owner');
+      }
+
+      await chatProxy.add({
+        text: `${displayName} joined the room`,
+        type: 'system',
+        sender: 'System',
+        timestamp: Date.now(),
+      });
 
       setStateDbReady(stateProxy);
       setChatDbReady(chatProxy);
       setStatusWrapped('connected');
-      initializingRef.current = false;
-      console.log('P2P connected successfully via Web Worker');
+      console.log('Trystero connected successfully!');
 
     } catch (err) {
       console.error('P2P Init Error:', err);
       setStatusWrapped('failed');
-      initializingRef.current = false;
-      if (workerRef.current) workerRef.current.terminate();
     }
-  }, [postMsg]);
+  }, []);
 
   useEffect(() => {
     return () => {
-      // Unmount cleanup
+      if (roomRef.current) roomRef.current.leave();
     };
   }, []);
 
