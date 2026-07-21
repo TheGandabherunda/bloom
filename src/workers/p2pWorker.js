@@ -73,10 +73,14 @@ self.onmessage = async (e) => {
  */
 async function getPublicRelayAddrs() {
   const BOOTSTRAP_PEER_IDS = [
+    // Standard IPFS Public Relays (Often full/NO_RESERVATION)
     'QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
     'QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
     'QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
-    'QmcZf59bWwK5XFi76CZX8cbJ4VtEQh4BcR56CWsMoP1S2i'
+    'QmcZf59bWwK5XFi76CZX8cbJ4VtEQh4BcR56CWsMoP1S2i',
+    // Dedicated libp2p test WebTransport/WebRTC Relays (More reliable)
+    '12D3KooWFhXabKDwALpzqMbto94sB7rvmZ6M28hs9Y9xSopDKwQr',
+    '12D3KooWDrsZEXH9wS1zHhMvMUPm571jVj1P7vj1r8TzVv8E4R'
   ];
 
   const relayListenAddrs = [];
