@@ -11,33 +11,42 @@ const formatTime = (seconds) => {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
 
-const TileVisualizer = ({ playerRef, cardColor }) => {
+const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
   const barsRef = React.useRef([]);
 
   React.useEffect(() => {
+    // Don't run the RAF loop when paused — saves 60fps of CPU drain
+    if (!isPlaying) {
+      // Reset bars to flat when paused
+      for (let i = 0; i < 6; i++) {
+        if (barsRef.current[i]) barsRef.current[i].style.height = '5%';
+      }
+      return;
+    }
+
     let animationFrameId;
-    
+
     const renderLoop = () => {
       let data = new Uint8Array(0);
       if (playerRef?.current) {
         data = playerRef.current.getFrequencyData();
       }
-      
+
       for (let i = 0; i < 6; i++) {
         if (barsRef.current[i]) {
-           const idx = Math.floor((i / 6) * 48); // sample like Player does
-           const val = data.length > idx ? data[idx] : 0;
-           const normalized = Math.pow(val / 255, 1.4);
-           barsRef.current[i].style.height = `${Math.max(5, normalized * 100)}%`;
+          const idx = Math.floor((i / 6) * 48);
+          const val = data.length > idx ? data[idx] : 0;
+          const normalized = Math.pow(val / 255, 1.4);
+          barsRef.current[i].style.height = `${Math.max(5, normalized * 100)}%`;
         }
       }
-      
+
       animationFrameId = requestAnimationFrame(renderLoop);
     };
-    
+
     renderLoop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [playerRef]);
+  }, [isPlaying, playerRef]);
 
   return (
     <div className="absolute inset-0 bg-black/70 flex items-end justify-between gap-[2px] px-1 pt-4 overflow-hidden">
@@ -84,7 +93,7 @@ const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canC
           <div className="absolute inset-0 z-20 shimmer" />
         )}
         {(isActive && isPlaying && !isLoading) && (
-          <TileVisualizer playerRef={playerRef} cardColor={cardColor} />
+          <TileVisualizer playerRef={playerRef} isPlaying={isPlaying} cardColor={cardColor} />
         )}
       </div>
       <div className={`min-w-0 flex-1 relative ${isActive && isLoading ? 'rounded overflow-hidden' : ''}`}>

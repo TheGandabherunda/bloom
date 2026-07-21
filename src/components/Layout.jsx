@@ -71,7 +71,6 @@ const Layout = ({ config }) => {
             opacity: currentTrack ? 0.55 : 0,
             filter: typeof window !== 'undefined' && window.innerWidth < 768 ? 'saturate(150%)' : 'blur(40px) saturate(150%)',
             transform: 'translateZ(0)',
-            willChange: 'opacity, filter'
           }}
         >
           <div className="blob blob-1"></div>

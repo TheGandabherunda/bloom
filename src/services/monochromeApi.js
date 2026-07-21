@@ -1,6 +1,15 @@
 // The backend proxy now handles all high-res streams natively via Jiosaavn CDN.
 // External monochrome mirrors are permanently stripped.
 
+// Decode HTML entities without DOM mutations (no textarea/DOMParser overhead)
+const decodeHtml = (str) => str
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#039;/g, "'")
+  .replace(/&apos;/g, "'");
+
 const fetchJSONP = (url) => new Promise((resolve, reject) => {
   const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
   window[callbackName] = (data) => {
@@ -39,9 +48,7 @@ export const searchTracks = async (query) => {
       const downloadUrl = song.downloadUrl?.find(d => d.quality === '320kbps')?.url || song.downloadUrl?.[song.downloadUrl.length - 1]?.url;
       const author = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
       
-      const textArea = document.createElement('textarea');
-      textArea.innerHTML = song.name;
-      const title = textArea.value;
+      const title = decodeHtml(song.name);
 
       return {
         id: song.id,
@@ -60,22 +67,24 @@ export const searchTracks = async (query) => {
   }
 };
 
+// Cache recommendations per track ID — avoid re-fetching on re-selection
+const recsCache = new Map();
+
 export const getRecommendations = async (track) => {
   if (!track || !track.id) return [];
+  if (recsCache.has(track.id)) return recsCache.get(track.id);
   try {
     const url = `https://jiosaavn-api-one-rho.vercel.app/api/songs/${track.id}/suggestions`;
     const response = await fetch(url);
     const data = await response.json();
     if (!data.success || !data.data || data.data.length === 0) return [];
     
-    return data.data.map(song => {
+    const results = data.data.map(song => {
       const thumbnail = song.image.find(img => img.quality === '500x500')?.url || song.image[song.image.length - 1]?.url;
       const downloadUrl = song.downloadUrl?.find(d => d.quality === '320kbps')?.url || song.downloadUrl?.[song.downloadUrl.length - 1]?.url;
       const author = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
       
-      const textArea = document.createElement('textarea');
-      textArea.innerHTML = song.name;
-      const title = textArea.value;
+      const title = decodeHtml(song.name);
 
       return {
         id: song.id,
@@ -88,6 +97,8 @@ export const getRecommendations = async (track) => {
         downloadUrl: downloadUrl
       };
     });
+    recsCache.set(track.id, results);
+    return results;
   } catch (e) {
     console.error('Recommendations failed:', e);
     return [];

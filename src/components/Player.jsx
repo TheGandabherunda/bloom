@@ -152,14 +152,21 @@ const Player = () => {
   };
 
   const [touchStartY, setTouchStartY] = useState(0);
-  const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const maxDragRef = useRef(0);
+  const dragYRef = useRef(0);
+  const draggableRef = useRef(null);
 
   const handleTouchStart = (e) => {
     setTouchStartY(e.touches[0].clientY);
     setIsDragging(true);
     maxDragRef.current = 0;
+    dragYRef.current = 0;
+    
+    if (draggableRef.current) {
+        draggableRef.current.style.transition = 'none';
+        draggableRef.current.style.pointerEvents = 'auto';
+    }
   };
 
   const handleTouchMove = (e) => {
@@ -168,27 +175,47 @@ const Player = () => {
     const deltaY = currentY - touchStartY;
     maxDragRef.current = Math.max(maxDragRef.current, Math.abs(deltaY));
     
-    // Expanded player: allow dragging DOWN
+    let newDragY = 0;
     if (isExpanded && deltaY > 0) {
-      setDragY(deltaY);
-    } 
-    // Miniplayer: allow dragging UP
-    else if (!isExpanded && deltaY < 0) {
-      setDragY(deltaY);
+      newDragY = deltaY;
+    } else if (!isExpanded && deltaY < 0) {
+      newDragY = deltaY;
+    }
+    
+    dragYRef.current = newDragY;
+    
+    if (draggableRef.current) {
+        const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        if (isExpanded) {
+            draggableRef.current.style.transform = `translateY(${newDragY}px)`;
+            draggableRef.current.style.opacity = Math.max(0.5, 1 - newDragY / windowHeight);
+        } else {
+            draggableRef.current.style.transform = `translateY(calc(100% + ${newDragY}px))`;
+            draggableRef.current.style.opacity = Math.max(0, -newDragY / windowHeight);
+        }
     }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
+    
+    if (draggableRef.current) {
+        draggableRef.current.style.transform = '';
+        draggableRef.current.style.transition = '';
+        draggableRef.current.style.opacity = '';
+        draggableRef.current.style.pointerEvents = '';
+    }
+    
     if (typeof window === 'undefined') return;
     const threshold = window.innerHeight * 0.2;
     
-    if (isExpanded && dragY > threshold) {
+    if (isExpanded && dragYRef.current > threshold) {
       setIsExpanded(false);
-    } else if (!isExpanded && dragY < -threshold) {
+    } else if (!isExpanded && dragYRef.current < -threshold) {
       setIsExpanded(true);
     }
-    setDragY(0);
+    
+    dragYRef.current = 0;
   };
 
   const formatTime = (seconds) => {
@@ -205,6 +232,7 @@ const Player = () => {
       {/* Expanded View */}
       {currentTrack && (
         <div 
+          ref={draggableRef}
           className={`bg-black flex flex-col items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : 'absolute inset-0 bottom-[60px] lg:bottom-0 lg:right-[400px] z-[45] pb-[80px] lg:pb-24'}`}
           onClick={handleExpandedClick}
           onMouseMove={handleMouseMove}
@@ -212,12 +240,6 @@ const Player = () => {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          style={{
-            transform: isDragging ? (isExpanded ? `translateY(${dragY}px)` : `translateY(calc(100% + ${dragY}px))`) : undefined,
-            transition: isDragging ? 'none' : undefined,
-            opacity: isDragging ? (isExpanded ? Math.max(0.5, 1 - dragY / (typeof window !== 'undefined' ? window.innerHeight : 800)) : Math.max(0, -dragY / (typeof window !== 'undefined' ? window.innerHeight : 800))) : undefined,
-            pointerEvents: isDragging ? 'auto' : undefined
-          }}
         >
           {/* Background blur */}
           <div 

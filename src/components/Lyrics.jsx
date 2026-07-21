@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { getLyrics } from '../services/monochromeApi';
 
 const Lyrics = ({ currentTrack, currentTime }) => {
@@ -99,19 +99,21 @@ const Lyrics = ({ currentTrack, currentTime }) => {
     return () => {
       isMounted = false;
     };
-  }, [currentTrack]);
+  }, [currentTrack?.id]);
 
-  // Determine active line index
-  let activeIndex = -1;
-  if (isSynced && lyricsData.length > 0) {
+  // Determine active line index (memoized to avoid O(n) scan on every time update)
+  const activeIndex = useMemo(() => {
+    if (!isSynced || lyricsData.length === 0) return -1;
+    let idx = -1;
     for (let i = 0; i < lyricsData.length; i++) {
       if (currentTime >= lyricsData[i].time) {
-        activeIndex = i;
+        idx = i;
       } else {
-        break; // Lyrics are chronological
+        break;
       }
     }
-  }
+    return idx;
+  }, [isSynced, lyricsData, currentTime]);
 
   // Smooth cinematic glide to active line
   useEffect(() => {

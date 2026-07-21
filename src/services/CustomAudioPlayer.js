@@ -1,37 +1,39 @@
 export class CustomAudioPlayer {
   constructor() {
-    // ─── Main Audio (Plays natively to speakers, NO WebAudio distortion) ───
+    // ─── Single Audio element (plays to speakers AND feeds the analyser) ───
     this.audio = new Audio();
-    this.audio.preload = 'auto'; // Maximize buffering
-    
-    // ─── Visualizer Audio (Cloned stream, muted, routes to WebAudio) ───
-    this.visualizerAudio = new Audio();
-    this.visualizerAudio.crossOrigin = 'anonymous';
-    this.visualizerAudio.preload = 'auto';
+    this.audio.preload = 'auto';
+    this.audio.crossOrigin = 'anonymous'; // Required for MediaElementSource CORS
 
-    // Set up WebAudio for the visualizer
+    // ─── WebAudio: single MediaElementSource → split to speakers + analyser ───
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     this.audioContext = new AudioCtx({ latencyHint: 'playback' });
-    
+
+    // Lower fftSize: 256 gives 128 bins — more than enough for 48 visualizer bars
     this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 2048; // High resolution: 1024 bins, ~21.5 Hz per bin
-    this.analyser.smoothingTimeConstant = 0.8; // Professional decay rate
-    
-    // Mute the visualizer audio output so we don't hear the WebAudio crackle bug
+    this.analyser.fftSize = 256;
+    this.analyser.smoothingTimeConstant = 0.8;
+
+    // Route: audio → source → splitter → [destination, analyser → mutedGain → destination]
+    this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
+
+    // Muted gain for the analyser branch so we don't double-output
     this.muteGain = this.audioContext.createGain();
-    this.muteGain.gain.value = 0; 
-    
-    // Connect visualizer audio -> analyser -> muted gain -> destination
-    this.sourceNode = this.audioContext.createMediaElementSource(this.visualizerAudio);
+    this.muteGain.gain.value = 0;
+
+    // Main signal goes to speakers directly
+    this.sourceNode.connect(this.audioContext.destination);
+
+    // Analyser branch: source → analyser → muted gain → destination
     this.sourceNode.connect(this.analyser);
     this.analyser.connect(this.muteGain);
     this.muteGain.connect(this.audioContext.destination);
-    
+
     this.volume = 1;
     this.isPlaying = false;
     this.isAborted = false;
-    
-    // Watchdog variables for stall recovery (monitoring main audio)
+
+    // Watchdog variables for stall recovery
     this.watchdogInterval = null;
     this.lastTime = -1;
     this.stallCount = 0;
@@ -44,17 +46,12 @@ export class CustomAudioPlayer {
     this.onBuffering = null;
     this.onPlayStateChange = null;
 
-    // ─── Sync Events ───
+    // ─── Events ───
     this.audio.addEventListener('timeupdate', () => {
       if (this.onTimeUpdate) this.onTimeUpdate(this.audio.currentTime);
-      // Auto-recover AudioContext if it suspended in the background
+      // Auto-recover AudioContext suspended in background
       if (this.isPlaying && this.audioContext && this.audioContext.state === 'suspended') {
         this.audioContext.resume().catch(() => {});
-      }
-      
-      // Keep visualizer audio strictly in sync with main audio
-      if (Math.abs(this.audio.currentTime - this.visualizerAudio.currentTime) > 0.5) {
-        this.visualizerAudio.currentTime = this.audio.currentTime;
       }
     });
 
@@ -83,24 +80,22 @@ export class CustomAudioPlayer {
       if (this.onBuffering) this.onBuffering(false);
       this.stallCount = 0;
     });
-    
+
     this.audio.addEventListener('stalled', () => {
       this._attemptStallRecovery();
     });
-    
+
     this.audio.addEventListener('play', () => {
       this.isPlaying = true;
-      this.visualizerAudio.play().catch(() => {}); // Sync clone
       if (this.onPlayStateChange) this.onPlayStateChange(true);
       if (this.audioContext.state === 'suspended') {
         this.audioContext.resume();
       }
       this._startWatchdog();
     });
-    
+
     this.audio.addEventListener('pause', () => {
       this.isPlaying = false;
-      this.visualizerAudio.pause(); // Sync clone
       if (this.onPlayStateChange) this.onPlayStateChange(false);
       this._stopWatchdog();
     });
@@ -120,16 +115,10 @@ export class CustomAudioPlayer {
         } else if (this.stallCount >= 5) {
           const currentSrc = this.audio.src;
           const timeToRestore = this.audio.currentTime;
-          
+
           this.audio.src = currentSrc;
-          this.visualizerAudio.src = currentSrc;
-          
           this.audio.load();
-          this.visualizerAudio.load();
-          
           this.audio.currentTime = timeToRestore;
-          this.visualizerAudio.currentTime = timeToRestore;
-          
           this.audio.play().catch(() => {});
           this.stallCount = 0;
         }
@@ -166,7 +155,6 @@ export class CustomAudioPlayer {
     this.volume = Math.max(0, Math.min(1, v));
     if (this.audio) {
       this.audio.volume = this.volume;
-      // Note: We don't change visualizerAudio volume because it's fully muted via GainNode anyway
     }
   }
 
@@ -178,46 +166,24 @@ export class CustomAudioPlayer {
     console.log(`[AudioPlayer] load called with URL: ${manifestUrl}, startTime: ${startTime}`);
     this.isAborted = false;
     this._stopWatchdog();
-    
+
     if (this.currentObjectUrl) {
       URL.revokeObjectURL(this.currentObjectUrl);
       this.currentObjectUrl = null;
     }
-    
-    try {
-      const response = await fetch(manifestUrl);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-      const blob = await response.blob();
-      if (this.isAborted) return; 
-      
-      this.currentObjectUrl = URL.createObjectURL(blob);
-      
-      // Feed both players the local RAM blob
-      this.audio.src = this.currentObjectUrl;
-      this.visualizerAudio.src = this.currentObjectUrl;
-    } catch (err) {
-      console.warn('[AudioPlayer] Pre-buffer failed, falling back to direct stream:', err);
-      if (this.isAborted) return;
-      this.audio.src = manifestUrl;
-      this.visualizerAudio.src = manifestUrl;
-    }
 
+    this.audio.src = manifestUrl;
     this.audio.currentTime = startTime;
-    this.visualizerAudio.currentTime = startTime;
-    
     this.audio.load();
-    this.visualizerAudio.load();
   }
 
   async play() {
     if (this.isAborted) return;
     try {
       if (this.audioContext.state === 'suspended') {
-         await this.audioContext.resume();
+        await this.audioContext.resume();
       }
       await this.audio.play();
-      // visualizerAudio.play() is handled in the 'play' event listener
     } catch (e) {
       if (e.name !== 'AbortError') {
         console.error('[AudioPlayer] play error:', e);
@@ -235,7 +201,6 @@ export class CustomAudioPlayer {
   seek(time) {
     if (this.audio) {
       this.audio.currentTime = time;
-      this.visualizerAudio.currentTime = time;
     }
   }
 
@@ -246,10 +211,6 @@ export class CustomAudioPlayer {
     if (this.audio) {
       this.audio.removeAttribute('src');
       this.audio.load();
-    }
-    if (this.visualizerAudio) {
-      this.visualizerAudio.removeAttribute('src');
-      this.visualizerAudio.load();
     }
     if (this.currentObjectUrl) {
       URL.revokeObjectURL(this.currentObjectUrl);

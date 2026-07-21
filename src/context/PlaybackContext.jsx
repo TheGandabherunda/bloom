@@ -405,13 +405,14 @@ export const PlaybackProvider = ({ children }) => {
     }
   }, [togglePlay, playPrev, playNext, seek]);
 
-  // Sync Media Session Position State (Progress Bar)
+  // Sync Media Session Position State (Progress Bar) — throttled to avoid per-frame calls
   useEffect(() => {
     if ('mediaSession' in navigator && duration > 0) {
       const lastSync = mediaSessionSyncRef.current;
-      const isSignificantJump = Math.abs(currentTime - lastSync.time) > 2;
+      // Only update on significant time jump (seek) or play/pause state change
+      const isSignificantJump = Math.abs(currentTime - lastSync.time) > 5;
       const stateChanged = lastSync.isPlaying !== isPlaying || lastSync.duration !== duration;
-      
+
       if (isSignificantJump || stateChanged) {
         try {
           navigator.mediaSession.setPositionState({
@@ -425,7 +426,7 @@ export const PlaybackProvider = ({ children }) => {
         }
       }
     }
-  }, [currentTime, duration, isPlaying]);
+  }, [isPlaying, duration]); // Removed currentTime — only sync on actual state changes
 
   const value = {
       isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,

@@ -157,6 +157,15 @@ input[type=range]::-webkit-slider-thumb {
 .blob-3 { bottom: -10vh; left: -10vw; width: 70vmax; height: 70vmax; background: radial-gradient(circle, var(--color-3, transparent) 0%, transparent 65%); animation: float3 22s infinite alternate ease-in-out; }
 .blob-4 { bottom: -10vh; right: -10vw; width: 80vmax; height: 80vmax; background: radial-gradient(circle, var(--color-4, transparent) 0%, transparent 65%); animation: float4 28s infinite alternate-reverse ease-in-out; }
 
+/* Respect system preference — pause all heavy animations on low-power/reduced-motion devices */
+@media (prefers-reduced-motion: reduce) {
+  .blob, .blob-1, .blob-2, .blob-3, .blob-4 { animation: none !important; }
+  .audio-mode::before { animation: none !important; }
+  .rotate-slow { animation: none !important; }
+  .animate-eq { animation: none !important; }
+  .shimmer::after { animation: none !important; }
+}
+
 @keyframes float1 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(20vw, 20vh) scale(1.1); } }
 @keyframes float2 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-20vw, 20vh) scale(1.05); } }
 @keyframes float3 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(20vw, -20vh) scale(1.15); } }

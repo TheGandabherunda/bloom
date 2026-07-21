@@ -1,90 +1,87 @@
+// ─── Module-level caches so repeated calls for the same URL are instant ───
+const dominantColorsCache = new Map();
+const primaryColorCache = new Map();
+
 export const extractDominantColors = (imageUrl) => {
+  if (dominantColorsCache.has(imageUrl)) {
+    return Promise.resolve(dominantColorsCache.get(imageUrl));
+  }
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
-    
-    // Proxy the image URL to avoid CORS
     img.src = imageUrl;
-    
+
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       canvas.width = 64; // Scale down for performance
       canvas.height = 64;
-      
+
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      
+
       const colors = [];
       // Sample every 4th pixel for speed
       for (let i = 0; i < data.length; i += 16) {
-        // Ignore very dark or very bright colors to get vibrant dominant colors
         const r = data[i], g = data[i+1], b = data[i+2];
         const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-        
         if (brightness > 30 && brightness < 220) {
-           colors.push([r, g, b]);
+          colors.push([r, g, b]);
         }
       }
-      
+
       if (colors.length === 0) {
         colors.push([236, 72, 153]); // Fallback pink
       }
 
-      // Simple clustering (k-means-lite) to find top 4 distinct colors
-      const palettes = [];
-      const used = new Set();
-      
-      // Sort colors by frequency roughly
+      // Simple frequency-based clustering to find top 4 distinct colors
       const colorCounts = {};
       colors.forEach(c => {
-        // quantize slightly to group similar colors
         const key = `${Math.floor(c[0]/32)*32},${Math.floor(c[1]/32)*32},${Math.floor(c[2]/32)*32}`;
         colorCounts[key] = (colorCounts[key] || 0) + 1;
       });
-      
+
       const sortedKeys = Object.keys(colorCounts).sort((a,b) => colorCounts[b] - colorCounts[a]);
-      
+      const palettes = [];
+
       for (const key of sortedKeys) {
         if (palettes.length >= 4) break;
-        
         const [r,g,b] = key.split(',').map(Number);
-        
-        // Ensure this color is somewhat distinct from already picked palettes
         const isDistinct = palettes.every(p => {
-           const dist = Math.abs(p[0]-r) + Math.abs(p[1]-g) + Math.abs(p[2]-b);
-           return dist > 60; // minimum distance
+          const dist = Math.abs(p[0]-r) + Math.abs(p[1]-g) + Math.abs(p[2]-b);
+          return dist > 60;
         });
-        
         if (isDistinct || palettes.length === 0) {
-           // We add some brightness to make it look better in dark mode
-           palettes.push([
-             Math.min(255, r + 20), 
-             Math.min(255, g + 20), 
-             Math.min(255, b + 20)
-           ]);
+          palettes.push([
+            Math.min(255, r + 20),
+            Math.min(255, g + 20),
+            Math.min(255, b + 20)
+          ]);
         }
       }
-      
+
       // Fill remaining if we couldn't find 4 distinct
       while (palettes.length < 4) {
-         if (palettes.length > 0) {
-             const base = palettes[0];
-             palettes.push([
-                 Math.min(255, base[0] + Math.random()*50 - 25),
-                 Math.min(255, base[1] + Math.random()*50 - 25),
-                 Math.min(255, base[2] + Math.random()*50 - 25)
-             ]);
-         } else {
-             palettes.push([236, 72, 153]); // Fallback
-         }
+        if (palettes.length > 0) {
+          const base = palettes[0];
+          palettes.push([
+            Math.min(255, base[0] + Math.random()*50 - 25),
+            Math.min(255, base[1] + Math.random()*50 - 25),
+            Math.min(255, base[2] + Math.random()*50 - 25)
+          ]);
+        } else {
+          palettes.push([236, 72, 153]);
+        }
       }
-      
-      resolve(palettes.map(p => `${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}`));
+
+      const result = palettes.map(p => `${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}`);
+      dominantColorsCache.set(imageUrl, result);
+      resolve(result);
     };
-    
+
     img.onerror = () => {
-       reject(new Error("Failed to load image for color extraction"));
+      reject(new Error("Failed to load image for color extraction"));
     };
   });
 };
@@ -93,6 +90,10 @@ export const extractDominantColors = (imageUrl) => {
 // Groups pixels by hue, scores each bucket by frequency × saturation × vibrancy,
 // then returns the average color of the winning cluster.
 export const extractPrimaryColor = (imageUrl) => {
+  if (primaryColorCache.has(imageUrl)) {
+    return Promise.resolve(primaryColorCache.get(imageUrl));
+  }
+
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -109,7 +110,6 @@ export const extractPrimaryColor = (imageUrl) => {
         const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
 
         const BUCKETS = 36; // 10° per bucket
-        // Each bucket: { sumR, sumG, sumB, sumSat, count }
         const buckets = Array.from({ length: BUCKETS }, () => ({
           sumR: 0, sumG: 0, sumB: 0, sumSat: 0, count: 0
         }));
@@ -148,15 +148,15 @@ export const extractPrimaryColor = (imageUrl) => {
           buckets[bucket].count += 1;
         }
 
-        // Score each bucket: frequency × avg_saturation × vibrancy (not too dark/light)
+        // Score each bucket: frequency × avg_saturation × vibrancy
         let bestScore = -1;
         let bestBucket = null;
 
         for (const b of buckets) {
-          if (b.count < 4) continue; // ignore tiny clusters
+          if (b.count < 4) continue;
           const avgSat = b.sumSat / b.count;
           const avgL = ((b.sumR + b.sumG + b.sumB) / b.count / 255 / 3);
-          const vibrancy = 1 - Math.abs(avgL - 0.45) * 1.5; // peak around 45% lightness
+          const vibrancy = 1 - Math.abs(avgL - 0.45) * 1.5;
           const score = b.count * avgSat * Math.max(0, vibrancy);
           if (score > bestScore) {
             bestScore = score;
@@ -165,10 +165,11 @@ export const extractPrimaryColor = (imageUrl) => {
         }
 
         if (!bestBucket || bestBucket.count === 0) {
-          return resolve('rgb(236, 72, 153)');
+          const fallback = 'rgb(236, 72, 153)';
+          primaryColorCache.set(imageUrl, fallback);
+          return resolve(fallback);
         }
 
-        // Average color of winning cluster, slightly boosted for dark covers
         const n = bestBucket.count;
         const avgR = bestBucket.sumR / n;
         const avgG = bestBucket.sumG / n;
@@ -176,7 +177,9 @@ export const extractPrimaryColor = (imageUrl) => {
         const avgLuma = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114) / 255;
         const boost = avgLuma < 0.35 ? 1.4 : 1.0;
 
-        resolve(`rgb(${Math.min(255, Math.round(avgR * boost))}, ${Math.min(255, Math.round(avgG * boost))}, ${Math.min(255, Math.round(avgB * boost))})`);
+        const result = `rgb(${Math.min(255, Math.round(avgR * boost))}, ${Math.min(255, Math.round(avgG * boost))}, ${Math.min(255, Math.round(avgB * boost))})`;
+        primaryColorCache.set(imageUrl, result);
+        resolve(result);
       } catch (e) {
         resolve('rgb(255, 255, 255)');
       }
