@@ -16,7 +16,14 @@ function App() {
       const hostId = params.get('host');
       
       if (hostId) {
-        setConfig(prev => ({ ...prev, roomId, hostId, isHost: false }));
+        const isActuallyHost = sessionStorage.getItem(`bloom_host_${roomId}`) === 'true';
+        if (isActuallyHost) {
+          // Reclaim host status
+          window.history.replaceState(null, '', `#${roomId}`);
+          setConfig(prev => ({ ...prev, roomId, isHost: true }));
+        } else {
+          setConfig(prev => ({ ...prev, roomId, hostId, isHost: false }));
+        }
       } else {
         // Invalid join attempt (missing host ID). Clear the hash and treat as a new host.
         window.history.replaceState(null, '', window.location.pathname);

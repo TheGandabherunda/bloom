@@ -1,4 +1,4 @@
-﻿# Bloom — Project Rules for Antigravity
+# Bloom — Project Rules for Antigravity
 
 ## Project Identity
 
@@ -28,15 +28,19 @@ Bloom is a **decentralized P2P music player** built with:
 
 ### 3. State — Context Architecture
 - **`PlaybackContext`** owns all playback state: `currentTrack`, `queue`, `isPlaying`, `currentTime`, `duration`, `volume`, `isShuffled`, `isRepeat`, `isExpanded`. Import via `usePlayback()`.
+  - The `queue` and `originalQueue` MUST be synchronized over OrbitDB via `stateDb`. Do not treat them as local state.
 - **`OrbitContext`** owns all P2P state: `stateDb`, `chatDb`, `peerId`, `peers`, `peerNames`, `peerRoles`, `status`. Import via `useOrbit()`.
+  - Maintains a silent `<audio loop>` in the background starting from room join to keep the tab active and bypass browser background-throttling of JS/WebAudio.
 - Do **not** lift state above these providers or duplicate state elsewhere. If a component needs playback info, it must consume `usePlayback()`.
 - Use `useRef` for values needed inside OrbitDB event listeners to avoid stale closures (see `isPlayingRef`, `currentTrackRef`, `peerRolesRef` patterns).
 
-### 4. P2P Sync — Security Model
-- Only peers with role `'owner'` or `'admin'` can mutate playback state in the OrbitDB `stateDb`.
+### 4. P2P Sync — Security & Reconnection
+- Only peers with role `'owner'` or `'admin'` can mutate playback state or the `queue` in the OrbitDB `stateDb`.
 - When writing to `stateDb`, always include `originator: peerId` in the value object.
 - When handling OrbitDB `update` events, always skip updates where `originator === peerId` (deduplication).
 - Chat system messages dispatched locally must use `window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }))` in addition to writing to `chatDb`.
+- **Reconnection/Discovery:** The Host must proactively push a `fullSyncAction` to any peer that triggers `room.onPeerJoin`, ensuring peers who reconnect or manually type the room code receive the room state.
+- **Host Recovery:** The Host reclaims their status on refresh by checking `sessionStorage.getItem('bloom_host_${roomId}')`.
 
 ### 5. Netlify Functions — Serverless Backend
 - All functions live in `netlify/functions/` and use ESM (`export const handler = async (event) => {}`).

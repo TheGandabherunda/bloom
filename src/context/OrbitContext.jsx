@@ -26,8 +26,30 @@ export const OrbitProvider = ({ children }) => {
   const [peerNames, setPeerNames] = useState({});
   const [peerRoles, setPeerRoles] = useState({});
   
+  const peerRolesRef = useRef({});
+  useEffect(() => {
+    peerRolesRef.current = peerRoles;
+  }, [peerRoles]);
+
   const statusRef = useRef('disconnected');
   const roomRef = useRef(null);
+  const silentAudioRef = useRef(null);
+
+  useEffect(() => {
+    // Generate a minimal valid silent WAV file to keep the browser's media session active
+    // This prevents Chrome/Safari from completely freezing the tab and blocking P2P play() commands in the background
+    const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+    const audio = new Audio(silentWav);
+    audio.loop = true;
+    audio.volume = 0;
+    silentAudioRef.current = audio;
+    
+    return () => {
+      audio.pause();
+      audio.src = '';
+      silentAudioRef.current = null;
+    };
+  }, []);
   
   const [stateDbReady, setStateDbReady] = useState(null);
   const [chatDbReady, setChatDbReady] = useState(null);
@@ -54,6 +76,11 @@ export const OrbitProvider = ({ children }) => {
     try {
       setStatusWrapped('initializing');
       console.log('Starting Trystero initialization...');
+
+      // Start the background silent loop to keep the tab alive
+      if (silentAudioRef.current) {
+        silentAudioRef.current.play().catch(e => console.warn('Silent loop autoplay blocked:', e));
+      }
 
       const config = {
         appId: 'bloom-p2p',
@@ -83,7 +110,11 @@ export const OrbitProvider = ({ children }) => {
           stateProxy.sendPut({ key, value });
           stateProxy.events.emit('update', { payload: { key, value } });
           
-          if (key === 'banned') {
+          if (key.startsWith('peer_name_')) {
+            setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: value}));
+          } else if (key.startsWith('peer_role_')) {
+            setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: value}));
+          } else if (key === 'banned') {
             room.leave();
           }
         },
@@ -112,6 +143,16 @@ export const OrbitProvider = ({ children }) => {
       chatProxy.sendAdd = chatAddAction.send;
 
       statePutAction.onMessage = (data, { peerId: pId }) => {
+        const senderRole = peerRolesRef.current[pId] || 'peer';
+        
+        // Security check for role changes and bans
+        if (data.key.startsWith('peer_role_') || data.key === 'banned') {
+          if (senderRole !== 'owner') {
+            console.warn(`[P2P] Unauthorized role/ban change attempt by ${pId}`);
+            return;
+          }
+        }
+
         console.log(`[P2P] Received state update from ${pId}:`, data.key);
         stateProxy.store[data.key] = data.value;
         stateProxy.events.emit('update', { payload: { key: data.key, value: data.value } });
@@ -152,6 +193,19 @@ export const OrbitProvider = ({ children }) => {
         statePutAction.send({ key: `peer_name_${selfId}`, value: displayName }, { target: pId });
         if (isHost) {
           statePutAction.send({ key: `peer_role_${selfId}`, value: 'owner' }, { target: pId });
+          
+          // Proactively send full sync in case the peer is reconnecting and dropped their reqSync
+          const storeCopy = { ...stateProxy.store };
+          let liveTime = 0;
+          if (window.__bloomPlayer) liveTime = window.__bloomPlayer.getCurrentTime() || 0;
+          if (storeCopy['currentTrack']) storeCopy['currentTrack'] = { ...storeCopy['currentTrack'], liveTime };
+          
+          console.log(`[P2P] Proactively sending full sync to new/reconnecting peer ${pId}`);
+          fullSyncAction.send({
+            state: storeCopy,
+            chat: chatProxy.arr,
+            names: storeCopy,
+          }, { target: pId });
         }
 
         // Request state sync ONLY from the host

@@ -42,6 +42,10 @@ const RoomSetup = ({ config, onComplete }) => {
       localStorage.removeItem('bloom_api_base');
     }
 
+    if (config.isHost) {
+      sessionStorage.setItem(`bloom_host_${finalRoomId}`, 'true');
+    }
+
     localStorage.setItem('bloom_name', name);
     onComplete({ ...config, displayName: name, roomId: finalRoomId });
   };

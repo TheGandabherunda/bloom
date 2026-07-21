@@ -189,6 +189,11 @@ export const PlaybackProvider = ({ children }) => {
           const index = trackData.index !== undefined ? trackData.index : -1;
           loadTrack(track, index, 0, false, 'initial-sync');
         }
+        const syncedQueue = await stateDb.get('queue');
+        if (syncedQueue) setQueueState(syncedQueue);
+        
+        const syncedOrigQueue = await stateDb.get('originalQueue');
+        if (syncedOrigQueue) setOriginalQueue(syncedOrigQueue);
       } catch (e) {
         // Ignore initial sync errors
       }
@@ -240,6 +245,10 @@ export const PlaybackProvider = ({ children }) => {
           if (Math.abs(playerRef.current?.getCurrentTime() - time) > 3) {
             playerRef.current?.seek(time);
           }
+        } else if (key === 'queue') {
+          setQueueState(value);
+        } else if (key === 'originalQueue') {
+          setOriginalQueue(value);
         }
       } catch (e) {
         console.error('OrbitDB Sync Error:', e);
@@ -326,27 +335,48 @@ export const PlaybackProvider = ({ children }) => {
   }, [queue, currentIndex, seek, loadTrack, peerId]);
 
   const addToQueue = useCallback((track) => {
-    setOriginalQueue(prev => [...prev, track]);
-    setQueueState(prev => [...prev, track]);
-  }, []);
+    if (!canControl()) return;
+    setOriginalQueue(prev => {
+      const newQ = [...prev, track];
+      if (stateDb) stateDb.put('originalQueue', newQ).catch(e => console.warn(e));
+      return newQ;
+    });
+    setQueueState(prev => {
+      const newQ = [...prev, track];
+      if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
+      return newQ;
+    });
+  }, [canControl, stateDb]);
 
   const removeFromQueue = useCallback((indexToRemove) => {
-    setQueueState(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    if (!canControl()) return;
+    setQueueState(prev => {
+      const newQ = prev.filter((_, idx) => idx !== indexToRemove);
+      if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
+      return newQ;
+    });
     // Approximate removal from original queue if needed, though active queue matters more
     const trackToRemove = queue[indexToRemove];
     setOriginalQueue(prev => {
       const idx = prev.findIndex(t => t.id === trackToRemove.id);
-      if (idx !== -1) return prev.filter((_, i) => i !== idx);
+      if (idx !== -1) {
+        const newOrigQ = prev.filter((_, i) => i !== idx);
+        if (stateDb) stateDb.put('originalQueue', newOrigQ).catch(e => console.warn(e));
+        return newOrigQ;
+      }
       return prev;
     });
     // Adjust index if we removed something before the current track
     if (indexToRemove < currentIndex) {
       setCurrentIndex(prev => prev - 1);
     }
-  }, [queue, currentIndex]);
+  }, [queue, currentIndex, canControl, stateDb]);
 
   const setIsShuffled = useCallback((shuffle) => {
+    if (!canControl()) return;
     setIsShuffledState(shuffle);
+    if (stateDb) stateDb.put('isShuffled', shuffle).catch(e => console.warn(e));
+
     if (shuffle) {
       setQueueState(prevQueue => {
         if (prevQueue.length <= 1) return prevQueue;
@@ -364,11 +394,14 @@ export const PlaybackProvider = ({ children }) => {
           [rest[i], rest[j]] = [rest[j], rest[i]];
         }
         setCurrentIndex(current ? 0 : -1);
-        return current ? [current, ...rest] : rest;
+        const newQ = current ? [current, ...rest] : rest;
+        if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
+        return newQ;
       });
     } else {
       // Restore from originalQueue
       setQueueState(originalQueue);
+      if (stateDb) stateDb.put('queue', originalQueue).catch(e => console.warn(e));
       if (currentTrackRef.current) {
         const idx = originalQueue.findIndex(t => t.id === currentTrackRef.current.id);
         setCurrentIndex(idx !== -1 ? idx : -1);
@@ -376,7 +409,7 @@ export const PlaybackProvider = ({ children }) => {
         setCurrentIndex(-1);
       }
     }
-  }, [currentIndex, originalQueue]);
+  }, [currentIndex, originalQueue, canControl, stateDb]);
 
   // Media Session API for mobile notifications and OS lock screen
   useEffect(() => {
