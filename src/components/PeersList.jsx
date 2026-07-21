@@ -59,7 +59,7 @@ const PeersList = () => {
               )}
               {role === 'admin' && (
                 <div className="bg-yellow-500 px-2 py-0.5 rounded-full flex items-center justify-center" title="Admin">
-                  <span className="material-symbols-rounded text-[14px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>military_tech</span>
+                  <span className="material-symbols-rounded text-[14px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>award_star</span>
                 </div>
               )}
               {p === peerId && <span className="text-[10px] text-white/30 uppercase tracking-widest">(You)</span>}

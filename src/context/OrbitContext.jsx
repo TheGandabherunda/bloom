@@ -27,9 +27,15 @@ export const OrbitProvider = ({ children }) => {
   const [peerRoles, setPeerRoles] = useState({});
   
   const peerRolesRef = useRef({});
+  const peerNamesRef = useRef({});
+
   useEffect(() => {
     peerRolesRef.current = peerRoles;
   }, [peerRoles]);
+
+  useEffect(() => {
+    peerNamesRef.current = peerNames;
+  }, [peerNames]);
 
   const statusRef = useRef('disconnected');
   const roomRef = useRef(null);
@@ -194,9 +200,31 @@ export const OrbitProvider = ({ children }) => {
             return {...prev, [extractedId]: pName};
           });
         } else if (data.key.startsWith('peer_role_')) {
-          setPeerRoles(prev => ({...prev, [data.key.replace('peer_role_', '')]: data.value}));
-        } else if (data.key === 'banned' && data.value === selfId) {
-          window.location.reload();
+          setPeerRoles(prev => {
+            const targetId = data.key.replace('peer_role_', '');
+            const newRole = data.value;
+            if (prev[targetId] !== newRole && newRole === 'admin') {
+              const targetName = peerNamesRef.current[targetId] || 'Someone';
+              chatProxy.events.emit('update', {
+                payload: {
+                  value: { id: Math.random().toString(36).substring(2,9), text: `${targetName} got promoted to admin.`, sender: 'System', timestamp: Date.now() }
+                }
+              });
+            }
+            return {...prev, [targetId]: newRole};
+          });
+        } else if (data.key === 'banned') {
+          const targetName = peerNamesRef.current[data.value] || 'Someone';
+          const kickerName = peerNamesRef.current[pId] || 'An admin';
+          chatProxy.events.emit('update', {
+            payload: {
+              value: { id: Math.random().toString(36).substring(2,9), text: `${targetName} got kicked out by ${kickerName}.`, sender: 'System', timestamp: Date.now() }
+            }
+          });
+          
+          if (data.value === selfId) {
+            window.location.reload();
+          }
         }
       };
 
@@ -240,6 +268,15 @@ export const OrbitProvider = ({ children }) => {
       room.onPeerLeave = (pId) => {
         console.log(`[P2P] Peer left room: ${pId}`);
         setPeers(prev => prev.filter(p => p !== pId));
+        
+        const targetName = peerNamesRef.current[pId];
+        if (targetName) {
+          chatProxy.events.emit('update', {
+            payload: {
+              value: { id: Math.random().toString(36).substring(2,9), text: `${targetName} left the room.`, sender: 'System', timestamp: Date.now() }
+            }
+          });
+        }
       };
 
       // State Synchronization Logic
