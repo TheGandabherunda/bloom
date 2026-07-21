@@ -119,10 +119,8 @@ async function initP2P(roomId, displayName, isHost, hostId) {
   const libp2p = await createLibp2p({
     addresses: {
       // Listen on /webrtc to accept direct browser-to-browser connections
-      // AND explicitly listen on the public relays to force reservation negotiation
       listen: [
-        '/webrtc',
-        ...relayAddrs
+        '/webrtc'
       ],
     },
     transports: [
@@ -137,8 +135,7 @@ async function initP2P(roomId, displayName, isHost, hostId) {
         },
       }),
       circuitRelayTransport({
-        // We explicitly provided listen addresses, so we don't need discoverRelays to search
-        discoverRelays: 0,
+        discoverRelays: 2,
       }),
     ],
     connectionEncryption: [noise()],
@@ -174,6 +171,21 @@ async function initP2P(roomId, displayName, isHost, hostId) {
 
   libp2pNode = libp2p;
   myPeerId = libp2p.peerId.toString();
+
+  // ── Step 1.5: Connect to public relays to get reservations ────────────────
+  console.log('[P2P Worker] Connecting to public relays to establish circuit reservations...');
+  let connectedRelays = 0;
+  for (const relayAddr of relayAddrs) {
+    try {
+      const relayNodeAddr = relayAddr.split('/p2p-circuit')[0];
+      await libp2p.dial(multiaddr(relayNodeAddr));
+      console.log(`[P2P Worker] ✅ Connected to relay: ${relayNodeAddr}`);
+      connectedRelays++;
+      if (connectedRelays >= 2) break; // 2 relays is enough for redundancy
+    } catch (err) {
+      console.warn(`[P2P Worker] ❌ Failed to connect to relay: ${err.message}`);
+    }
+  }
 
   // ── Step 1: Set up OrbitDB ───────────────────────────────────────────────
   let nodeLibp2p = null;
