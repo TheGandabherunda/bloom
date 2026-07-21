@@ -41,7 +41,11 @@ export const PlayerTrackSkeleton = () => (
 
 // ─── Full-screen app init skeleton ───────────────────────────
 export const AppInitSkeleton = ({ status }) => {
-  const loadingText = status === 'initializing' ? 'Connecting to peers...' : 'Making things ready for you...';
+  const loadingText = 
+    status === 'initializing' ? 'Connecting to peers...' : 
+    status === 'syncing' ? 'Syncing room data...' : 
+    status === 'failed' ? 'Connection failed' : 
+    'Making things ready for you...';
   
   return (
     <div className="fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center overflow-hidden">
@@ -57,14 +61,25 @@ export const AppInitSkeleton = ({ status }) => {
         <div className="relative flex items-center justify-center">
           <img 
             src="./assets/Bloom.svg" 
-            className="w-24 h-24 sm:w-32 sm:h-32 animate-[spin_4s_linear_infinite]" 
+            className={`w-24 h-24 sm:w-32 sm:h-32 ${status !== 'failed' ? 'animate-[spin_4s_linear_infinite]' : 'opacity-50'}`} 
             alt="Bloom Logo" 
           />
         </div>
         
-        <p className="text-white/40 text-xs sm:text-sm tracking-[0.3em] uppercase font-medium">
-          {loadingText}
-        </p>
+        <div className="flex flex-col items-center gap-6">
+          <p className={`text-xs sm:text-sm tracking-[0.3em] uppercase font-medium ${status === 'failed' ? 'text-red-400' : 'text-white/40'}`}>
+            {loadingText}
+          </p>
+
+          {status === 'failed' && (
+            <button 
+              onClick={() => window.location.href = '/'} 
+              className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors text-xs font-bold tracking-widest"
+            >
+              RETURN HOME
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

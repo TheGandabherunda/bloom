@@ -207,6 +207,10 @@ export const OrbitProvider = ({ children }) => {
         setPeerNames(prev => ({ ...prev, ...initialNames }));
         setPeerRoles(prev => ({ ...prev, ...initialRoles }));
 
+        if (!isHost) {
+          setStatusWrapped('connected');
+        }
+
         // Emit updates so mounted components (PlaybackContext, Chat) catch the new state
         data.chat.forEach(msg => {
           chatProxy.events.emit('update', { payload: { value: msg } });
@@ -228,8 +232,19 @@ export const OrbitProvider = ({ children }) => {
 
       setStateDbReady(stateProxy);
       setChatDbReady(chatProxy);
-      setStatusWrapped('connected');
-      console.log('Trystero connected successfully!');
+      
+      if (isHost) {
+        setStatusWrapped('connected');
+      } else {
+        setStatusWrapped('syncing');
+        // Set a 15-second timeout for the connection
+        setTimeout(() => {
+          setStatusWrapped(prev => {
+            if (prev === 'syncing') return 'failed';
+            return prev;
+          });
+        }, 15000);
+      }
 
     } catch (err) {
       console.error('P2P Init Error:', err);
