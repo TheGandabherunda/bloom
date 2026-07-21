@@ -175,7 +175,10 @@ export const OrbitProvider = ({ children }) => {
         
         // Security check for role changes and bans
         if (data.key.startsWith('peer_role_') || data.key === 'banned') {
-          if (senderRole !== 'owner') {
+          // Bypass check if the sender is the actual host claiming their own owner role
+          const isHostSelfClaim = pId === hostId && data.key === `peer_role_${hostId}` && data.value === 'owner';
+          
+          if (senderRole !== 'owner' && !isHostSelfClaim) {
             console.warn(`[P2P] Unauthorized role/ban change attempt by ${pId}`);
             return;
           }
@@ -357,13 +360,24 @@ export const OrbitProvider = ({ children }) => {
       } else {
         setStatusWrapped('syncing');
         if (!isHost) {
-          // Fallback timeout: if we don't receive sync after 30s, fail.
+          // Actively ping the network to force the device's Wi-Fi/Cellular radio into a high-power state.
+          // This prevents the OS from delaying WebRTC UDP packets while the app is loading.
+          const pingInterval = setInterval(() => {
+            if (statusRef.current === 'syncing' || statusRef.current === 'initializing') {
+              fetch('/?ping=' + Date.now()).catch(() => {});
+            } else {
+              clearInterval(pingInterval);
+            }
+          }, 2000);
+
+          // Fallback timeout: if we don't receive sync after 60s, fail.
           setTimeout(() => {
+            clearInterval(pingInterval);
             if (statusRef.current === 'syncing' || statusRef.current === 'initializing') {
               console.error('[P2P] Sync timeout');
               setStatusWrapped('failed');
             }
-          }, 30000);
+          }, 60000);
         }
       }
 
