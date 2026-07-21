@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { joinRoom, selfId } from '@trystero-p2p/torrent';
+import { joinRoom, selfId } from 'trystero/nostr';
 
 const OrbitContext = createContext(null);
 
@@ -112,12 +112,6 @@ export const OrbitProvider = ({ children }) => {
 
       const config = {
         appId: 'bloom-p2p',
-        trackerUrls: [
-          'wss://tracker.webtorrent.dev',
-          'wss://tracker.openwebtorrent.com',
-          'wss://tracker.files.fm:7073/announce',
-          'wss://tracker.btorrent.xyz'
-        ],
         rtcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
