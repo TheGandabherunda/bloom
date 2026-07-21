@@ -4,7 +4,7 @@ import { usePlayback } from '../context/PlaybackContext';
 import Lyrics from './Lyrics';
 import { PlayerTrackSkeleton } from './Skeleton';
 
-const Visualizer = ({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
+const Visualizer = React.memo(({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
   const barsRef = useRef([]);
 
   useEffect(() => {
@@ -67,7 +67,140 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
       ))}
     </div>
   );
+});
+
+const formatTime = (seconds) => {
+  if (isNaN(seconds)) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
+
+const MobileProgressBar = React.memo(({ playerRef, duration, canControl, seek }) => {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [localProgress, setLocalProgress] = useState(null);
+
+  useEffect(() => {
+    if (playerRef?.current) {
+      const handleTime = (time) => setCurrentTime(time);
+      playerRef.current.addTimeListener(handleTime);
+      return () => {
+        if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
+      };
+    }
+  }, [playerRef]);
+
+  const actualProgress = (currentTime / duration) * 100 || 0;
+  const displayProgress = localProgress !== null ? localProgress : actualProgress;
+  const displayTime = localProgress !== null ? (localProgress / 100) * duration : currentTime;
+
+  return (
+    <div className="w-full flex flex-col mb-6 relative">
+      <div className={`w-full h-1.5 bg-white/20 rounded-full mb-3 relative ${canControl ? 'cursor-pointer' : ''}`}>
+        <div className="h-full bg-[var(--color-primary)] rounded-full relative pointer-events-none" style={{ width: `${displayProgress}%` }}>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md pointer-events-none"></div>
+        </div>
+        {canControl && (
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="0.1"
+            value={displayProgress}
+            onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
+            onMouseUp={(e) => {
+              seek((parseFloat(e.target.value) / 100) * duration);
+              setLocalProgress(null);
+            }}
+            onTouchEnd={(e) => {
+              seek((parseFloat(e.target.value) / 100) * duration);
+              setLocalProgress(null);
+            }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0 z-10"
+          />
+        )}
+      </div>
+      <div className="flex justify-between text-[11px] font-mono text-white/50 tracking-wider">
+        <span>{formatTime(displayTime)}</span>
+        <span>{formatTime(duration)}</span>
+      </div>
+    </div>
+  );
+});
+
+const DesktopTopProgressBar = React.memo(({ playerRef, duration, canControl, seek }) => {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [localProgress, setLocalProgress] = useState(null);
+
+  useEffect(() => {
+    if (playerRef?.current) {
+      const handleTime = (time) => setCurrentTime(time);
+      playerRef.current.addTimeListener(handleTime);
+      return () => {
+        if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
+      };
+    }
+  }, [playerRef]);
+
+  const actualProgress = (currentTime / duration) * 100 || 0;
+  const displayProgress = localProgress !== null ? localProgress : actualProgress;
+
+  return (
+    <div className={`absolute top-0 left-0 right-0 h-1 group ${canControl ? 'cursor-pointer' : ''}`}>
+      <div
+        className="absolute top-0 left-0 h-full bg-[var(--color-primary)] pointer-events-none"
+        style={{ width: `${displayProgress}%` }}
+      >
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform pointer-events-none"></div>
+      </div>
+      {canControl && (
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="0.1"
+          value={displayProgress}
+          onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
+          onMouseUp={(e) => {
+            seek((parseFloat(e.target.value) / 100) * duration);
+            setLocalProgress(null);
+          }}
+          onTouchEnd={(e) => {
+            seek((parseFloat(e.target.value) / 100) * duration);
+            setLocalProgress(null);
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0 z-10"
+        />
+      )}
+    </div>
+  );
+});
+
+const DesktopTimeDisplay = React.memo(({ playerRef, duration }) => {
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    if (playerRef?.current) {
+      const handleTime = (time) => setCurrentTime(time);
+      playerRef.current.addTimeListener(handleTime);
+      return () => {
+        if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
+      };
+    }
+  }, [playerRef]);
+
+  return (
+    <div className="text-[11px] font-mono text-white/40 flex items-center gap-1 tracking-wider">
+      <span className="text-white/80">{formatTime(currentTime)}</span>
+      <span>/</span>
+      <span>{formatTime(duration)}</span>
+    </div>
+  );
+});
 
 const Player = () => {
   const {
@@ -102,19 +235,7 @@ const Player = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFsControls, setShowFsControls] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [localProgress, setLocalProgress] = useState(null);
-  const [currentTime, setCurrentTime] = useState(0);
   const fsTimeoutRef = useRef(null);
-
-  useEffect(() => {
-    if (playerRef?.current) {
-      const handleTime = (time) => setCurrentTime(time);
-      playerRef.current.addTimeListener(handleTime);
-      return () => {
-        if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
-      };
-    }
-  }, [playerRef]);
 
   // Sync fullscreen exit via Escape key or browser back
   useEffect(() => {
@@ -225,17 +346,6 @@ const Player = () => {
     dragYRef.current = 0;
   };
 
-  const formatTime = (seconds) => {
-    if (isNaN(seconds)) return "0:00";
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  const actualProgress = (currentTime / duration) * 100 || 0;
-  const displayProgress = localProgress !== null ? localProgress : actualProgress;
-  const displayTime = localProgress !== null ? (localProgress / 100) * duration : currentTime;
-
   return (
     <>
       {/* Expanded View */}
@@ -320,7 +430,7 @@ const Player = () => {
               </div>
             </div>
           ) : (
-            <Lyrics currentTrack={currentTrack} currentTime={currentTime} />
+            <Lyrics currentTrack={currentTrack} playerRef={playerRef} />
           )}
           
           <Visualizer playerRef={playerRef} isExpanded={isExpanded} isFullscreen={isFullscreen} isPlaying={isPlaying} />
@@ -328,38 +438,7 @@ const Player = () => {
           {/* Mobile Expanded Bottom Sheet Controls */}
           <div className="lg:hidden absolute bottom-12 left-0 right-0 px-8 flex flex-col z-30" onClick={(e) => e.stopPropagation()}>
             {/* Progress Bar & Time */}
-            <div className="w-full flex flex-col mb-6 relative">
-              <div className={`w-full h-1.5 bg-white/20 rounded-full mb-3 relative ${canControl ? 'cursor-pointer' : ''}`}>
-                <div className="h-full bg-[var(--color-primary)] rounded-full relative pointer-events-none" style={{ width: `${displayProgress}%` }}>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md pointer-events-none"></div>
-                </div>
-                {canControl && (
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={displayProgress}
-                    onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
-                    onMouseUp={(e) => {
-                      seek((parseFloat(e.target.value) / 100) * duration);
-                      setLocalProgress(null);
-                    }}
-                    onTouchEnd={(e) => {
-                      seek((parseFloat(e.target.value) / 100) * duration);
-                      setLocalProgress(null);
-                    }}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchMove={(e) => e.stopPropagation()}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0 z-10"
-                  />
-                )}
-              </div>
-              <div className="flex justify-between text-[11px] font-mono text-white/50 tracking-wider">
-                <span>{formatTime(displayTime)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
-            </div>
+            <MobileProgressBar playerRef={playerRef} duration={duration} canControl={canControl} seek={seek} />
 
             {/* Playback Controls Row */}
             <div className={`w-full flex items-center justify-between ${!canControl ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -413,35 +492,7 @@ const Player = () => {
       >
       
       {/* Progress Bar (Top Edge) */}
-      <div className={`absolute top-0 left-0 right-0 h-1 group ${canControl ? 'cursor-pointer' : ''}`}>
-        <div
-          className="absolute top-0 left-0 h-full bg-[var(--color-primary)] pointer-events-none"
-          style={{ width: `${displayProgress}%` }}
-        >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform pointer-events-none"></div>
-        </div>
-        {canControl && (
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="0.1"
-            value={displayProgress}
-            onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
-            onMouseUp={(e) => {
-              seek((parseFloat(e.target.value) / 100) * duration);
-              setLocalProgress(null);
-            }}
-            onTouchEnd={(e) => {
-              seek((parseFloat(e.target.value) / 100) * duration);
-              setLocalProgress(null);
-            }}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0 z-10"
-          />
-        )}
-      </div>
+      <DesktopTopProgressBar playerRef={playerRef} duration={duration} canControl={canControl} seek={seek} />
 
       <div className="max-w-screen-2xl mx-auto hidden lg:flex items-center justify-between px-6 h-full pt-1">
         
@@ -464,11 +515,7 @@ const Player = () => {
             </button>
           </div>
           
-          <div className="text-[11px] font-mono text-white/40 flex items-center gap-1 tracking-wider">
-            <span className="text-white/80">{formatTime(displayTime)}</span>
-            <span>/</span>
-            <span>{formatTime(duration)}</span>
-          </div>
+          <DesktopTimeDisplay playerRef={playerRef} duration={duration} />
         </div>
 
         {/* Middle: Track Info */}

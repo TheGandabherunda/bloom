@@ -52,7 +52,7 @@ const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
         <div 
           key={i} 
           ref={el => barsRef.current[i] = el}
-          className="flex-1 rounded-t-sm transition-transform duration-75 ease-out origin-bottom will-change-transform"
+          className="flex-1 rounded-t-sm origin-bottom will-change-transform"
           style={{ transform: 'scaleY(0.05)', backgroundColor: cardColor }}
         />
       ))}

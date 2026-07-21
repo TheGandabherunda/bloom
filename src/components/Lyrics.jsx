@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getLyrics } from '../services/monochromeApi';
 
-const Lyrics = ({ currentTrack, currentTime }) => {
+const Lyrics = React.memo(({ currentTrack, playerRef }) => {
   const [lyricsData, setLyricsData] = useState([]);
   const [isSynced, setIsSynced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const activeIndexRef = useRef(-1);
   
   const containerRef = useRef(null);
   const lineRefs = useRef([]);
@@ -68,6 +70,8 @@ const Lyrics = ({ currentTrack, currentTime }) => {
       setLoading(true);
       setError(false);
       setLyricsData([]);
+      setActiveIndex(-1);
+      activeIndexRef.current = -1;
       
       try {
         const data = await getLyrics(currentTrack.title, currentTrack.author);
@@ -101,19 +105,34 @@ const Lyrics = ({ currentTrack, currentTime }) => {
     };
   }, [currentTrack?.id]);
 
-  // Determine active line index (memoized to avoid O(n) scan on every time update)
-  const activeIndex = useMemo(() => {
-    if (!isSynced || lyricsData.length === 0) return -1;
-    let idx = -1;
-    for (let i = 0; i < lyricsData.length; i++) {
-      if (currentTime >= lyricsData[i].time) {
-        idx = i;
-      } else {
-        break;
+  // Determine active line index via direct timeListener (only triggers state change when line index changes)
+  useEffect(() => {
+    if (!playerRef?.current || !isSynced || lyricsData.length === 0) return;
+
+    const handleTime = (time) => {
+      let idx = -1;
+      for (let i = 0; i < lyricsData.length; i++) {
+        if (time >= lyricsData[i].time) {
+          idx = i;
+        } else {
+          break;
+        }
       }
-    }
-    return idx;
-  }, [isSynced, lyricsData, currentTime]);
+      if (idx !== activeIndexRef.current) {
+        activeIndexRef.current = idx;
+        setActiveIndex(idx);
+      }
+    };
+
+    handleTime(playerRef.current.getCurrentTime());
+
+    playerRef.current.addTimeListener(handleTime);
+    return () => {
+      if (playerRef?.current) {
+        playerRef.current.removeTimeListener(handleTime);
+      }
+    };
+  }, [playerRef, isSynced, lyricsData]);
 
   // Smooth cinematic glide to active line
   useEffect(() => {
@@ -203,6 +222,6 @@ const Lyrics = ({ currentTrack, currentTime }) => {
       </div>
     </div>
   );
-};
+});
 
 export default Lyrics;
