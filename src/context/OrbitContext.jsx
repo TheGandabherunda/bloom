@@ -96,6 +96,7 @@ export const OrbitProvider = ({ children }) => {
       chatProxy.sendAdd = chatAddAction.send;
 
       statePutAction.onMessage = (data, { peerId: pId }) => {
+        console.log(`[P2P] Received state update from ${pId}:`, data.key);
         stateProxy.store[data.key] = data.value;
         stateProxy.events.emit('update', { payload: { key: data.key, value: data.value } });
         
@@ -109,23 +110,30 @@ export const OrbitProvider = ({ children }) => {
       };
 
       chatAddAction.onMessage = (data, { peerId: pId }) => {
+        console.log(`[P2P] Received chat message from ${pId}`);
         chatProxy.arr.push(data.msg);
         chatProxy.events.emit('update', { payload: { value: data.msg } });
       };
 
       // Peer Lifecycle
       room.onPeerJoin = (pId) => {
+        console.log(`[P2P] Peer joined room: ${pId}`);
         setPeers(prev => [...new Set([...prev, pId])]);
         // Request state sync from newly joined peer just in case they have history
-        if (!isHost) reqSyncAction.send({}, { target: pId });
+        if (!isHost) {
+          console.log(`[P2P] Requesting full state sync from ${pId}...`);
+          reqSyncAction.send({}, { target: pId });
+        }
       };
 
       room.onPeerLeave = (pId) => {
+        console.log(`[P2P] Peer left room: ${pId}`);
         setPeers(prev => prev.filter(p => p !== pId));
       };
 
       // State Synchronization Logic
       reqSyncAction.onMessage = (_, { peerId: pId }) => {
+        console.log(`[P2P] Received sync request from ${pId}. Sending full state...`);
         fullSyncAction.send({
           state: stateProxy.store,
           chat: chatProxy.arr,
@@ -134,6 +142,8 @@ export const OrbitProvider = ({ children }) => {
       };
 
       fullSyncAction.onMessage = (data, { peerId: pId }) => {
+        console.log(`[P2P] Received full sync from ${pId}`, data);
+        
         stateProxy.store = { ...stateProxy.store, ...data.state };
         chatProxy.arr = data.chat;
         
@@ -147,6 +157,15 @@ export const OrbitProvider = ({ children }) => {
         
         setPeerNames(initialNames);
         setPeerRoles(initialRoles);
+
+        // Emit updates so mounted components (PlaybackContext, Chat) catch the new state
+        data.chat.forEach(msg => {
+          chatProxy.events.emit('update', { payload: { value: msg } });
+        });
+        
+        Object.entries(data.state).forEach(([key, value]) => {
+          stateProxy.events.emit('update', { payload: { key, value } });
+        });
       };
 
       // Initial Local State Setup
