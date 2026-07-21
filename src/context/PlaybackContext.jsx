@@ -72,7 +72,6 @@ export const PlaybackProvider = ({ children }) => {
 
     const isLocal = !originator || originator === peerId;
 
-    try {
       setError(null);
       setIsLoading(true);
       // Reset playing state immediately so button reflects loading
@@ -80,6 +79,8 @@ export const PlaybackProvider = ({ children }) => {
       isPlayingRef.current = false;
       const currentLoadId = Symbol();
       loadingTrackId.current = currentLoadId;
+      
+      try {
       
       let streamUrl = track.downloadUrl;
       
@@ -419,12 +420,14 @@ export const PlaybackProvider = ({ children }) => {
           try {
             navigator.mediaSession.setPositionState({
               duration: Math.max(0, duration),
-              playbackRate: isPlaying ? 1 : 0,
+              playbackRate: 1, // playbackRate cannot be 0 in Chrome
               position: Math.max(0, Math.min(cTime, duration))
             });
             mediaSessionSyncRef.current = { time: cTime, isPlaying, duration };
           } catch (e) {
             console.warn("MediaSession setPositionState error:", e);
+            // Ensure ref updates even on error to prevent infinite error loops
+            mediaSessionSyncRef.current = { time: cTime, isPlaying, duration };
           }
         }
       };
