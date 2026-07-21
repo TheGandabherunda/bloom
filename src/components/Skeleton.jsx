@@ -40,69 +40,37 @@ export const PlayerTrackSkeleton = () => (
 );
 
 // ─── Full-screen app init skeleton ───────────────────────────
-export const AppInitSkeleton = ({ status }) => (
-  <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl flex flex-col overflow-hidden">
-
-    {/* Fake header */}
-    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
-      <div className="flex items-center gap-3">
-        <Shimmer className="h-5 w-16" />
-        <Shimmer className="h-5 w-24" />
+export const AppInitSkeleton = ({ status }) => {
+  const loadingText = status === 'initializing' ? 'Connecting to peers...' : 'Starting Node...';
+  
+  return (
+    <div className="fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center overflow-hidden">
+      {/* Ambient background logo */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+        <img 
+          src="./assets/Bloom.svg" 
+          className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow blur-xl mix-blend-screen saturate-150" 
+          alt="" 
+        />
       </div>
-      {/* Fake search bar */}
-      <Shimmer className="h-11 w-80 rounded-full" />
-      <Shimmer className="h-5 w-24" />
-    </div>
 
-    {/* Fake content area */}
-    <div className="flex flex-1 overflow-hidden">
-      <main className="flex-1 p-6 space-y-10">
-        {/* Section header */}
-        <div className="space-y-6">
-          <Shimmer className="h-4 w-40" />
-          <TrackGridSkeleton count={10} />
+      {/* Spinning logo in middle */}
+      <div className="z-10 flex flex-col items-center gap-8">
+        <div className="relative flex items-center justify-center">
+          <img 
+            src="./assets/Bloom.svg" 
+            className="w-24 h-24 sm:w-32 sm:h-32 animate-[spin_4s_linear_infinite] drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]" 
+            alt="Bloom Logo" 
+          />
         </div>
-      </main>
-
-      {/* Fake sidebar */}
-      <aside className="w-72 border-l border-white/10 p-4 space-y-4 hidden lg:block">
-        <Shimmer className="h-4 w-32 mb-6" />
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <Shimmer className="w-10 h-10 rounded-full shrink-0" />
-            <div className="flex-1 space-y-2">
-              <Shimmer className="h-3 w-3/4" />
-              <Shimmer className="h-2.5 w-1/2" />
-            </div>
-          </div>
-        ))}
-      </aside>
-    </div>
-
-    {/* Fake player bar */}
-    <div className="h-[77px] border-t border-white/10 flex items-center px-6 gap-6 shrink-0">
-      <div className="flex items-center gap-4 w-1/3">
-        <Shimmer className="w-10 h-10 rounded-full" />
-        <Shimmer className="w-14 h-14 rounded-full" />
-        <Shimmer className="w-10 h-10 rounded-full" />
-      </div>
-      <div className="flex items-center gap-4 justify-center w-1/3">
-        <Shimmer className="w-12 h-12 rounded-lg" />
-        <div className="space-y-2">
-          <Shimmer className="h-3.5 w-36" />
-          <Shimmer className="h-3 w-24" />
+        
+        <div className="flex flex-col items-center gap-3">
+          <h1 className="text-4xl font-bold tracking-tight text-white/90 drop-shadow-md">Bloom</h1>
+          <p className="text-white/50 text-sm tracking-[0.2em] uppercase font-medium animate-pulse">
+            {loadingText}
+          </p>
         </div>
       </div>
-      <div className="flex items-center gap-3 justify-end w-1/3">
-        <Shimmer className="h-3 w-28 rounded-full" />
-      </div>
     </div>
-
-    {/* Status label */}
-    <div className="absolute bottom-24 left-0 right-0 flex justify-center">
-      <p className="text-white/20 text-xs font-bold uppercase tracking-widest animate-pulse">
-        {status}…
-      </p>
-    </div>
-  </div>
-);
+  );
+};
