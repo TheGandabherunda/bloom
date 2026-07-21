@@ -29,7 +29,7 @@ const RoomSetup = ({ config, onComplete }) => {
     e.preventDefault();
     if (!name || isOptimizing) return;
 
-    let finalRoomId = room;
+    let finalRoomId = config.isHost ? room : config.roomId;
     if (config.isHost && !room) {
       finalRoomId = `bloom-${Math.random().toString(36).substring(2, 8)}`;
     } else if (config.isHost) {

@@ -107,7 +107,7 @@ const Layout = ({ config }) => {
               <button
                 title="Copy invite link"
                 onClick={() => {
-                  const url = `${window.location.origin}?room=${config.roomId}`;
+                  const url = `${window.location.origin}${window.location.pathname}#${config.roomId}`;
                   navigator.clipboard.writeText(url).catch(() => {});
                 }}
                 className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center"
