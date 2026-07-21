@@ -14,79 +14,49 @@ export class CustomAudioPlayer {
     this.analyser.fftSize = 256;
     this.analyser.smoothingTimeConstant = 0.8;
 
-    // ─── Dynamic Auto-EQ via ScriptProcessorNode (CPU-Intensive) ───
+    // ─── Parametric EQ Studio (10-Band) ───
     this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
 
-    this.lowEQ = this.audioContext.createBiquadFilter();
-    this.lowEQ.type = 'lowshelf';
-    this.lowEQ.frequency.value = 250;
-
-    this.midEQ = this.audioContext.createBiquadFilter();
-    this.midEQ.type = 'peaking';
-    this.midEQ.frequency.value = 2000;
-    this.midEQ.Q.value = 1;
-
-    this.highEQ = this.audioContext.createBiquadFilter();
-    this.highEQ.type = 'highshelf';
-    this.highEQ.frequency.value = 6000;
-
-    this.sourceNode.connect(this.lowEQ);
-    this.lowEQ.connect(this.midEQ);
-    this.midEQ.connect(this.highEQ);
+    // Preamp to prevent clipping when boosting bands
+    this.preampNode = this.audioContext.createGain();
+    this.preampNode.gain.value = 1.0;
     
-    // Main signal to speakers
-    this.highEQ.connect(this.audioContext.destination);
+    this.sourceNode.connect(this.preampNode);
 
-    // Analyser branch
-    this.highEQ.connect(this.analyser);
+    // Default 10 bands
+    const defaultFrequencies = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    this.eqBands = [];
     
-    // Muted gain to terminate analyser and script processor quietly
+    let lastNode = this.preampNode;
+    
+    for (let i = 0; i < 10; i++) {
+      const filter = this.audioContext.createBiquadFilter();
+      // Usually AutoEq uses peaking filters for everything except extremes, 
+      // but sticking to standard 10-band graphic EQ layout for defaults:
+      if (i === 0) filter.type = 'lowshelf';
+      else if (i === 9) filter.type = 'highshelf';
+      else filter.type = 'peaking';
+      
+      filter.frequency.value = defaultFrequencies[i];
+      filter.Q.value = 1.41;
+      filter.gain.value = 0;
+      
+      lastNode.connect(filter);
+      lastNode = filter;
+      this.eqBands.push(filter);
+    }
+    
+    // Main signal goes to speakers
+    lastNode.connect(this.audioContext.destination);
+
+    // Analyser branch (sees the EQ'd audio)
+    lastNode.connect(this.analyser);
+    
+    // Muted gain to terminate analyser quietly
     this.muteGain = this.audioContext.createGain();
     this.muteGain.gain.value = 0;
     this.analyser.connect(this.muteGain);
-
-    // ScriptProcessor to dynamically analyze frames
-    this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-    this.analyser.connect(this.scriptProcessor);
-    this.scriptProcessor.connect(this.muteGain);
     this.muteGain.connect(this.audioContext.destination);
-
-    const TARGET_LOW = 180;
-    const TARGET_MID = 130;
-    const TARGET_HIGH = 140;
-
-    this.scriptProcessor.onaudioprocess = () => {
-      if (!this.isPlaying) return;
-
-      const data = new Uint8Array(this.analyser.frequencyBinCount);
-      this.analyser.getByteFrequencyData(data); // 128 bins
-
-      let lowEnergy = 0, midEnergy = 0, highEnergy = 0;
-      
-      // Bins 0-3 (0 - ~500Hz)
-      for (let i = 0; i <= 3; i++) lowEnergy += data[i];
-      lowEnergy /= 4;
-      
-      // Bins 4-25 (~500Hz - ~4300Hz)
-      for (let i = 4; i <= 25; i++) midEnergy += data[i];
-      midEnergy /= 22;
-
-      // Bins 26-100 (~4300Hz - ~17200Hz)
-      for (let i = 26; i <= 100; i++) highEnergy += data[i];
-      highEnergy /= 75;
-
-      const k = 0.05; // Smoothing factor
-      
-      // Calculate diff and restrict max boost/cut to +/- 10dB
-      const lowDiff = (TARGET_LOW - lowEnergy) / 10; 
-      this.lowEQ.gain.value += (Math.max(-10, Math.min(10, lowDiff)) - this.lowEQ.gain.value) * k;
-
-      const midDiff = (TARGET_MID - midEnergy) / 10;
-      this.midEQ.gain.value += (Math.max(-10, Math.min(10, midDiff)) - this.midEQ.gain.value) * k;
-
-      const highDiff = (TARGET_HIGH - highEnergy) / 10;
-      this.highEQ.gain.value += (Math.max(-10, Math.min(10, highDiff)) - this.highEQ.gain.value) * k;
-    };
 
     this.volume = 1;
     this.isPlaying = false;
@@ -214,6 +184,23 @@ export class CustomAudioPlayer {
     this.volume = Math.max(0, Math.min(1, v));
     if (this.audio) {
       this.audio.volume = this.volume;
+    }
+  }
+
+  setPreamp(gainDb) {
+    if (this.preampNode) {
+      // Convert dB to linear gain
+      this.preampNode.gain.value = Math.pow(10, gainDb / 20);
+    }
+  }
+
+  setEQBand(index, type, freq, q, gainDb) {
+    if (this.eqBands && this.eqBands[index]) {
+      const filter = this.eqBands[index];
+      if (type) filter.type = type;
+      if (freq !== undefined) filter.frequency.value = freq;
+      if (q !== undefined) filter.Q.value = q;
+      if (gainDb !== undefined) filter.gain.value = gainDb;
     }
   }
 
