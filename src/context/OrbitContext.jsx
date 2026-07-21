@@ -65,7 +65,7 @@ export const OrbitProvider = ({ children }) => {
     initializingRef.current = false;
   }, [postMsg]);
 
-  const initP2P = useCallback(async (roomId, displayName, isHost = false) => {
+  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null) => {
     if (initializingRef.current || statusRef.current === 'connected') return;
     
     try {
@@ -119,7 +119,7 @@ export const OrbitProvider = ({ children }) => {
       stateDbRef.current = stateProxy;
       chatDbRef.current = chatProxy;
 
-      const myPeerId = await postMsg('INIT', { roomId, displayName, isHost });
+      const myPeerId = await postMsg('INIT', { roomId, displayName, isHost, hostId });
       myPeerIdRef.current = myPeerId;
       setPeerId(myPeerId);
 

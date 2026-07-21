@@ -18,10 +18,16 @@ const Layout = ({ config }) => {
   const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
 
   useEffect(() => {
-    initP2P(config.roomId, config.displayName, config.isHost);
-    return () => {
-    };
+    initP2P(config.roomId, config.displayName, config.isHost, config.hostId);
   }, [config, initP2P]);
+
+  useEffect(() => {
+    if (config.isHost && peerId) {
+      window.location.hash = `${config.roomId}?host=${peerId}`;
+    } else if (!config.isHost && config.hostId) {
+      window.location.hash = `${config.roomId}?host=${config.hostId}`;
+    }
+  }, [config, peerId]);
 
   // Auto-hide search and extract colors when a track is played
   useEffect(() => {
@@ -107,8 +113,7 @@ const Layout = ({ config }) => {
               <button
                 title="Copy invite link"
                 onClick={() => {
-                  const url = `${window.location.origin}${window.location.pathname}#${config.roomId}`;
-                  navigator.clipboard.writeText(url).catch(() => {});
+                  navigator.clipboard.writeText(window.location.href).catch(() => {});
                 }}
                 className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center"
               >

@@ -6,12 +6,22 @@ import RoomSetup from './components/RoomSetup';
 
 function App() {
   const [setupComplete, setSetupComplete] = useState(false);
-  const [config, setConfig] = useState({ roomId: '', displayName: '', isHost: false });
+  const [config, setConfig] = useState({ roomId: '', displayName: '', isHost: false, hostId: null });
 
   useEffect(() => {
-    const hash = window.location.hash.substring(1);
-    if (hash) {
-      setConfig(prev => ({ ...prev, roomId: hash, isHost: false }));
+    const hashPart = window.location.hash.substring(1);
+    if (hashPart) {
+      const [roomId, query] = hashPart.split('?');
+      const params = new URLSearchParams(query || '');
+      const hostId = params.get('host');
+      
+      if (hostId) {
+        setConfig(prev => ({ ...prev, roomId, hostId, isHost: false }));
+      } else {
+        // Invalid join attempt (missing host ID). Clear the hash and treat as a new host.
+        window.history.replaceState(null, '', window.location.pathname);
+        setConfig(prev => ({ ...prev, isHost: true }));
+      }
     } else {
       setConfig(prev => ({ ...prev, isHost: true }));
     }
@@ -20,7 +30,7 @@ function App() {
   const handleSetup = (newConfig) => {
     setConfig(newConfig);
     setSetupComplete(true);
-    window.location.hash = newConfig.roomId;
+    // Let Layout.jsx handle updating the hash once the peerId is known
   };
 
   return (

@@ -26,7 +26,7 @@ self.onmessage = async (e) => {
   try {
     switch (type) {
       case 'INIT':
-        await initP2P(payload.roomId, payload.displayName, payload.isHost);
+        await initP2P(payload.roomId, payload.displayName, payload.isHost, payload.hostId);
         self.postMessage({ id, success: true, peerId: myPeerId });
         break;
       case 'STOP':
@@ -66,7 +66,7 @@ self.onmessage = async (e) => {
   }
 };
 
-async function initP2P(roomId, displayName, isHost) {
+async function initP2P(roomId, displayName, isHost, hostId) {
   const libp2p = await createLibp2p({
     addresses: {
       listen: [
@@ -181,4 +181,30 @@ async function initP2P(roomId, displayName, isHost) {
   chatDb.events.on('update', (entry) => {
     self.postMessage({ type: 'CHAT_UPDATE', entry: { payload: entry.payload } });
   });
+
+  if (hostId && hostId !== myPeerId) {
+    const dialHost = async () => {
+      const relays = [
+        '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+        '/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+        '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+        '/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4VtEQh4BcR56CWsMoP1S2i'
+      ];
+      console.log(`[P2P Worker] Attempting to explicitly dial host ${hostId} via relays...`);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        for (const relay of relays) {
+          try {
+            await libp2p.dial(`${relay}/p2p-circuit/p2p/${hostId}`);
+            console.log(`[P2P Worker] Successfully dialed host via relay ${relay}`);
+            return; 
+          } catch(err) {
+            // ignore
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+      console.warn(`[P2P Worker] Failed to explicitly dial host after 5 attempts.`);
+    };
+    dialHost();
+  }
 }
