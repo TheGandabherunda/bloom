@@ -41,13 +41,19 @@ export const PlayerTrackSkeleton = () => (
 
 // ─── Full-screen app init skeleton ───────────────────────────
 export const AppInitSkeleton = ({ status }) => {
-  const loadingText = status === 'initializing' ? 'Connecting to peers...' : 'Starting Node...';
+  const loadingText = status === 'initializing' ? 'Connecting to peers...' : 'Making things ready for you...';
   
   return (
-    <div className="fixed inset-0 z-[300] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900 to-black flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center overflow-hidden">
       
+      {/* Ambient background glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[40vw] h-[40vw] max-w-[400px] max-h-[400px] bg-pink-500/10 rounded-full blur-[100px] animate-pulse"></div>
+        <div className="absolute w-[30vw] h-[30vw] max-w-[300px] max-h-[300px] bg-purple-500/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+
       {/* Spinning logo in middle */}
-      <div className="z-10 flex flex-col items-center gap-6">
+      <div className="z-10 flex flex-col items-center gap-8">
         <div className="relative flex items-center justify-center">
           <img 
             src="./assets/Bloom.svg" 
@@ -56,7 +62,7 @@ export const AppInitSkeleton = ({ status }) => {
           />
         </div>
         
-        <p className="text-white/40 text-sm tracking-[0.2em] uppercase font-medium">
+        <p className="text-white/40 text-xs sm:text-sm tracking-[0.3em] uppercase font-medium">
           {loadingText}
         </p>
       </div>

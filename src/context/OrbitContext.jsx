@@ -87,15 +87,15 @@ export const OrbitProvider = ({ children }) => {
       };
 
       // Trystero Actions
-      const [sendPut, getPut] = room.makeAction('statePut');
-      const [sendAdd, getAdd] = room.makeAction('chatAdd');
-      const [requestSync, getSyncRequest] = room.makeAction('reqSync');
-      const [sendFullSync, getFullSync] = room.makeAction('fullSync');
+      const statePutAction = room.makeAction('statePut');
+      const chatAddAction = room.makeAction('chatAdd');
+      const reqSyncAction = room.makeAction('reqSync');
+      const fullSyncAction = room.makeAction('fullSync');
 
-      stateProxy.sendPut = sendPut;
-      chatProxy.sendAdd = sendAdd;
+      stateProxy.sendPut = statePutAction.send;
+      chatProxy.sendAdd = chatAddAction.send;
 
-      getPut((data, pId) => {
+      statePutAction.onMessage = (data, { peerId: pId }) => {
         stateProxy.store[data.key] = data.value;
         stateProxy.events.emit('update', { payload: { key: data.key, value: data.value } });
         
@@ -106,18 +106,18 @@ export const OrbitProvider = ({ children }) => {
         } else if (data.key === 'banned' && data.value === selfId) {
           window.location.reload();
         }
-      });
+      };
 
-      getAdd((data, pId) => {
+      chatAddAction.onMessage = (data, { peerId: pId }) => {
         chatProxy.arr.push(data.msg);
         chatProxy.events.emit('update', { payload: { value: data.msg } });
-      });
+      };
 
       // Peer Lifecycle
       room.onPeerJoin = (pId) => {
         setPeers(prev => [...new Set([...prev, pId])]);
         // Request state sync from newly joined peer just in case they have history
-        if (!isHost) requestSync({}, pId);
+        if (!isHost) reqSyncAction.send({}, { target: pId });
       };
 
       room.onPeerLeave = (pId) => {
@@ -125,15 +125,15 @@ export const OrbitProvider = ({ children }) => {
       };
 
       // State Synchronization Logic
-      getSyncRequest((_, pId) => {
-        sendFullSync({
+      reqSyncAction.onMessage = (_, { peerId: pId }) => {
+        fullSyncAction.send({
           state: stateProxy.store,
           chat: chatProxy.arr,
           names: stateProxy.store,
         }, { target: pId });
-      });
+      };
 
-      getFullSync((data) => {
+      fullSyncAction.onMessage = (data, { peerId: pId }) => {
         stateProxy.store = { ...stateProxy.store, ...data.state };
         chatProxy.arr = data.chat;
         
@@ -147,7 +147,7 @@ export const OrbitProvider = ({ children }) => {
         
         setPeerNames(initialNames);
         setPeerRoles(initialRoles);
-      });
+      };
 
       // Initial Local State Setup
       setPeerNames(prev => ({ ...prev, [selfId]: displayName }));
