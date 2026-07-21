@@ -2,6 +2,7 @@ import { createLibp2p } from 'libp2p';
 import { createHelia } from 'helia';
 import { createOrbitDB, Identities } from '@orbitdb/core';
 import { webSockets } from '@libp2p/websockets';
+import { all } from '@libp2p/websockets/filters';
 import { webRTC } from '@libp2p/webrtc';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
 import { identify } from '@libp2p/identify';
@@ -68,14 +69,22 @@ self.onmessage = async (e) => {
 async function initP2P(roomId, displayName, isHost) {
   const libp2p = await createLibp2p({
     addresses: {
-      listen: ['/webrtc']
+      listen: [
+        '/webrtc',
+        '/p2p-circuit'
+      ]
     },
-    // We intentionally removed connectionManager limits to allow max P2P performance 
-    // since this now safely runs in a background thread without freezing the UI.
     transports: [
-      webSockets(),
-      webRTC(),
-      circuitRelayTransport()
+      webSockets({ filter: all }),
+      webRTC({
+        rtcConfiguration: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+          ]
+        }
+      }),
+      circuitRelayTransport({ discoverRelays: 1 })
     ],
     connectionEncryption: [noise()],
     streamMuxers: [yamux()],
@@ -90,9 +99,10 @@ async function initP2P(roomId, displayName, isHost) {
     peerDiscovery: [
       bootstrap({
         list: [
-          '/dns4/bootstrap.libp2p.io/tcp/443/wss/p2p/QmNnoo2uRhyKmRkUMvBxTRCM9D2Eryqk9TqZ8D5x5hAn6v',
-          '/dns4/bootstrap.libp2p.io/tcp/443/wss/p2p/QmQCU2EcNmSRRL6JWvAa6uW7YyqK13f99ZcsNqXF8vMpxU',
-          '/dns4/bootstrap.libp2p.io/tcp/443/wss/p2p/QmbLHAnMoUv8H75Fm6nU78Y4XvW3N9N9X4x4Wq3vS6xU6x'
+          '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+          '/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+          '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+          '/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4VtEQh4BcR56CWsMoP1S2i'
         ]
       })
     ]
@@ -150,15 +160,22 @@ async function initP2P(roomId, displayName, isHost) {
   } catch (e) {}
 
   // Wire up event listeners to bridge back to the UI thread
+  libp2p.addEventListener('peer:discovery', (evt) => {
+    console.log(`[P2P Worker] Discovered peer: ${evt.detail.id.toString()}`);
+  });
+
   libp2p.addEventListener('peer:connect', (evt) => {
+    console.log(`[P2P Worker] Connected to peer: ${evt.detail.toString()}`);
     self.postMessage({ type: 'PEER_CONNECT', peerId: evt.detail.toString() });
   });
   
   libp2p.addEventListener('peer:disconnect', (evt) => {
+    console.log(`[P2P Worker] Disconnected from peer: ${evt.detail.toString()}`);
     self.postMessage({ type: 'PEER_DISCONNECT', peerId: evt.detail.toString() });
   });
 
   stateDb.events.on('update', (entry) => {
+    console.log(`[P2P Worker] State DB updated:`, entry.payload.key);
     self.postMessage({ type: 'STATE_UPDATE', entry: { payload: entry.payload } });
   });
   
