@@ -47,7 +47,7 @@ const Chat = () => {
     const loadMessages = async () => {
       seenHashesRef.current = new Set();
       const all = await chatDb.all();
-      const msgs = all.map(e => e.value).filter(Boolean);
+      const msgs = all.map(e => e.payload?.value || e.value).filter(Boolean);
       msgs.forEach(m => {
         const key = `${m.sender}|${m.timestamp}|${m.type}|${m.text || m.image || ''}`;
         seenHashesRef.current.add(key);

@@ -5,7 +5,7 @@ import { CustomAudioPlayer } from '../services/CustomAudioPlayer';
 const PlaybackContext = createContext(null);
 
 export const PlaybackProvider = ({ children }) => {
-  const { stateDb, chatDb, peerId, peerRoles } = useOrbit();
+  const { stateDb, chatDb, peerId, peerRoles, status } = useOrbit();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [queue, setQueueState] = useState([]);
@@ -71,6 +71,10 @@ export const PlaybackProvider = ({ children }) => {
     }
 
     const isLocal = !originator || originator === peerId;
+    if (isLocal && !canControl()) {
+      console.warn("Only owners and admins can play tracks in this room.");
+      return;
+    }
 
       setError(null);
       setIsLoading(true);
@@ -134,8 +138,10 @@ export const PlaybackProvider = ({ children }) => {
 
       setIsLoading(false);
       if (autoPlay) {
-        // play() will fire onPlayStateChange(true) which updates isPlaying + ref
         await playerRef.current.play();
+        if (isLocal && stateDb) {
+          stateDb.put('isPlaying', { status: true, originator: peerId }).catch(e => console.warn(e));
+        }
       }
     } catch (err) {
       console.error('[Playback] Load Track Error:', err);
@@ -155,6 +161,7 @@ export const PlaybackProvider = ({ children }) => {
   const isPlayingRef = useRef(false);
   const isRepeatRef = useRef(false);
   const peerRolesRef = useRef({});
+  const statusRef = useRef('disconnected');
   const mediaSessionSyncRef = useRef({ time: 0, isPlaying: false, duration: 0 });
 
   useEffect(() => {
@@ -162,7 +169,14 @@ export const PlaybackProvider = ({ children }) => {
     isPlayingRef.current = isPlaying;
     isRepeatRef.current = isRepeat;
     peerRolesRef.current = peerRoles;
-  }, [currentTrack, isPlaying, isRepeat, peerRoles]);
+    statusRef.current = status;
+  }, [currentTrack, isPlaying, isRepeat, peerRoles, status]);
+
+  const canControl = useCallback(() => {
+    if (statusRef.current !== 'connected') return true;
+    const role = peerRolesRef.current[peerId];
+    return role === 'owner' || role === 'admin';
+  }, [peerId]);
 
   // Initial Sync from OrbitDB
   useEffect(() => {
@@ -236,6 +250,7 @@ export const PlaybackProvider = ({ children }) => {
   }, [stateDb, peerId, loadTrack]);
 
   const seek = useCallback((time) => {
+    if (!canControl()) return;
     if (playerRef.current) {
       playerRef.current.seek(time);
     }
@@ -245,6 +260,7 @@ export const PlaybackProvider = ({ children }) => {
   }, [stateDb, peerId]);
 
   const togglePlay = useCallback(async () => {
+    if (!canControl()) return;
     console.log(`[Playback] togglePlay called. currentTrack: ${currentTrackRef.current?.id}`);
     if (!currentTrackRef.current) {
       if (queue.length > 0) {
@@ -268,6 +284,7 @@ export const PlaybackProvider = ({ children }) => {
   }, [stateDb, peerId, queue, loadTrack]);
 
   const playNext = useCallback((autoPlay = true) => {
+    if (!canControl()) return;
     if (isRepeatRef.current && currentTrackRef.current) {
       seek(0);
       if (autoPlay) {
@@ -292,6 +309,7 @@ export const PlaybackProvider = ({ children }) => {
   }, [playNext]);
 
   const playPrev = useCallback(() => {
+    if (!canControl()) return;
     const cTime = playerRef.current?.getCurrentTime() || 0;
     if (cTime > 3) {
       seek(0);

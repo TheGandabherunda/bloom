@@ -119,6 +119,13 @@ export const OrbitProvider = ({ children }) => {
       room.onPeerJoin = (pId) => {
         console.log(`[P2P] Peer joined room: ${pId}`);
         setPeers(prev => [...new Set([...prev, pId])]);
+        
+        // Announce our identity to the new peer so they know who we are
+        statePutAction.send({ key: `peer_name_${selfId}`, value: displayName }, { target: pId });
+        if (isHost) {
+          statePutAction.send({ key: `peer_role_${selfId}`, value: 'owner' }, { target: pId });
+        }
+
         // Request state sync from newly joined peer just in case they have history
         if (!isHost) {
           console.log(`[P2P] Requesting full state sync from ${pId}...`);
