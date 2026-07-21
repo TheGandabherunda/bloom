@@ -164,14 +164,12 @@ export class CustomAudioPlayer {
     const fps = 30; // Hard cap at 30fps to prevent mobile CPU thermal throttling
     const frameInterval = 1000 / fps;
     
-    let lastFrameTime = performance.now();
+    this.visualizerLastTime = performance.now();
 
     const loop = (time) => {
       this.visualizerFrameId = requestAnimationFrame(loop);
       
       if (!time) time = performance.now();
-      
-      lastFrameTime = time;
 
       const elapsed = time - this.visualizerLastTime;
       if (elapsed < frameInterval) return;

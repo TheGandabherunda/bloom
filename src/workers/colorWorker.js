@@ -114,6 +114,9 @@ const extractPrimaryColor = (imageData) => {
 };
 
 
+let sharedCanvas = null;
+let sharedCtx = null;
+
 self.onmessage = async (e) => {
   const { id, url, type } = e.data;
   
@@ -125,10 +128,16 @@ self.onmessage = async (e) => {
     // Resize down to 32x32 for extremely fast analysis
     const bitmap = await createImageBitmap(blob, { resizeWidth: 32, resizeHeight: 32 });
     
-    const canvas = new OffscreenCanvas(32, 32);
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(bitmap, 0, 0, 32, 32);
-    const imageData = ctx.getImageData(0, 0, 32, 32);
+    if (!sharedCanvas) {
+      sharedCanvas = new OffscreenCanvas(32, 32);
+      sharedCtx = sharedCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    
+    sharedCtx.drawImage(bitmap, 0, 0, 32, 32);
+    const imageData = sharedCtx.getImageData(0, 0, 32, 32);
+    
+    // EXTREMELY IMPORTANT: Free GPU memory immediately to prevent GC pauses that stutter audio
+    bitmap.close();
 
     let result;
     if (type === 'dominant') {
