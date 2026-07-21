@@ -127,6 +127,21 @@ export class CustomAudioPlayer {
         this.audioContext.resume();
       }
       this._startVisualizerLoop();
+      
+      // Aggressive UI Lag Monitor
+      let lastTick = performance.now();
+      const monitor = () => {
+        const now = performance.now();
+        const delta = now - lastTick;
+        if (delta > 50 && this.isPlaying) {
+           console.warn(`[DEBUG-UI-LAG] Main UI thread was BLOCKED for ${delta.toFixed(1)}ms! This will cause stuttering.`);
+        }
+        lastTick = now;
+        if (this.isPlaying) {
+           requestAnimationFrame(monitor);
+        }
+      };
+      requestAnimationFrame(monitor);
     });
 
     this.audio.addEventListener('pause', () => {
@@ -163,11 +178,19 @@ export class CustomAudioPlayer {
     
     const fps = 30; // Hard cap at 30fps to prevent mobile CPU thermal throttling
     const frameInterval = 1000 / fps;
+    
+    let lastFrameTime = performance.now();
 
     const loop = (time) => {
       this.visualizerFrameId = requestAnimationFrame(loop);
       
       if (!time) time = performance.now();
+      
+      const frameDelta = time - lastFrameTime;
+      if (frameDelta > 100) {
+        console.warn(`[DEBUG] Main thread blocked! visualizer requestAnimationFrame delayed by ${frameDelta.toFixed(1)}ms`);
+      }
+      lastFrameTime = time;
 
       const elapsed = time - this.visualizerLastTime;
       if (elapsed < frameInterval) return;

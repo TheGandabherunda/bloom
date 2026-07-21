@@ -9,13 +9,16 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
   const { chatDb, peerNames, peerId } = useOrbit();
 
   useEffect(() => {
-    if (!track?.thumbnail) return;
+    if (!hovered || !track?.thumbnail) {
+      setCardColor('rgb(255, 255, 255)');
+      return;
+    }
     let cancelled = false;
     extractPrimaryColor(track.thumbnail).then(color => {
       if (!cancelled) setCardColor(color);
     });
     return () => { cancelled = true; };
-  }, [track?.thumbnail]);
+  }, [hovered, track?.thumbnail]);
 
   // Convert rgb(R, G, B) → rgba(R, G, B, opacity)
   const rgba = (color, opacity) => {

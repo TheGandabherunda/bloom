@@ -32,22 +32,22 @@ const Layout = ({ config }) => {
       if (currentTrack.thumbnail) {
         extractDominantColors(currentTrack.thumbnail)
           .then(colors => {
-            if (colors && colors.length >= 4) {
-              const root = document.documentElement;
-              const rgbStr = colors[0]; // "R G B" space-separated
+            if (colors && colors.rawRgbStrings && colors.rawRgbStrings.length >= 4) {
+              const rgbStr = colors.rawRgbStrings[0]; // "R G B" space-separated
+              const rgbComma = rgbStr.split(' ').join(', ');
 
               root.style.setProperty('--color-primary-rgb', rgbStr);
               root.style.setProperty('--color-primary-light-rgb', rgbStr);
               root.style.setProperty('--color-primary-dark-rgb', rgbStr);
 
               // Full rgb() value — used by all var(--color-primary) references
-              root.style.setProperty('--color-primary', `rgb(${rgbStr})`);
+              root.style.setProperty('--color-primary', `rgb(${rgbComma})`);
 
               // Ambient blob colors
-              root.style.setProperty('--color-1', `rgb(${colors[0]})`);
-              root.style.setProperty('--color-2', `rgb(${colors[1]})`);
-              root.style.setProperty('--color-3', `rgb(${colors[2]})`);
-              root.style.setProperty('--color-4', `rgb(${colors[3]})`);
+              root.style.setProperty('--color-1', `rgb(${colors.rawRgbStrings[0].split(' ').join(', ')})`);
+              root.style.setProperty('--color-2', `rgb(${colors.rawRgbStrings[1].split(' ').join(', ')})`);
+              root.style.setProperty('--color-3', `rgb(${colors.rawRgbStrings[2].split(' ').join(', ')})`);
+              root.style.setProperty('--color-4', `rgb(${colors.rawRgbStrings[3].split(' ').join(', ')})`);
             }
           })
           .catch(e => console.error('Color extraction failed:', e));
