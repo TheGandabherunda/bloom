@@ -12,6 +12,7 @@ import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { bootstrap } from '@libp2p/bootstrap';
 import { IDBBlockstore } from 'blockstore-idb';
 import { IDBDatastore } from 'datastore-idb';
+import { multiaddr } from '@multiformats/multiaddr';
 
 let heliaNode = null;
 let orbitdb = null;
@@ -158,6 +159,13 @@ async function initP2P(roomId, displayName, isHost, hostId) {
     });
   } catch (e) {}
 
+  if (isHost) {
+    setInterval(() => {
+      const addrs = libp2p.getMultiaddrs().map(a => a.toString());
+      console.log('[P2P Worker] Host is listening on:', addrs);
+    }, 10000);
+  }
+
   // Wire up event listeners to bridge back to the UI thread
   libp2p.addEventListener('peer:discovery', (evt) => {
     console.log(`[P2P Worker] Discovered peer: ${evt.detail.id.toString()}`);
@@ -194,11 +202,12 @@ async function initP2P(roomId, displayName, isHost, hostId) {
       for (let attempt = 0; attempt < 5; attempt++) {
         for (const relay of relays) {
           try {
-            await libp2p.dial(`${relay}/p2p-circuit/p2p/${hostId}`);
+            const ma = multiaddr(`${relay}/p2p-circuit/p2p/${hostId}`);
+            await libp2p.dial(ma);
             console.log(`[P2P Worker] Successfully dialed host via relay ${relay}`);
             return; 
           } catch(err) {
-            // ignore
+            console.error(`[P2P Worker] Dial error for relay ${relay}:`, err.message || err);
           }
         }
         await new Promise(resolve => setTimeout(resolve, 3000));
