@@ -123,6 +123,21 @@ export class CustomAudioPlayer {
         this.audioContext.resume();
       }
       this._startVisualizerLoop();
+      
+      // Aggressive UI Lag Monitor
+      let lastTick = performance.now();
+      const monitor = () => {
+        const now = performance.now();
+        const delta = now - lastTick;
+        if (delta > 50 && this.isPlaying) {
+           console.warn(`[DEBUG-UI-LAG] Main UI thread was BLOCKED for ${delta.toFixed(1)}ms! This will cause stuttering.`);
+        }
+        lastTick = now;
+        if (this.isPlaying) {
+           requestAnimationFrame(monitor);
+        }
+      };
+      requestAnimationFrame(monitor);
     });
 
     this.audio.addEventListener('pause', () => {
