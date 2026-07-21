@@ -3,7 +3,6 @@ import { useOrbit } from '../context/OrbitContext';
 import { usePlayback } from '../context/PlaybackContext';
 import Lyrics from './Lyrics';
 import { PlayerTrackSkeleton } from './Skeleton';
-import EQStudio from './EQStudio';
 
 const Visualizer = ({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
   const barsRef = useRef([]);
@@ -109,7 +108,6 @@ const Player = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFsControls, setShowFsControls] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [showEQ, setShowEQ] = useState(false);
   const fsTimeoutRef = useRef(null);
 
   // Sync fullscreen exit via Escape key or browser back
@@ -352,13 +350,6 @@ const Player = () => {
                 <span className="material-symbols-rounded text-[26px] leading-none">shuffle</span>
               </button>
 
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowEQ(true); }} 
-                className={`w-10 h-10 flex items-center justify-center transition-colors text-white/40 hover:text-white`}
-              >
-                <span className="material-symbols-rounded text-[26px] leading-none">tune</span>
-              </button>
-
               <div className="flex items-center gap-4">
                 <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="text-white/70 hover:text-white flex items-center justify-center">
                   <span className="material-symbols-rounded text-[36px] icon-fill leading-none">skip_previous</span>
@@ -500,13 +491,6 @@ const Player = () => {
               <span className="material-symbols-rounded text-[24px] leading-none">lyrics</span>
             </button>
             <button 
-              onClick={(e) => { e.stopPropagation(); setShowEQ(true); }} 
-              className={`transition-colors flex items-center justify-center text-white/40 hover:text-white`}
-              title="EQ Studio"
-            >
-              <span className="material-symbols-rounded text-[24px] leading-none">tune</span>
-            </button>
-            <button 
               onClick={(e) => { e.stopPropagation(); setIsShuffled(!isShuffled); }} 
               className={`transition-colors flex items-center justify-center ${isShuffled ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white'}`}
             >
@@ -601,8 +585,6 @@ const Player = () => {
 
       </div>
     </div>
-      
-    {showEQ && <EQStudio onClose={() => setShowEQ(false)} />}
     </>
   );
 };

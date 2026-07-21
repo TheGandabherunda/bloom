@@ -14,47 +14,18 @@ export class CustomAudioPlayer {
     this.analyser.fftSize = 256;
     this.analyser.smoothingTimeConstant = 0.8;
 
-    // ─── Parametric EQ Studio (10-Band) ───
+    // Route: audio → source → splitter → [destination, analyser → mutedGain → destination]
     this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
 
-    // Preamp to prevent clipping when boosting bands
-    this.preampNode = this.audioContext.createGain();
-    this.preampNode.gain.value = 1.0;
-    
-    this.sourceNode.connect(this.preampNode);
-
-    // Default 10 bands
-    const defaultFrequencies = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-    this.eqBands = [];
-    
-    let lastNode = this.preampNode;
-    
-    for (let i = 0; i < 10; i++) {
-      const filter = this.audioContext.createBiquadFilter();
-      // Usually AutoEq uses peaking filters for everything except extremes, 
-      // but sticking to standard 10-band graphic EQ layout for defaults:
-      if (i === 0) filter.type = 'lowshelf';
-      else if (i === 9) filter.type = 'highshelf';
-      else filter.type = 'peaking';
-      
-      filter.frequency.value = defaultFrequencies[i];
-      filter.Q.value = 1.41;
-      filter.gain.value = 0;
-      
-      lastNode.connect(filter);
-      lastNode = filter;
-      this.eqBands.push(filter);
-    }
-    
-    // Main signal goes to speakers
-    lastNode.connect(this.audioContext.destination);
-
-    // Analyser branch (sees the EQ'd audio)
-    lastNode.connect(this.analyser);
-    
-    // Muted gain to terminate analyser quietly
+    // Muted gain for the analyser branch so we don't double-output
     this.muteGain = this.audioContext.createGain();
     this.muteGain.gain.value = 0;
+
+    // Main signal goes to speakers directly
+    this.sourceNode.connect(this.audioContext.destination);
+
+    // Analyser branch: source → analyser → muted gain → destination
+    this.sourceNode.connect(this.analyser);
     this.analyser.connect(this.muteGain);
     this.muteGain.connect(this.audioContext.destination);
 
@@ -187,22 +158,7 @@ export class CustomAudioPlayer {
     }
   }
 
-  setPreamp(gainDb) {
-    if (this.preampNode) {
-      // Convert dB to linear gain
-      this.preampNode.gain.value = Math.pow(10, gainDb / 20);
-    }
-  }
 
-  setEQBand(index, type, freq, q, gainDb) {
-    if (this.eqBands && this.eqBands[index]) {
-      const filter = this.eqBands[index];
-      if (type) filter.type = type;
-      if (freq !== undefined) filter.frequency.value = freq;
-      if (q !== undefined) filter.Q.value = q;
-      if (gainDb !== undefined) filter.gain.value = gainDb;
-    }
-  }
 
   getCurrentTime() {
     return this.audio ? this.audio.currentTime : 0;
