@@ -214,28 +214,28 @@ const Layout = ({ config }) => {
         {/* Bottom Navigation for Mobile */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-black/80 backdrop-blur-3xl border-t border-white/10 z-[100] flex items-center justify-around px-2">
           <button 
-            onClick={() => setActiveMobileView('home')} 
+            onClick={() => { setActiveMobileView('home'); setIsExpanded(false); }} 
             className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'home' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
           >
             <span className="material-symbols-rounded text-[24px]">home</span>
             <span className="text-[9px] font-bold tracking-widest mt-1">HOME</span>
           </button>
           <button 
-            onClick={() => { setActiveMobileView('queue'); setActiveSidebarTab('queue'); }} 
+            onClick={() => { setActiveMobileView('queue'); setActiveSidebarTab('queue'); setIsExpanded(false); }} 
             className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'queue' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
           >
             <span className="material-symbols-rounded text-[24px]">queue_music</span>
             <span className="text-[9px] font-bold tracking-widest mt-1">QUEUE</span>
           </button>
           <button 
-            onClick={() => { setActiveMobileView('chat'); setActiveSidebarTab('chat'); }} 
+            onClick={() => { setActiveMobileView('chat'); setActiveSidebarTab('chat'); setIsExpanded(false); }} 
             className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'chat' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
           >
             <span className="material-symbols-rounded text-[24px]">chat</span>
             <span className="text-[9px] font-bold tracking-widest mt-1">CHAT</span>
           </button>
           <button 
-            onClick={() => { setActiveMobileView('peers'); setActiveSidebarTab('peers'); }} 
+            onClick={() => { setActiveMobileView('peers'); setActiveSidebarTab('peers'); setIsExpanded(false); }} 
             className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'peers' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}
           >
             <span className="material-symbols-rounded text-[24px]">people</span>

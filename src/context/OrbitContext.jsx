@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { joinRoom, selfId } from 'trystero';
+import { joinRoom, selfId } from '@trystero-p2p/torrent';
 
 const OrbitContext = createContext(null);
 
@@ -55,7 +55,17 @@ export const OrbitProvider = ({ children }) => {
       setStatusWrapped('initializing');
       console.log('Starting Trystero initialization...');
 
-      const room = joinRoom({ appId: 'bloom-p2p' }, roomId);
+      const config = {
+        appId: 'bloom-p2p',
+        rtcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' },
+            { urls: 'stun:stun.cloudflare.com:3478' }
+          ]
+        }
+      };
+      const room = joinRoom(config, roomId);
       roomRef.current = room;
       setPeerId(selfId);
 
@@ -101,7 +111,19 @@ export const OrbitProvider = ({ children }) => {
         stateProxy.events.emit('update', { payload: { key: data.key, value: data.value } });
         
         if (data.key.startsWith('peer_name_')) {
-          setPeerNames(prev => ({...prev, [data.key.replace('peer_name_', '')]: data.value}));
+          const extractedId = data.key.replace('peer_name_', '');
+          const pName = data.value;
+          setPeerNames(prev => {
+            if (isHost && !prev[extractedId]) {
+              chatProxy.add({
+                text: `${pName} joined the room`,
+                type: 'system',
+                sender: 'System',
+                timestamp: Date.now(),
+              });
+            }
+            return {...prev, [extractedId]: pName};
+          });
         } else if (data.key.startsWith('peer_role_')) {
           setPeerRoles(prev => ({...prev, [data.key.replace('peer_role_', '')]: data.value}));
         } else if (data.key === 'banned' && data.value === selfId) {
@@ -126,9 +148,9 @@ export const OrbitProvider = ({ children }) => {
           statePutAction.send({ key: `peer_role_${selfId}`, value: 'owner' }, { target: pId });
         }
 
-        // Request state sync from newly joined peer just in case they have history
-        if (!isHost) {
-          console.log(`[P2P] Requesting full state sync from ${pId}...`);
+        // Request state sync ONLY from the host
+        if (!isHost && pId === hostId) {
+          console.log(`[P2P] Requesting full state sync from host ${pId}...`);
           reqSyncAction.send({}, { target: pId });
         }
       };
@@ -141,10 +163,24 @@ export const OrbitProvider = ({ children }) => {
       // State Synchronization Logic
       reqSyncAction.onMessage = (_, { peerId: pId }) => {
         console.log(`[P2P] Received sync request from ${pId}. Sending full state...`);
+        
+        let liveTime = 0;
+        if (window.__bloomPlayer) {
+           liveTime = window.__bloomPlayer.getCurrentTime() || 0;
+        }
+        
+        const storeCopy = { ...stateProxy.store };
+        if (storeCopy['currentTrack']) {
+          storeCopy['currentTrack'] = {
+            ...storeCopy['currentTrack'],
+            liveTime
+          };
+        }
+
         fullSyncAction.send({
-          state: stateProxy.store,
+          state: storeCopy,
           chat: chatProxy.arr,
-          names: stateProxy.store,
+          names: storeCopy,
         }, { target: pId });
       };
 
@@ -162,8 +198,8 @@ export const OrbitProvider = ({ children }) => {
           if (key.startsWith('peer_role_')) initialRoles[key.replace('peer_role_', '')] = value;
         });
         
-        setPeerNames(initialNames);
-        setPeerRoles(initialRoles);
+        setPeerNames(prev => ({ ...prev, ...initialNames }));
+        setPeerRoles(prev => ({ ...prev, ...initialRoles }));
 
         // Emit updates so mounted components (PlaybackContext, Chat) catch the new state
         data.chat.forEach(msg => {
@@ -183,13 +219,6 @@ export const OrbitProvider = ({ children }) => {
       if (isHost) {
         await stateProxy.put(`peer_role_${selfId}`, 'owner');
       }
-
-      await chatProxy.add({
-        text: `${displayName} joined the room`,
-        type: 'system',
-        sender: 'System',
-        timestamp: Date.now(),
-      });
 
       setStateDbReady(stateProxy);
       setChatDbReady(chatProxy);

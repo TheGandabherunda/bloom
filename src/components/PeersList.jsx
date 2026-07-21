@@ -29,6 +29,7 @@ const PeersList = () => {
 
   const allPeers = [peerId, ...peers].filter(Boolean); // Include self
   const isOwner = peerRoles[peerId] === 'owner';
+  const canManage = isOwner || peerRoles[peerId] === 'admin';
 
   if (loading || status === 'initializing') {
     return (
@@ -64,26 +65,28 @@ const PeersList = () => {
               {p === peerId && <span className="text-[10px] text-white/30 uppercase tracking-widest">(You)</span>}
             </div>
 
-            {isOwner && p !== peerId && peers.includes(p) && (
-              <div className="relative opacity-0 group-hover:opacity-100 transition-opacity">
+            {canManage && p !== peerId && peers.includes(p) && (
+              <div className="relative opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                 <button className="text-white/40 hover:text-white flex items-center justify-center p-1 rounded-full peer">
                   <span className="material-symbols-rounded text-[26px] leading-none">more_vert</span>
                 </button>
                 <div className="absolute right-0 top-full mt-1 w-32 bg-slate-900 border border-white/10 rounded-lg shadow-xl opacity-0 invisible peer-focus:opacity-100 peer-focus:visible focus-within:opacity-100 focus-within:visible transition-all z-50 overflow-hidden">
-                  {role !== 'admin' ? (
-                    <button 
-                      onClick={() => handleMakeAdmin(p)}
-                      className="w-full text-left px-3 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                    >
-                      Make Admin
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleRemoveAdmin(p)}
-                      className="w-full text-left px-3 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                    >
-                      Remove Admin
-                    </button>
+                  {isOwner && (
+                    role !== 'admin' ? (
+                      <button 
+                        onClick={() => handleMakeAdmin(p)}
+                        className="w-full text-left px-3 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                      >
+                        Make Admin
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleRemoveAdmin(p)}
+                        className="w-full text-left px-3 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                      >
+                        Remove Admin
+                      </button>
+                    )
                   )}
                   <button 
                     onClick={() => handleKick(p)}

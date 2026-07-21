@@ -218,10 +218,11 @@ export const PlaybackProvider = ({ children }) => {
         if (key === 'currentTrack') {
           const track = value.track || value;
           const index = value.index !== undefined ? value.index : -1;
-          console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}`);
+          const liveTime = value.liveTime || 0;
+          console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}, liveTime=${liveTime}`);
           if (track?.id !== currentTrackRef.current?.id) {
              console.log(`[Orbit Sync] Loading synced track...`);
-             loadTrack(track, index, 0, isPlayingRef.current, originator);
+             loadTrack(track, index, liveTime, isPlayingRef.current, originator);
           } else {
              console.log(`[Orbit Sync] Ignored currentTrack update (already playing)`);
           }
