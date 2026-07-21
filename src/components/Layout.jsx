@@ -10,7 +10,7 @@ import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config }) => {
-  const { initP2P, status } = useOrbit();
+  const { initP2P, status, peerId } = useOrbit();
   const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
   const [showSearch, setShowSearch] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
