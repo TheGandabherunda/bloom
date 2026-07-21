@@ -11,49 +11,34 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
     // Prevent heavy JS loop when visualizer is hidden OR when audio is paused!
     if (!isExpanded || !isPlaying) return;
 
-    let animationFrameId;
-    
-    const renderLoop = () => {
-      let data = new Uint8Array(0);
-      if (playerRef?.current) {
-        data = playerRef.current.getFrequencyData();
-      }
-      
+    const handleVisualizerFrame = (data) => {
       const numBars = 48;
-      
-      // We use 128 bins (from fftSize 256) and visualize the first 75% of them (0 to ~16kHz)
-      // This perfectly captures all musical energy while ignoring empty ultra-high frequencies.
       const usableBins = data.length > 0 ? Math.floor(data.length * 0.75) : 0;
       
       for (let i = 0; i < numBars; i++) {
         if (barsRef.current[i]) {
            let val = 0;
            if (usableBins > 0) {
-             // A smooth quadratic curve (1.5) spreads the bass out beautifully 
-             // without compressing the high-end too much.
              const ratio = i / (numBars - 1);
              const binIndex = Math.floor(Math.pow(ratio, 1.5) * (usableBins - 1));
-             
              val = data[binIndex] || 0;
-             
-             // Gentle treble boost to keep the right side active and dancing
              val = val * (1 + (ratio * 0.5));
            }
-           
-           // Exponent 1.3 provides a snappy, rhythmic bounce to the bars.
-           // Multiplier 1.25 lets them hit the top of the container gracefully on loud beats.
            const normalized = Math.min(1, Math.pow(val / 255, 1.3) * 1.25);
-           
-           // Use transform scaleY instead of height to prevent layout thrashing
            barsRef.current[i].style.transform = `scaleY(${Math.max(0.01, normalized)})`;
         }
       }
-      
-      animationFrameId = requestAnimationFrame(renderLoop);
     };
+
+    if (playerRef?.current) {
+      playerRef.current.addVisualizer(handleVisualizerFrame);
+    }
     
-    renderLoop();
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      if (playerRef?.current) {
+        playerRef.current.removeVisualizer(handleVisualizerFrame);
+      }
+    };
   }, [isExpanded, isPlaying, playerRef]);
 
   return (

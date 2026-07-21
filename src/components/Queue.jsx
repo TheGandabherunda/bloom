@@ -19,33 +19,31 @@ const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
     if (!isPlaying) {
       // Reset bars to flat when paused
       for (let i = 0; i < 6; i++) {
-        if (barsRef.current[i]) barsRef.current[i].style.height = '5%';
+        if (barsRef.current[i]) barsRef.current[i].style.transform = 'scaleY(0.05)';
       }
       return;
     }
 
-    let animationFrameId;
-
-    const renderLoop = () => {
-      let data = new Uint8Array(0);
-      if (playerRef?.current) {
-        data = playerRef.current.getFrequencyData();
-      }
-
+    const handleVisualizerFrame = (data) => {
       for (let i = 0; i < 6; i++) {
         if (barsRef.current[i]) {
           const idx = Math.floor((i / 6) * 48);
           const val = data.length > idx ? data[idx] : 0;
           const normalized = Math.pow(val / 255, 1.4);
-          barsRef.current[i].style.height = `${Math.max(5, normalized * 100)}%`;
+          barsRef.current[i].style.transform = `scaleY(${Math.max(0.05, normalized)})`;
         }
       }
-
-      animationFrameId = requestAnimationFrame(renderLoop);
     };
 
-    renderLoop();
-    return () => cancelAnimationFrame(animationFrameId);
+    if (playerRef?.current) {
+      playerRef.current.addVisualizer(handleVisualizerFrame);
+    }
+
+    return () => {
+      if (playerRef?.current) {
+        playerRef.current.removeVisualizer(handleVisualizerFrame);
+      }
+    };
   }, [isPlaying, playerRef]);
 
   return (
@@ -54,8 +52,8 @@ const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
         <div 
           key={i} 
           ref={el => barsRef.current[i] = el}
-          className="flex-1 rounded-t-sm transition-all duration-75 ease-out will-change-[height]"
-          style={{ height: '5%', backgroundColor: cardColor }}
+          className="flex-1 rounded-t-sm transition-transform duration-75 ease-out origin-bottom will-change-transform"
+          style={{ transform: 'scaleY(0.05)', backgroundColor: cardColor }}
         />
       ))}
     </div>
@@ -103,24 +101,23 @@ const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canC
         <h4 className={`text-xs font-bold truncate ${isActive ? '' : 'text-white/90'}`} style={{ color: isActive ? cardColor : undefined }}>{track.title}</h4>
         <p className="text-[10px] text-white/40 font-medium truncate mt-0.5">{track.author}</p>
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center gap-2 shrink-0">
         <div className="text-[10px] font-mono text-white/30 tabular-nums">
           {formatTime(track.duration / 1000)}
         </div>
+        {canControl && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              removeFromQueue(idx);
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+            title="Remove from queue"
+          >
+            <span className="material-symbols-rounded text-[14px] leading-none">close</span>
+          </button>
+        )}
       </div>
-      
-      {canControl && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            removeFromQueue(idx);
-          }}
-          className={`absolute -top-2 -right-2 z-10 w-6 h-6 flex items-center justify-center rounded-full bg-neutral-900 border border-white/20 transition-all ${isHovered ? 'text-white hover:bg-neutral-800 opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'}`}
-          title="Remove from queue"
-        >
-          <span className="material-symbols-rounded text-[14px] leading-none">close</span>
-        </button>
-      )}
     </div>
   );
 }, (prev, next) => {

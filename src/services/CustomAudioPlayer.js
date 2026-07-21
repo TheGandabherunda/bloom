@@ -39,6 +39,11 @@ export class CustomAudioPlayer {
     this.lastTime = -1;
     this.stallCount = 0;
 
+    // Centralized Visualizer Engine
+    this.visualizers = [];
+    this.visualizerFrameId = null;
+    this.visualizerLastTime = 0;
+
     // Callbacks
     this.onTimeUpdate = null;
     this.onDurationChange = null;
@@ -87,12 +92,58 @@ export class CustomAudioPlayer {
       if (this.audioContext.state === 'suspended') {
         this.audioContext.resume();
       }
+      this._startVisualizerLoop();
     });
 
     this.audio.addEventListener('pause', () => {
       this.isPlaying = false;
       if (this.onPlayStateChange) this.onPlayStateChange(false);
+      this._stopVisualizerLoop();
     });
+  }
+
+  addVisualizer(callback) {
+    if (!this.visualizers.includes(callback)) {
+      this.visualizers.push(callback);
+      this._startVisualizerLoop();
+    }
+  }
+
+  removeVisualizer(callback) {
+    this.visualizers = this.visualizers.filter(cb => cb !== callback);
+    if (this.visualizers.length === 0) this._stopVisualizerLoop();
+  }
+
+  _startVisualizerLoop() {
+    if (this.visualizerFrameId || !this.isPlaying || this.visualizers.length === 0) return;
+    
+    const fps = 30; // Hard cap at 30fps to prevent mobile CPU thermal throttling
+    const frameInterval = 1000 / fps;
+    
+    const loop = (time) => {
+      this.visualizerFrameId = requestAnimationFrame(loop);
+      
+      if (!time) time = performance.now();
+      const elapsed = time - this.visualizerLastTime;
+      if (elapsed < frameInterval) return;
+      this.visualizerLastTime = time - (elapsed % frameInterval);
+
+      if (!this.analyser) return;
+      this.analyser.getByteFrequencyData(this.frequencyDataArray);
+      
+      // Dispatch single read to all subscribers
+      for (const callback of this.visualizers) {
+        callback(this.frequencyDataArray);
+      }
+    };
+    this.visualizerFrameId = requestAnimationFrame(loop);
+  }
+
+  _stopVisualizerLoop() {
+    if (this.visualizerFrameId) {
+      cancelAnimationFrame(this.visualizerFrameId);
+      this.visualizerFrameId = null;
+    }
   }
 
   getFrequencyData() {
@@ -157,6 +208,8 @@ export class CustomAudioPlayer {
 
   destroy() {
     this.isAborted = true;
+    this._stopVisualizerLoop();
+    this.visualizers = [];
     this.pause();
     if (this.audio) {
       this.audio.removeAttribute('src');
