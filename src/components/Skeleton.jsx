@@ -73,7 +73,7 @@ export const AppInitSkeleton = ({ status }) => {
 
           {status === 'failed' && (
             <button 
-              onClick={() => window.location.href = '/'} 
+              onClick={() => window.location.href = window.location.pathname} 
               className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors text-xs font-bold tracking-widest"
             >
               RETURN HOME
