@@ -15,20 +15,28 @@ export class CustomAudioPlayer {
     this.analyser.smoothingTimeConstant = 0.8;
     this.frequencyDataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
-    // Route: audio → source → splitter → [destination, analyser → mutedGain → destination]
-    this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
-
-    // Muted gain for the analyser branch so we don't double-output
-    this.muteGain = this.audioContext.createGain();
-    this.muteGain.gain.value = 0;
-
-    // Main signal goes to speakers directly
-    this.sourceNode.connect(this.audioContext.destination);
-
-    // Analyser branch: source → analyser → muted gain → destination
-    this.sourceNode.connect(this.analyser);
-    this.analyser.connect(this.muteGain);
-    this.muteGain.connect(this.audioContext.destination);
+    // Use captureStream if available to bypass the Chromium MediaElementSource buffering stall bug
+    try {
+      const stream = this.audio.captureStream ? this.audio.captureStream() : this.audio.mozCaptureStream ? this.audio.mozCaptureStream() : null;
+      if (stream) {
+        this.sourceNode = this.audioContext.createMediaStreamSource(stream);
+        // Connect ONLY to analyser. Do NOT connect to destination to avoid echoing native audio.
+        this.sourceNode.connect(this.analyser);
+      } else {
+        throw new Error('captureStream not supported');
+      }
+    } catch (e) {
+      console.warn("[CustomAudioPlayer] captureStream failed/unsupported. Falling back to MediaElementSource.", e);
+      this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
+      
+      this.muteGain = this.audioContext.createGain();
+      this.muteGain.gain.value = 0;
+      
+      this.sourceNode.connect(this.audioContext.destination);
+      this.sourceNode.connect(this.analyser);
+      this.analyser.connect(this.muteGain);
+      this.muteGain.connect(this.audioContext.destination);
+    }
 
     this.volume = 1;
     this.isPlaying = false;

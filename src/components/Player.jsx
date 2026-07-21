@@ -222,7 +222,7 @@ const Player = () => {
       {currentTrack && (
         <div 
           ref={draggableRef}
-          className={`bg-black flex flex-col items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : 'absolute inset-0 bottom-[60px] lg:bottom-0 lg:right-[400px] z-[45] pb-[80px] lg:pb-24'}`}
+          className={`bg-black flex flex-col items-center justify-center select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : 'absolute inset-0 bottom-[60px] lg:bottom-0 lg:right-[400px] z-[45] pb-[80px] lg:pb-24'}`}
           onClick={handleExpandedClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isFullscreen && setShowFsControls(false)}
@@ -321,11 +321,13 @@ const Player = () => {
                     step="0.1"
                     value={displayProgress}
                     onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
-                    onPointerUp={() => {
-                      if (localProgress !== null) {
-                        seek((localProgress / 100) * duration);
-                        setLocalProgress(null);
-                      }
+                    onMouseUp={(e) => {
+                      seek((parseFloat(e.target.value) / 100) * duration);
+                      setLocalProgress(null);
+                    }}
+                    onTouchEnd={(e) => {
+                      seek((parseFloat(e.target.value) / 100) * duration);
+                      setLocalProgress(null);
                     }}
                     onTouchStart={(e) => e.stopPropagation()}
                     onTouchMove={(e) => e.stopPropagation()}
@@ -379,7 +381,7 @@ const Player = () => {
 
       {/* Main Player Bar (Collapsed Miniplayer & Desktop Expanded) */}
       <div 
-        className={`absolute bottom-[60px] lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 transition-transform duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
+        className={`absolute bottom-[60px] lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 transition-transform duration-500 cursor-pointer h-[77px] select-none ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
         onClick={() => {
           if (maxDragRef.current < 10) {
             setIsExpanded(!isExpanded);
@@ -406,11 +408,13 @@ const Player = () => {
             step="0.1"
             value={displayProgress}
             onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
-            onPointerUp={() => {
-              if (localProgress !== null) {
-                seek((localProgress / 100) * duration);
-                setLocalProgress(null);
-              }
+            onMouseUp={(e) => {
+              seek((parseFloat(e.target.value) / 100) * duration);
+              setLocalProgress(null);
+            }}
+            onTouchEnd={(e) => {
+              seek((parseFloat(e.target.value) / 100) * duration);
+              setLocalProgress(null);
             }}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
