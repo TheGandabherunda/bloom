@@ -115,24 +115,14 @@ export const OrbitProvider = ({ children }) => {
         trackerUrls: [
           'wss://tracker.webtorrent.dev',
           'wss://tracker.openwebtorrent.com',
-          'wss://tracker.novage.com.ua',
-          'wss://tracker.sloppyta.co:443/announce',
-          'wss://tracker.files.fm:7073/announce'
+          'wss://tracker.files.fm:7073/announce',
+          'wss://tracker.btorrent.xyz'
         ],
         rtcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:global.stun.twilio.com:3478' },
-            { urls: 'stun:stun.cloudflare.com:3478' },
-            {
-              urls: [
-                'turn:openrelay.metered.ca:80',
-                'turn:openrelay.metered.ca:443',
-                'turn:openrelay.metered.ca:443?transport=tcp'
-              ],
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
-            }
+            { urls: 'stun:stun.cloudflare.com:3478' }
           ]
         }
       };
