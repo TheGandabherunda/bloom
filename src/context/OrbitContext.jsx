@@ -115,8 +115,9 @@ export const OrbitProvider = ({ children }) => {
         trackerUrls: [
           'wss://tracker.webtorrent.dev',
           'wss://tracker.openwebtorrent.com',
-          'wss://tracker.files.fm:7073/announce',
-          'wss://tracker.btorrent.xyz'
+          'wss://tracker.novage.com.ua',
+          'wss://tracker.sloppyta.co:443/announce',
+          'wss://tracker.files.fm:7073/announce'
         ],
         rtcConfig: {
           iceServers: [
@@ -365,13 +366,15 @@ export const OrbitProvider = ({ children }) => {
         setStatusWrapped('connected');
       } else {
         setStatusWrapped('syncing');
-        // Set a 15-second timeout for the connection
-        setTimeout(() => {
-          setStatusWrapped(prev => {
-            if (prev === 'syncing') return 'failed';
-            return prev;
-          });
-        }, 15000);
+        if (!isHost) {
+          // Fallback timeout: if we don't receive sync after 30s, fail.
+          setTimeout(() => {
+            if (statusRef.current === 'syncing' || statusRef.current === 'initializing') {
+              console.error('[P2P] Sync timeout');
+              setStatusWrapped('failed');
+            }
+          }, 30000);
+        }
       }
 
     } catch (err) {
