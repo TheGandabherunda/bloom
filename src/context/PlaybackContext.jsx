@@ -443,13 +443,13 @@ export const PlaybackProvider = ({ children }) => {
     }
   }, [isPlaying, duration, playerRef.current]);
 
-  const value = {
+  const value = React.useMemo(() => ({
       isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
       duration, loadTrack, togglePlay, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
       playerRef
-  };
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, duration, loadTrack, togglePlay, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded]);
 
   return (
     <PlaybackContext.Provider value={value}>

@@ -28,13 +28,21 @@ const Layout = ({ config }) => {
     if (currentTrack) {
       setShowSearch(false);
       
+      const root = document.documentElement;
+      // Clear old colors immediately for a smooth transition to neutral before the new colors load
+      root.style.setProperty('--color-1', 'rgb(30, 30, 30)');
+      root.style.setProperty('--color-2', 'rgb(40, 40, 40)');
+      root.style.setProperty('--color-3', 'rgb(20, 20, 20)');
+      root.style.setProperty('--color-4', 'rgb(50, 50, 50)');
+      root.style.setProperty('--color-primary', 'rgb(100, 100, 100)');
+      root.style.setProperty('--color-primary-rgb', '100 100 100');
+      
       // Extract and apply colors
       if (currentTrack.thumbnail) {
         // Ambient background blobs
         extractDominantColors(currentTrack.thumbnail)
           .then(colors => {
             if (colors && colors.rawRgbStrings && colors.rawRgbStrings.length >= 4) {
-              const root = document.documentElement;
               root.style.setProperty('--color-1', `rgb(${colors.rawRgbStrings[0].split(' ').join(', ')})`);
               root.style.setProperty('--color-2', `rgb(${colors.rawRgbStrings[1].split(' ').join(', ')})`);
               root.style.setProperty('--color-3', `rgb(${colors.rawRgbStrings[2].split(' ').join(', ')})`);
@@ -47,7 +55,6 @@ const Layout = ({ config }) => {
         extractPrimaryColor(currentTrack.thumbnail)
           .then(color => {
             if (color) {
-              const root = document.documentElement;
               // Extract just the RGB numbers from "rgb(R, G, B)"
               const m = color.match(/\d+/g);
               if (m && m.length >= 3) {

@@ -158,8 +158,13 @@ export const OrbitProvider = ({ children }) => {
     };
   }, []);
 
+  const contextValue = React.useMemo(() => ({
+    helia: null, orbitdb: null, stateDb: stateDbReady, chatDb: chatDbReady, 
+    status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P
+  }), [stateDbReady, chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P]);
+
   return (
-    <OrbitContext.Provider value={{ helia: null, orbitdb: null, stateDb: stateDbReady, chatDb: chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P }}>
+    <OrbitContext.Provider value={contextValue}>
       {children}
     </OrbitContext.Provider>
   );
