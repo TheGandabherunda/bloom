@@ -13,6 +13,7 @@ export class CustomAudioPlayer {
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 256;
     this.analyser.smoothingTimeConstant = 0.8;
+    this.frequencyDataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
     // Route: audio → source → splitter → [destination, analyser → mutedGain → destination]
     this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
@@ -96,9 +97,8 @@ export class CustomAudioPlayer {
 
   getFrequencyData() {
     if (!this.analyser) return new Uint8Array(0);
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
-    return dataArray;
+    this.analyser.getByteFrequencyData(this.frequencyDataArray);
+    return this.frequencyDataArray;
   }
 
   setVolume(v) {
