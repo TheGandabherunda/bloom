@@ -25,6 +25,10 @@ export class CustomAudioPlayer {
     this.analyser.connect(this.muteGain);
     this.muteGain.connect(this.audioContext.destination);
 
+    this.audioContext.addEventListener('statechange', () => {
+      console.log(`[DEBUG] AudioContext state changed to: ${this.audioContext.state}`);
+    });
+
     this.volume = 1;
     this.isPlaying = false;
     this.isAborted = false;
@@ -48,7 +52,21 @@ export class CustomAudioPlayer {
     this.onPlayStateChange = null;
 
     // ─── Events ───
+    let lastTimeUpdate = performance.now();
+    let lastAudioTime = 0;
+
     this.audio.addEventListener('timeupdate', () => {
+      const now = performance.now();
+      const deltaReal = now - lastTimeUpdate;
+      const deltaAudio = (this.audio.currentTime - lastAudioTime) * 1000;
+      
+      if (deltaReal > 500 && this.isPlaying) {
+        console.warn(`[DEBUG] timeupdate delayed! Real time passed: ${deltaReal.toFixed(1)}ms, Audio advanced: ${deltaAudio.toFixed(1)}ms`);
+      }
+      
+      lastTimeUpdate = now;
+      lastAudioTime = this.audio.currentTime;
+
       if (this.onTimeUpdate) this.onTimeUpdate(this.audio.currentTime);
       // Auto-recover AudioContext suspended in background
       if (this.isPlaying && this.audioContext && this.audioContext.state === 'suspended') {
@@ -74,10 +92,27 @@ export class CustomAudioPlayer {
     });
 
     this.audio.addEventListener('waiting', () => {
+      console.log(`[DEBUG] 'waiting' event fired - stream is buffering. Current time: ${this.audio.currentTime}`);
       if (this.onBuffering) this.onBuffering(true);
     });
 
+    this.audio.addEventListener('stalled', () => {
+      console.warn(`[DEBUG] 'stalled' event fired - network is not sending data.`);
+    });
+
+    this.audio.addEventListener('suspend', () => {
+      console.log(`[DEBUG] 'suspend' event fired - browser stopped fetching (buffer full).`);
+    });
+
+    this.audio.addEventListener('progress', () => {
+      if (this.audio.buffered.length > 0) {
+        const bufferedEnd = this.audio.buffered.end(this.audio.buffered.length - 1);
+        // console.log(`[DEBUG] 'progress' - Buffer end at: ${bufferedEnd.toFixed(2)}s`);
+      }
+    });
+
     this.audio.addEventListener('playing', () => {
+      console.log(`[DEBUG] 'playing' event fired - buffer recovered. Current time: ${this.audio.currentTime}`);
       if (this.onBuffering) this.onBuffering(false);
     });
 
@@ -112,13 +147,22 @@ export class CustomAudioPlayer {
   _startVisualizerLoop() {
     if (this.visualizerFrameId || !this.isPlaying || this.visualizers.length === 0) return;
     
-    const fps = 24; // Throttle to 24fps (cinematic smooth) to significantly reduce mobile CPU load
+    const fps = 30; // Hard cap at 30fps to prevent mobile CPU thermal throttling
     const frameInterval = 1000 / fps;
     
+    let lastFrameTime = performance.now();
+
     const loop = (time) => {
       this.visualizerFrameId = requestAnimationFrame(loop);
       
       if (!time) time = performance.now();
+      
+      const frameDelta = time - lastFrameTime;
+      if (frameDelta > 100) {
+        console.warn(`[DEBUG] Main thread blocked! visualizer requestAnimationFrame delayed by ${frameDelta.toFixed(1)}ms`);
+      }
+      lastFrameTime = time;
+
       const elapsed = time - this.visualizerLastTime;
       if (elapsed < frameInterval) return;
       this.visualizerLastTime = time - (elapsed % frameInterval);

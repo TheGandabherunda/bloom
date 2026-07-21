@@ -391,7 +391,7 @@ const Player = () => {
 
       {/* Main Player Bar (Collapsed Miniplayer & Desktop Expanded) */}
       <div 
-        className={`absolute bottom-[60px] lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 transition-transform duration-500 cursor-pointer h-[77px] select-none ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
+        className={`absolute bottom-[60px] lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 select-none transition-transform duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
         onClick={() => {
           if (maxDragRef.current < 10) {
             setIsExpanded(!isExpanded);
