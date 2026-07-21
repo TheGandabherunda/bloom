@@ -77,27 +77,46 @@ const formatTime = (seconds) => {
 };
 
 const MobileProgressBar = React.memo(({ playerRef, duration, canControl, seek }) => {
-  const [currentTime, setCurrentTime] = useState(0);
   const [localProgress, setLocalProgress] = useState(null);
+  const progressRef = useRef(null);
+  const timeTextRef = useRef(null);
+  const localProgressRef = useRef(null);
+
+  useEffect(() => {
+    localProgressRef.current = localProgress;
+  }, [localProgress]);
 
   useEffect(() => {
     if (playerRef?.current) {
-      const handleTime = (time) => setCurrentTime(time);
+      const handleTime = (time) => {
+        if (localProgressRef.current !== null) return;
+        const actualProgress = (time / duration) * 100 || 0;
+        if (progressRef.current) progressRef.current.style.width = `${actualProgress}%`;
+        if (timeTextRef.current) timeTextRef.current.textContent = formatTime(time);
+      };
       playerRef.current.addTimeListener(handleTime);
+      // Initialize with current time if available
+      if (playerRef.current.audio) handleTime(playerRef.current.audio.currentTime);
       return () => {
         if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
       };
     }
-  }, [playerRef]);
+  }, [playerRef, duration]);
 
-  const actualProgress = (currentTime / duration) * 100 || 0;
-  const displayProgress = localProgress !== null ? localProgress : actualProgress;
-  const displayTime = localProgress !== null ? (localProgress / 100) * duration : currentTime;
+  const displayProgress = localProgress !== null ? localProgress : 0;
+  const displayTime = localProgress !== null ? (localProgress / 100) * duration : 0;
+
+  useEffect(() => {
+    if (localProgress !== null) {
+      if (progressRef.current) progressRef.current.style.width = `${displayProgress}%`;
+      if (timeTextRef.current) timeTextRef.current.textContent = formatTime(displayTime);
+    }
+  }, [localProgress, displayProgress, displayTime]);
 
   return (
     <div className="w-full flex flex-col mb-6 relative">
       <div className={`w-full h-1.5 bg-white/20 rounded-full mb-3 relative ${canControl ? 'cursor-pointer' : ''}`}>
-        <div className="h-full bg-[var(--color-primary)] rounded-full relative pointer-events-none" style={{ width: `${displayProgress}%` }}>
+        <div ref={progressRef} className="h-full bg-[var(--color-primary)] rounded-full relative pointer-events-none" style={{ width: `${displayProgress}%` }}>
           <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md pointer-events-none"></div>
         </div>
         {canControl && (
@@ -123,7 +142,7 @@ const MobileProgressBar = React.memo(({ playerRef, duration, canControl, seek })
         )}
       </div>
       <div className="flex justify-between text-[11px] font-mono text-white/50 tracking-wider">
-        <span>{formatTime(displayTime)}</span>
+        <span ref={timeTextRef}>{formatTime(displayTime)}</span>
         <span>{formatTime(duration)}</span>
       </div>
     </div>
@@ -131,25 +150,41 @@ const MobileProgressBar = React.memo(({ playerRef, duration, canControl, seek })
 });
 
 const DesktopTopProgressBar = React.memo(({ playerRef, duration, canControl, seek }) => {
-  const [currentTime, setCurrentTime] = useState(0);
   const [localProgress, setLocalProgress] = useState(null);
+  const progressRef = useRef(null);
+  const localProgressRef = useRef(null);
+
+  useEffect(() => {
+    localProgressRef.current = localProgress;
+  }, [localProgress]);
 
   useEffect(() => {
     if (playerRef?.current) {
-      const handleTime = (time) => setCurrentTime(time);
+      const handleTime = (time) => {
+        if (localProgressRef.current !== null) return;
+        const actualProgress = (time / duration) * 100 || 0;
+        if (progressRef.current) progressRef.current.style.width = `${actualProgress}%`;
+      };
       playerRef.current.addTimeListener(handleTime);
+      if (playerRef.current.audio) handleTime(playerRef.current.audio.currentTime);
       return () => {
         if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
       };
     }
-  }, [playerRef]);
+  }, [playerRef, duration]);
 
-  const actualProgress = (currentTime / duration) * 100 || 0;
-  const displayProgress = localProgress !== null ? localProgress : actualProgress;
+  const displayProgress = localProgress !== null ? localProgress : 0;
+
+  useEffect(() => {
+    if (localProgress !== null && progressRef.current) {
+      progressRef.current.style.width = `${displayProgress}%`;
+    }
+  }, [localProgress, displayProgress]);
 
   return (
     <div className={`absolute top-0 left-0 right-0 h-1 group ${canControl ? 'cursor-pointer' : ''}`}>
       <div
+        ref={progressRef}
         className="absolute top-0 left-0 h-full bg-[var(--color-primary)] pointer-events-none"
         style={{ width: `${displayProgress}%` }}
       >
@@ -181,12 +216,15 @@ const DesktopTopProgressBar = React.memo(({ playerRef, duration, canControl, see
 });
 
 const DesktopTimeDisplay = React.memo(({ playerRef, duration }) => {
-  const [currentTime, setCurrentTime] = useState(0);
+  const timeTextRef = useRef(null);
 
   useEffect(() => {
     if (playerRef?.current) {
-      const handleTime = (time) => setCurrentTime(time);
+      const handleTime = (time) => {
+        if (timeTextRef.current) timeTextRef.current.textContent = formatTime(time);
+      };
       playerRef.current.addTimeListener(handleTime);
+      if (playerRef.current.audio) handleTime(playerRef.current.audio.currentTime);
       return () => {
         if (playerRef?.current) playerRef.current.removeTimeListener(handleTime);
       };
@@ -195,7 +233,7 @@ const DesktopTimeDisplay = React.memo(({ playerRef, duration }) => {
 
   return (
     <div className="text-[11px] font-mono text-white/40 flex items-center gap-1 tracking-wider">
-      <span className="text-white/80">{formatTime(currentTime)}</span>
+      <span ref={timeTextRef} className="text-white/80">0:00</span>
       <span>/</span>
       <span>{formatTime(duration)}</span>
     </div>
