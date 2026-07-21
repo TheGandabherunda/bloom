@@ -44,32 +44,21 @@ export const AppInitSkeleton = ({ status }) => {
   const loadingText = status === 'initializing' ? 'Connecting to peers...' : 'Starting Node...';
   
   return (
-    <div className="fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center overflow-hidden">
-      {/* Ambient background logo */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-        <img 
-          src="./assets/Bloom.svg" 
-          className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow blur-xl mix-blend-screen saturate-150" 
-          alt="" 
-        />
-      </div>
-
+    <div className="fixed inset-0 z-[300] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900 to-black flex flex-col items-center justify-center overflow-hidden">
+      
       {/* Spinning logo in middle */}
-      <div className="z-10 flex flex-col items-center gap-8">
+      <div className="z-10 flex flex-col items-center gap-6">
         <div className="relative flex items-center justify-center">
           <img 
             src="./assets/Bloom.svg" 
-            className="w-24 h-24 sm:w-32 sm:h-32 animate-[spin_4s_linear_infinite] drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]" 
+            className="w-24 h-24 sm:w-32 sm:h-32 animate-[spin_4s_linear_infinite]" 
             alt="Bloom Logo" 
           />
         </div>
         
-        <div className="flex flex-col items-center gap-3">
-          <h1 className="text-4xl font-bold tracking-tight text-white/90 drop-shadow-md">Bloom</h1>
-          <p className="text-white/50 text-sm tracking-[0.2em] uppercase font-medium animate-pulse">
-            {loadingText}
-          </p>
-        </div>
+        <p className="text-white/40 text-sm tracking-[0.2em] uppercase font-medium">
+          {loadingText}
+        </p>
       </div>
     </div>
   );

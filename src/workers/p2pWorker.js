@@ -3,7 +3,6 @@ import { createHelia } from 'helia';
 import { createOrbitDB, Identities } from '@orbitdb/core';
 import { webSockets } from '@libp2p/websockets';
 import { all } from '@libp2p/websockets/filters';
-import { webTransport } from '@libp2p/webtransport';
 import { webRTC } from '@libp2p/webrtc';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
 import { identify } from '@libp2p/identify';
@@ -90,8 +89,8 @@ async function getPublicRelayAddrs() {
         const peer = json.Peers[0];
         if (peer.Addrs) {
           for (const addr of peer.Addrs) {
-            // We want WebSocket Secure (wss) or WebTransport
-            if (addr.includes('/wss') || addr.includes('/webtransport')) {
+            // We want WebSocket Secure (wss) for browser compatibility
+            if (addr.includes('/wss')) {
               // Skip ipv6 loopback or local ip4
               if (addr.includes('127.0.0.1') || addr.includes('::1') || addr.includes('192.168.')) continue;
               
@@ -125,7 +124,6 @@ async function initP2P(roomId, displayName, isHost, hostId) {
     },
     transports: [
       webSockets({ filter: all }),
-      webTransport(),
       webRTC({
         rtcConfiguration: {
           iceServers: [
