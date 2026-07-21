@@ -14,18 +14,54 @@ export class CustomAudioPlayer {
     this.analyser.fftSize = 256;
     this.analyser.smoothingTimeConstant = 0.8;
 
-    // Route: audio → source → splitter → [destination, analyser → mutedGain → destination]
     this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
+
+    // ─── Studio EQ & Dynamics (Monochrom "HD" Curve) ───
+    
+    // 1. Low EQ (Sub-bass boost for depth)
+    this.lowEQ = this.audioContext.createBiquadFilter();
+    this.lowEQ.type = 'lowshelf';
+    this.lowEQ.frequency.value = 60;
+    this.lowEQ.gain.value = 4.5;
+    
+    // 2. Mid EQ (Slight scoop to remove muddiness)
+    this.midEQ = this.audioContext.createBiquadFilter();
+    this.midEQ.type = 'peaking';
+    this.midEQ.frequency.value = 1000;
+    this.midEQ.Q.value = 1;
+    this.midEQ.gain.value = -1.5;
+    
+    // 3. High EQ (Treble boost for crispness and clarity)
+    this.highEQ = this.audioContext.createBiquadFilter();
+    this.highEQ.type = 'highshelf';
+    this.highEQ.frequency.value = 8000;
+    this.highEQ.gain.value = 4.0;
+    
+    // 4. Dynamics Compressor (Auto-Limiter to prevent clipping & glue the sound)
+    this.compressor = this.audioContext.createDynamicsCompressor();
+    this.compressor.threshold.value = -12;
+    this.compressor.knee.value = 30;
+    this.compressor.ratio.value = 3;
+    this.compressor.attack.value = 0.005;
+    this.compressor.release.value = 0.1;
 
     // Muted gain for the analyser branch so we don't double-output
     this.muteGain = this.audioContext.createGain();
     this.muteGain.gain.value = 0;
 
-    // Main signal goes to speakers directly
-    this.sourceNode.connect(this.audioContext.destination);
+    // ─── Routing ───
+    // Source -> Low -> Mid -> High -> Compressor
+    this.sourceNode.connect(this.lowEQ);
+    this.lowEQ.connect(this.midEQ);
+    this.midEQ.connect(this.highEQ);
+    this.highEQ.connect(this.compressor);
 
-    // Analyser branch: source → analyser → muted gain → destination
-    this.sourceNode.connect(this.analyser);
+    // Split from Compressor:
+    // 1. Main signal goes to speakers directly
+    this.compressor.connect(this.audioContext.destination);
+
+    // 2. Analyser branch (so visualizer sees the EQ'd audio)
+    this.compressor.connect(this.analyser);
     this.analyser.connect(this.muteGain);
     this.muteGain.connect(this.audioContext.destination);
 

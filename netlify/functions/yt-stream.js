@@ -11,7 +11,11 @@ export const handler = async (event) => {
     const info = await ytdl.getInfo(videoId);
     const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
     
-    // Prefer audio/mp4 for better browser compatibility in <audio> tag
+    // Sort by highest bitrate to ensure HD audio
+    audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
+    
+    // Prefer audio/mp4 for better browser compatibility in <audio> tag, 
+    // it will now naturally pick the highest bitrate MP4 available.
     const format = audioFormats.find(f => f.container === 'mp4') || audioFormats[0];
 
     if (!format || !format.url) {

@@ -4,11 +4,12 @@ import { usePlayback } from '../context/PlaybackContext';
 import Lyrics from './Lyrics';
 import { PlayerTrackSkeleton } from './Skeleton';
 
-const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
+const Visualizer = ({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
   const barsRef = useRef([]);
 
   useEffect(() => {
-    if (!isExpanded) return; // Prevent heavy JS loop when visualizer is hidden!
+    // Prevent heavy JS loop when visualizer is hidden OR when audio is paused!
+    if (!isExpanded || !isPlaying) return;
 
     let animationFrameId;
     
@@ -53,7 +54,7 @@ const Visualizer = ({ playerRef, isExpanded, isFullscreen }) => {
     
     renderLoop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [isExpanded, playerRef]);
+  }, [isExpanded, isPlaying, playerRef]);
 
   return (
     <div className={`absolute left-0 right-0 h-[25vh] lg:h-[45vh] z-0 flex items-end justify-between px-1 gap-[2px] md:gap-1 transition-opacity duration-1000 pointer-events-none ${isExpanded ? 'opacity-100' : 'opacity-0'} ${isFullscreen ? 'bottom-0' : 'bottom-0 lg:bottom-[82px]'}`}>
@@ -314,7 +315,7 @@ const Player = () => {
             <Lyrics currentTrack={currentTrack} currentTime={currentTime} />
           )}
           
-          <Visualizer playerRef={playerRef} isExpanded={isExpanded} isFullscreen={isFullscreen} />
+          <Visualizer playerRef={playerRef} isExpanded={isExpanded} isFullscreen={isFullscreen} isPlaying={isPlaying} />
 
           {/* Mobile Expanded Bottom Sheet Controls */}
           <div className="lg:hidden absolute bottom-12 left-0 right-0 px-8 flex flex-col z-30" onClick={(e) => e.stopPropagation()}>
