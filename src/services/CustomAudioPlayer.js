@@ -214,7 +214,7 @@ export class CustomAudioPlayer {
     return this.audio ? this.audio.currentTime : 0;
   }
 
-  async load(manifestUrl, unused = null, startTime = 0) {
+  load(manifestUrl, unused = null, startTime = 0) {
     console.log(`[AudioPlayer] load called with URL: ${manifestUrl}, startTime: ${startTime}`);
     this.isAborted = false;
 
@@ -223,9 +223,47 @@ export class CustomAudioPlayer {
       this.currentObjectUrl = null;
     }
 
-    this.audio.src = manifestUrl;
-    this.audio.currentTime = startTime;
-    this.audio.load();
+    const currentLoadId = Symbol();
+    this.activeLoadId = currentLoadId;
+
+    return new Promise((resolve, reject) => {
+      this.audio.src = manifestUrl;
+      this.audio.currentTime = startTime;
+      
+      let timeoutId;
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        this.audio.removeEventListener('canplay', onCanPlay);
+        this.audio.removeEventListener('error', onError);
+      };
+
+      const onCanPlay = () => {
+        cleanup();
+        if (this.activeLoadId !== currentLoadId) return;
+        resolve();
+      };
+
+      const onError = () => {
+        cleanup();
+        if (this.activeLoadId !== currentLoadId) return;
+        const err = this.audio.error;
+        reject(new Error(err ? `Error ${err.code}: ${err.message}` : 'Failed to load audio stream'));
+      };
+
+      this.audio.addEventListener('canplay', onCanPlay);
+      this.audio.addEventListener('error', onError);
+
+      this.audio.load();
+
+      // Protect against infinite hangs if the network drops but browser doesn't fire error
+      timeoutId = setTimeout(() => {
+        if (this.activeLoadId === currentLoadId) {
+          cleanup();
+          reject(new Error('Audio stream buffering timed out after 30 seconds'));
+        }
+      }, 30000);
+    });
   }
 
   async play() {

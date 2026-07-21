@@ -5,7 +5,7 @@ import Search from './Search';
 import Player from './Player';
 import Sidebar from './Sidebar';
 import { getRecommendations, getTopVideos, getMix } from '../services/monochromeApi';
-import { extractDominantColors } from '../utils/colorExtractor';
+import { extractDominantColors, extractPrimaryColor } from '../utils/colorExtractor';
 import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
@@ -30,27 +30,36 @@ const Layout = ({ config }) => {
       
       // Extract and apply colors
       if (currentTrack.thumbnail) {
+        // Ambient background blobs
         extractDominantColors(currentTrack.thumbnail)
           .then(colors => {
             if (colors && colors.rawRgbStrings && colors.rawRgbStrings.length >= 4) {
-              const rgbStr = colors.rawRgbStrings[0]; // "R G B" space-separated
-              const rgbComma = rgbStr.split(' ').join(', ');
-
-              root.style.setProperty('--color-primary-rgb', rgbStr);
-              root.style.setProperty('--color-primary-light-rgb', rgbStr);
-              root.style.setProperty('--color-primary-dark-rgb', rgbStr);
-
-              // Full rgb() value — used by all var(--color-primary) references
-              root.style.setProperty('--color-primary', `rgb(${rgbComma})`);
-
-              // Ambient blob colors
+              const root = document.documentElement;
               root.style.setProperty('--color-1', `rgb(${colors.rawRgbStrings[0].split(' ').join(', ')})`);
               root.style.setProperty('--color-2', `rgb(${colors.rawRgbStrings[1].split(' ').join(', ')})`);
               root.style.setProperty('--color-3', `rgb(${colors.rawRgbStrings[2].split(' ').join(', ')})`);
               root.style.setProperty('--color-4', `rgb(${colors.rawRgbStrings[3].split(' ').join(', ')})`);
             }
           })
-          .catch(e => console.error('Color extraction failed:', e));
+          .catch(e => console.error('Dominant color extraction failed:', e));
+
+        // Vibrant UI primary color
+        extractPrimaryColor(currentTrack.thumbnail)
+          .then(color => {
+            if (color) {
+              const root = document.documentElement;
+              // Extract just the RGB numbers from "rgb(R, G, B)"
+              const m = color.match(/\d+/g);
+              if (m && m.length >= 3) {
+                 const rgbStr = `${m[0]} ${m[1]} ${m[2]}`;
+                 root.style.setProperty('--color-primary-rgb', rgbStr);
+                 root.style.setProperty('--color-primary-light-rgb', rgbStr);
+                 root.style.setProperty('--color-primary-dark-rgb', rgbStr);
+              }
+              root.style.setProperty('--color-primary', color);
+            }
+          })
+          .catch(e => console.error('Primary color extraction failed:', e));
       }
     }
   }, [currentTrack]);

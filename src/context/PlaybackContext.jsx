@@ -44,7 +44,9 @@ export const PlaybackProvider = ({ children }) => {
     player.onEnded = () => {
       if (playNextRef.current) playNextRef.current(true);
     };
-    player.onBuffering = (isBuffering) => {};
+    player.onBuffering = (isBuffering) => {
+      setIsLoading(isBuffering);
+    };
     // Keep React isPlaying in sync with actual audio context state
     player.onPlayStateChange = (playing) => {
       setIsPlaying(playing);
@@ -141,7 +143,7 @@ export const PlaybackProvider = ({ children }) => {
       setIsPlaying(false);
       isPlayingRef.current = false;
     } finally {
-      if (loadingTrackId.current === track.id) {
+      if (loadingTrackId.current === currentLoadId) {
         loadingTrackId.current = null;
       }
     }
