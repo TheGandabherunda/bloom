@@ -41,13 +41,35 @@ export const OrbitProvider = ({ children }) => {
     const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
     const audio = new Audio(silentWav);
     audio.loop = true;
-    audio.volume = 0;
+    // CRITICAL: Do NOT set volume = 0 or muted = true. 
+    // Mobile browsers will ignore muted audio when deciding whether to kill a background tab!
+    // The WAV file itself is mathematically silent, so the user hears nothing, but the browser sees volume=1.
     silentAudioRef.current = audio;
+    
+    // Screen Wake Lock API to prevent the device from sleeping if the user walks away
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        // Ignore wake lock errors
+      }
+    };
+    requestWakeLock();
+    
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') requestWakeLock();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
     
     return () => {
       audio.pause();
       audio.src = '';
       silentAudioRef.current = null;
+      if (wakeLock) wakeLock.release().catch(() => {});
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
   
