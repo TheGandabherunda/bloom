@@ -10,7 +10,7 @@ import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config }) => {
-  const { initP2P, status, peerId } = useOrbit();
+  const { initP2P, status, peerId, getConnectedRelays } = useOrbit();
   const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
   const [showSearch, setShowSearch] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,7 +113,19 @@ const Layout = ({ config }) => {
               <button
                 title="Copy invite link"
                 onClick={() => {
-                  navigator.clipboard.writeText(window.location.href).catch(() => {});
+                  let inviteLink = window.location.href;
+                  try {
+                    const relays = getConnectedRelays?.() || [];
+                    if (relays.length > 0) {
+                      const rString = relays.map(r => r.replace('wss://', '').replace('ws://', '')).join(',');
+                      const url = new URL(window.location.href);
+                      const [hashPath, hashQuery] = url.hash.substring(1).split('?');
+                      const params = new URLSearchParams(hashQuery || '');
+                      params.set('r', rString);
+                      inviteLink = `${url.origin}${url.pathname}#${hashPath}?${params.toString()}`;
+                    }
+                  } catch (e) {}
+                  navigator.clipboard.writeText(inviteLink).catch(() => {});
                 }}
                 className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center"
               >

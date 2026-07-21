@@ -14,6 +14,11 @@ function App() {
       const [roomId, query] = hashPart.split('?');
       const params = new URLSearchParams(query || '');
       const hostId = params.get('host');
+      const relaysParam = params.get('r');
+      let customRelays = null;
+      if (relaysParam) {
+        customRelays = relaysParam.split(',').map(r => 'wss://' + r);
+      }
       
       if (hostId) {
         const isActuallyHost = sessionStorage.getItem(`bloom_host_${roomId}`) === 'true';
@@ -22,7 +27,7 @@ function App() {
           window.history.replaceState(null, '', `#${roomId}`);
           setConfig(prev => ({ ...prev, roomId, isHost: true }));
         } else {
-          setConfig(prev => ({ ...prev, roomId, hostId, isHost: false }));
+          setConfig(prev => ({ ...prev, roomId, hostId, customRelays, isHost: false }));
         }
       } else {
         // Invalid join attempt (missing host ID). Clear the hash and treat as a new host.

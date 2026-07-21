@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { joinRoom, selfId } from 'trystero/nostr';
+import { joinRoom, selfId, getRelaySockets } from 'trystero/nostr';
 
 const OrbitContext = createContext(null);
 
@@ -98,7 +98,15 @@ export const OrbitProvider = ({ children }) => {
     setStatusWrapped('disconnected');
   }, []);
 
-  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null) => {
+  const getConnectedRelays = useCallback(() => {
+    try {
+      return Object.keys(getRelaySockets());
+    } catch (e) {
+      return [];
+    }
+  }, []);
+
+  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, customRelays = null) => {
     if (statusRef.current === 'connected' || statusRef.current === 'initializing') return;
     
     try {
@@ -112,13 +120,6 @@ export const OrbitProvider = ({ children }) => {
 
       const config = {
         appId: 'bloom-p2p',
-        relayUrls: [
-          'wss://relay.damus.io',
-          'wss://nos.lol',
-          'wss://relay.nostr.band',
-          'wss://relay.snort.social',
-          'wss://nostr.wine'
-        ],
         rtcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -127,6 +128,11 @@ export const OrbitProvider = ({ children }) => {
           ]
         }
       };
+
+      if (customRelays && customRelays.length > 0) {
+        config.relayUrls = customRelays;
+      }
+      
       const room = joinRoom(config, roomId);
       roomRef.current = room;
       setPeerId(selfId);
@@ -396,8 +402,8 @@ export const OrbitProvider = ({ children }) => {
 
   const contextValue = React.useMemo(() => ({
     helia: null, orbitdb: null, stateDb: stateDbReady, chatDb: chatDbReady, 
-    status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P
-  }), [stateDbReady, chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P]);
+    status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays
+  }), [stateDbReady, chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays]);
 
   return (
     <OrbitContext.Provider value={contextValue}>
