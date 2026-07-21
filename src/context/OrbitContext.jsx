@@ -112,6 +112,13 @@ export const OrbitProvider = ({ children }) => {
 
       const config = {
         appId: 'bloom-p2p',
+        relayUrls: [
+          'wss://relay.damus.io',
+          'wss://nos.lol',
+          'wss://relay.nostr.band',
+          'wss://relay.snort.social',
+          'wss://nostr.wine'
+        ],
         rtcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
