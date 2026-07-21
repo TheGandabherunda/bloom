@@ -70,8 +70,7 @@ async function initP2P(roomId, displayName, isHost) {
   const libp2p = await createLibp2p({
     addresses: {
       listen: [
-        '/webrtc',
-        '/p2p-circuit'
+        '/webrtc'
       ]
     },
     transports: [
