@@ -108,6 +108,7 @@ const Player = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFsControls, setShowFsControls] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
+  const [localProgress, setLocalProgress] = useState(null);
   const fsTimeoutRef = useRef(null);
 
   // Sync fullscreen exit via Escape key or browser back
@@ -226,7 +227,9 @@ const Player = () => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progress = (currentTime / duration) * 100 || 0;
+  const actualProgress = (currentTime / duration) * 100 || 0;
+  const displayProgress = localProgress !== null ? localProgress : actualProgress;
+  const displayTime = localProgress !== null ? (localProgress / 100) * duration : currentTime;
 
   return (
     <>
@@ -320,23 +323,33 @@ const Player = () => {
           {/* Mobile Expanded Bottom Sheet Controls */}
           <div className="lg:hidden absolute bottom-12 left-0 right-0 px-8 flex flex-col z-30" onClick={(e) => e.stopPropagation()}>
             {/* Progress Bar & Time */}
-            <div className="w-full flex flex-col mb-6">
-              <div 
-                className={`w-full h-1.5 bg-white/20 rounded-full mb-3 ${canControl ? 'cursor-pointer' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!canControl) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const pos = (e.clientX - rect.left) / rect.width;
-                  seek(pos * duration);
-                }}
-              >
-                <div className="h-full bg-[var(--color-primary)] rounded-full relative" style={{ width: `${progress}%` }}>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full"></div>
+            <div className="w-full flex flex-col mb-6 relative">
+              <div className={`w-full h-1.5 bg-white/20 rounded-full mb-3 relative ${canControl ? 'cursor-pointer' : ''}`}>
+                <div className="h-full bg-[var(--color-primary)] rounded-full relative pointer-events-none" style={{ width: `${displayProgress}%` }}>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md pointer-events-none"></div>
                 </div>
+                {canControl && (
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={displayProgress}
+                    onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
+                    onPointerUp={() => {
+                      if (localProgress !== null) {
+                        seek((localProgress / 100) * duration);
+                        setLocalProgress(null);
+                      }
+                    }}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0 z-10"
+                  />
+                )}
               </div>
               <div className="flex justify-between text-[11px] font-mono text-white/50 tracking-wider">
-                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(displayTime)}</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
@@ -393,22 +406,32 @@ const Player = () => {
       >
       
       {/* Progress Bar (Top Edge) */}
-      <div 
-        className={`absolute top-0 left-0 right-0 h-1 bg-white/10 group ${canControl ? 'cursor-pointer' : ''}`} 
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!canControl) return;
-          const rect = e.currentTarget.getBoundingClientRect();
-          const pos = (e.clientX - rect.left) / rect.width;
-          seek(pos * duration);
-        }}
-      >
+      <div className={`absolute top-0 left-0 right-0 h-1 group ${canControl ? 'cursor-pointer' : ''}`}>
         <div
-          className="absolute top-0 left-0 h-full bg-[var(--color-primary)] transition-all duration-100"
-          style={{ width: `${progress}%` }}
+          className="absolute top-0 left-0 h-full bg-[var(--color-primary)] pointer-events-none"
+          style={{ width: `${displayProgress}%` }}
         >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform"></div>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform pointer-events-none"></div>
         </div>
+        {canControl && (
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="0.1"
+            value={displayProgress}
+            onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
+            onPointerUp={() => {
+              if (localProgress !== null) {
+                seek((localProgress / 100) * duration);
+                setLocalProgress(null);
+              }
+            }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0 z-10"
+          />
+        )}
       </div>
 
       <div className="max-w-screen-2xl mx-auto hidden lg:flex items-center justify-between px-6 h-full pt-1">
@@ -433,7 +456,7 @@ const Player = () => {
           </div>
           
           <div className="text-[11px] font-mono text-white/40 flex items-center gap-1 tracking-wider">
-            <span className="text-white/80">{formatTime(currentTime)}</span>
+            <span className="text-white/80">{formatTime(displayTime)}</span>
             <span>/</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -523,6 +546,8 @@ const Player = () => {
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0 p-0"
               />
             </div>

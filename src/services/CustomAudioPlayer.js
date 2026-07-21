@@ -78,11 +78,6 @@ export class CustomAudioPlayer {
 
     this.audio.addEventListener('playing', () => {
       if (this.onBuffering) this.onBuffering(false);
-      this.stallCount = 0;
-    });
-
-    this.audio.addEventListener('stalled', () => {
-      this._attemptStallRecovery();
     });
 
     this.audio.addEventListener('play', () => {
@@ -91,57 +86,12 @@ export class CustomAudioPlayer {
       if (this.audioContext.state === 'suspended') {
         this.audioContext.resume();
       }
-      this._startWatchdog();
     });
 
     this.audio.addEventListener('pause', () => {
       this.isPlaying = false;
       if (this.onPlayStateChange) this.onPlayStateChange(false);
-      this._stopWatchdog();
     });
-  }
-
-  _startWatchdog() {
-    this._stopWatchdog();
-    this.lastTime = this.audio.currentTime;
-    this.watchdogInterval = setInterval(() => {
-      if (!this.isPlaying) return;
-
-      const currentTime = this.audio.currentTime;
-      if (currentTime === this.lastTime && !this.audio.ended && this.audio.readyState < 3) {
-        this.stallCount++;
-        if (this.stallCount === 2) {
-          this.audio.currentTime = currentTime + 0.001;
-        } else if (this.stallCount >= 5) {
-          const currentSrc = this.audio.src;
-          const timeToRestore = this.audio.currentTime;
-
-          this.audio.src = currentSrc;
-          this.audio.load();
-          this.audio.currentTime = timeToRestore;
-          this.audio.play().catch(() => {});
-          this.stallCount = 0;
-        }
-      } else {
-        this.stallCount = 0;
-      }
-      this.lastTime = currentTime;
-    }, 1000);
-  }
-
-  _stopWatchdog() {
-    if (this.watchdogInterval) {
-      clearInterval(this.watchdogInterval);
-      this.watchdogInterval = null;
-    }
-    this.stallCount = 0;
-  }
-
-  _attemptStallRecovery() {
-    if (this.isPlaying && this.audio.readyState < 3) {
-      const time = this.audio.currentTime;
-      if (time > 0) this.audio.currentTime = time + 0.0001;
-    }
   }
 
   getFrequencyData() {
@@ -167,7 +117,6 @@ export class CustomAudioPlayer {
   async load(manifestUrl, unused = null, startTime = 0) {
     console.log(`[AudioPlayer] load called with URL: ${manifestUrl}, startTime: ${startTime}`);
     this.isAborted = false;
-    this._stopWatchdog();
 
     if (this.currentObjectUrl) {
       URL.revokeObjectURL(this.currentObjectUrl);
@@ -208,7 +157,6 @@ export class CustomAudioPlayer {
 
   destroy() {
     this.isAborted = true;
-    this._stopWatchdog();
     this.pause();
     if (this.audio) {
       this.audio.removeAttribute('src');
