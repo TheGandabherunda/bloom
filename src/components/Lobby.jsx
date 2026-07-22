@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { pool, DEFAULT_RELAYS } from '../services/nostr';
+import { DIRECTORY_PK } from '../services/directory';
 
 
 const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
@@ -10,16 +11,16 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
   const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
-    // Subscribe to Beacon events (kind 31337)
+    // Subscribe to Beacon events (kind 30000 signed by App Directory)
     const sub = pool.subscribeMany(
       DEFAULT_RELAYS,
-      [{ kinds: [31337], limit: 100 }],
+      [{ kinds: [30000], authors: [DIRECTORY_PK], limit: 100 }],
       {
         onevent(event) {
           try {
             const data = JSON.parse(event.content);
-            const rTag = event.tags.find(t => t[0] === 'r');
-            if (!rTag || !data.roomId) return;
+            const dTag = event.tags.find(t => t[0] === 'd');
+            if (!dTag || !dTag[1].startsWith('lobby-') || !data.roomId) return;
             console.log('[Lobby] Received beacon for:', data.roomId, data);
             
             setRooms(prev => {
@@ -32,7 +33,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
                 [data.roomId]: {
                   ...data,
                   timestamp: event.created_at,
-                  pubkey: event.pubkey
+                  pubkey: data.hostPk
                 }
               };
             });

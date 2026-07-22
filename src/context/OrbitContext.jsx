@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { pool, DEFAULT_RELAYS, signEvent } from '../services/nostr';
+import { DIRECTORY_SK } from '../services/directory';
+import { finalizeEvent } from 'nostr-tools';
 
 const OrbitContext = createContext(null);
 
@@ -120,26 +122,29 @@ export const OrbitProvider = ({ children }) => {
 
             // Update beacon if public
             if (isPublicRef.current && (key === 'currentTrack' || key.startsWith('peer_name_'))) {
-               // Throttle/dedupe could go here, but for now we just publish
-               publishSigned({
-                 kind: 31337,
+               // Use standard kind 30000 signed by Directory SK for global lobby discovery
+               const beaconEvent = {
+                 kind: 30000,
                  created_at: Math.floor(Date.now() / 1000),
-                 tags: [['d', roomId], ['r', roomId]],
-                   content: JSON.stringify({ 
-                     roomId, 
-                     roomName: stateProxy.store['roomName'] || roomId,
-                     hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
-                     currentTrack: stateProxy.store['currentTrack'],
-                     activePeers: Object.keys(peerNamesRef.current).length
-                   })
-               });
+                 tags: [['d', `lobby-${roomId}`]],
+                 content: JSON.stringify({ 
+                   roomId, 
+                   roomName: stateProxy.store['roomName'] || roomId,
+                   hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                   currentTrack: stateProxy.store['currentTrack'],
+                   activePeers: Object.keys(peerNamesRef.current).length,
+                   hostPk: hostIdRef.current
+                 })
+               };
+               const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
+               pool.publish(DEFAULT_RELAYS, signedBeacon);
             }
           } else {
-            // Peer sends intent to host
+            // Peer sends intent to host (using #p tag for reliable relay routing)
             await publishSigned({
               kind: 20001,
               created_at: Math.floor(Date.now() / 1000),
-              tags: [['r', roomId]],
+              tags: [['p', hostIdRef.current], ['r', roomId]],
               content: JSON.stringify({ key, value })
             });
           }
@@ -170,7 +175,7 @@ export const OrbitProvider = ({ children }) => {
       ];
       
       if (isHost) {
-        filters.push({ kinds: [20001, 20002], '#r': [roomId] }); // State intents & Join intents from peers
+        filters.push({ kinds: [20001, 20002], '#p': [nostrPk] }); // State intents & Join intents from peers
       }
 
       pool.subscribeMany(DEFAULT_RELAYS, filters, {
@@ -251,18 +256,21 @@ export const OrbitProvider = ({ children }) => {
             return;
           }
           if (isPublicRef.current) {
-             publishSigned({
-               kind: 31337,
+             const beaconEvent = {
+               kind: 30000,
                created_at: Math.floor(Date.now() / 1000),
-               tags: [['d', roomId], ['r', roomId]],
-                 content: JSON.stringify({ 
-                   roomId, 
-                   roomName: stateProxy.store['roomName'] || roomId,
-                   hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
-                   currentTrack: stateProxy.store['currentTrack'],
-                   activePeers: Object.keys(peerNamesRef.current).length
-                 })
-             });
+               tags: [['d', `lobby-${roomId}`]],
+               content: JSON.stringify({ 
+                 roomId, 
+                 roomName: stateProxy.store['roomName'] || roomId,
+                 hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                 currentTrack: stateProxy.store['currentTrack'],
+                 activePeers: Object.keys(peerNamesRef.current).length,
+                 hostPk: hostIdRef.current
+               })
+             };
+             const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
+             pool.publish(DEFAULT_RELAYS, signedBeacon);
           }
         }, 15000);
 
@@ -272,7 +280,7 @@ export const OrbitProvider = ({ children }) => {
           publishSigned({
             kind: 20002,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [['r', roomId]],
+            tags: [['p', hostIdRef.current], ['r', roomId]],
             content: displayName
           });
         };
