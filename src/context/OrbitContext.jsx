@@ -120,10 +120,11 @@ export const OrbitProvider = ({ children }) => {
 
             // Update beacon if public
             if (isPublicRef.current && (key === 'currentTrack' || key.startsWith('peer_name_'))) {
-               await publishSigned({
+               // Throttle/dedupe could go here, but for now we just publish
+               publishSigned({
                  kind: 31337,
                  created_at: Math.floor(Date.now() / 1000),
-                 tags: [['r', roomId]],
+                 tags: [['d', roomId], ['r', roomId]],
                    content: JSON.stringify({ 
                      roomId, 
                      roomName: stateProxy.store['roomName'] || roomId,
@@ -234,20 +235,66 @@ export const OrbitProvider = ({ children }) => {
       if (isHost) {
         setPeerNames(prev => ({ ...prev, [nostrPk]: displayName }));
         setPeerRoles(prev => ({ ...prev, [nostrPk]: 'owner' }));
-        stateProxy.put(`peer_name_${nostrPk}`, displayName);
-        stateProxy.put(`peer_role_${nostrPk}`, 'owner');
-        setStatusWrapped('connected');
+        
+        // Wait briefly for WebSockets to open before slamming them with the initial state
+        setTimeout(() => {
+          if (roomRef.current !== roomId) return;
+          stateProxy.put(`peer_name_${nostrPk}`, displayName);
+          stateProxy.put(`peer_role_${nostrPk}`, 'owner');
+          setStatusWrapped('connected');
+        }, 1500);
+
+        // Heartbeat beacon every 15s to ensure Lobby visibility even if connection dropped
+        const beaconInterval = setInterval(() => {
+          if (roomRef.current !== roomId) {
+            clearInterval(beaconInterval);
+            return;
+          }
+          if (isPublicRef.current) {
+             publishSigned({
+               kind: 31337,
+               created_at: Math.floor(Date.now() / 1000),
+               tags: [['d', roomId], ['r', roomId]],
+                 content: JSON.stringify({ 
+                   roomId, 
+                   roomName: stateProxy.store['roomName'] || roomId,
+                   hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                   currentTrack: stateProxy.store['currentTrack'],
+                   activePeers: Object.keys(peerNamesRef.current).length
+                 })
+             });
+          }
+        }, 15000);
+
       } else {
-        // Send join intent
-        publishSigned({
-          kind: 20002,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [['r', roomId]],
-          content: displayName
-        });
+        // Send join intent in a loop until we get connected (Host acks by setting our peer_name)
+        const sendJoin = () => {
+          publishSigned({
+            kind: 20002,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [['r', roomId]],
+            content: displayName
+          });
+        };
+
+        sendJoin(); // Try immediately
+        
+        const joinInterval = setInterval(() => {
+          if (roomRef.current !== roomId) {
+            clearInterval(joinInterval);
+            return;
+          }
+          if (statusRef.current === 'initializing') {
+            console.log('[Nostr] Re-sending join intent...');
+            sendJoin();
+          } else {
+            clearInterval(joinInterval);
+          }
+        }, 2000);
         
         // Fallback timeout
         setTimeout(() => {
+          clearInterval(joinInterval);
           if (statusRef.current === 'initializing') {
             setStatusWrapped('failed');
           }
