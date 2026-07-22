@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { pool, signEvent, hexToBytes } from '../services/nostr';
+import { pool, signEvent, hexToBytes, DEFAULT_RELAYS } from '../services/nostr';
 import { finalizeEvent } from 'nostr-tools';
 
 const OrbitContext = createContext(null);
@@ -63,7 +63,7 @@ export const OrbitProvider = ({ children }) => {
       }
       console.log(`[Nostr] Successfully signed event, publishing to pool...`, signedEvent);
       try {
-        const results = pool.publish(relays, signedEvent);
+        const results = pool.publish(relaysRef.current, signedEvent);
         if (Array.isArray(results)) {
           Promise.allSettled(results).then(() => {});
         } else if (results && typeof results.catch === 'function') {
@@ -148,7 +148,7 @@ export const OrbitProvider = ({ children }) => {
                      hostPk: hostIdRef.current
                    })
                  };
-                 const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
+                 const signedBeacon = finalizeEvent(beaconEvent, skRef.current);
                  const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
                  if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
                }, 1000);
