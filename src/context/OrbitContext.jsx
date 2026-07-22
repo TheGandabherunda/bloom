@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { pool, DEFAULT_RELAYS, signEvent } from '../services/nostr';
-import { DIRECTORY_SK } from '../services/directory';
+import { pool, DEFAULT_RELAYS, signEvent, hexToBytes } from '../services/nostr';
 import { finalizeEvent } from 'nostr-tools';
 
 const OrbitContext = createContext(null);
@@ -182,8 +181,9 @@ export const OrbitProvider = ({ children }) => {
       };
 
       // Set up subscriptions
+      const hostPubKey = isHost ? nostrPk : hostIdRef.current;
       const filters = [
-        { kinds: [30000], '#d': [roomId], authors: [hostIdRef.current] }, // State sync from host
+        { kinds: [30000], '#d': [roomId], authors: [hostPubKey] }, // State sync from host
         { kinds: [9], '#h': [roomId] }, // Chat
       ];
       
@@ -282,22 +282,22 @@ export const OrbitProvider = ({ children }) => {
             return;
           }
           if (isPublicRef.current) {
+             const activePeerIds = Object.keys(peerNamesRef.current);
              const beaconEvent = {
-               kind: 30000,
+               kind: 30311,
                created_at: Math.floor(Date.now() / 1000),
-               tags: [['d', `lobby-${roomId}`]],
-               content: JSON.stringify({ 
-                 roomId, 
-                 roomName: stateProxy.store['roomName'] || roomId,
-                 hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
-                 currentTrack: stateProxy.store['currentTrack'],
-                 activePeers: Object.keys(peerNamesRef.current).length,
-                 hostPk: hostIdRef.current
-               })
+               tags: [
+                 ['d', `bloom-${roomId}`],
+                 ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
+                 ['status', 'live'],
+                 ['t', 'music'],
+                 ['p', nostrPk, 'host']
+               ],
+               content: JSON.stringify({ roomId, activePeerIds, hostPk: nostrPk })
              };
-             const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
+             const signedBeacon = finalizeEvent(beaconEvent, hexToBytes(nostrSk));
              const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
-             console.log(`[Nostr] Heartbeat beacon published to pool.`);
+             console.log(`[Nostr] Heartbeat beacon (NIP-53) published to pool.`);
              if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
           }
         }, 30000);

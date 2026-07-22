@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { pool, DEFAULT_RELAYS } from '../services/nostr';
-import { DIRECTORY_PK } from '../services/directory';
 
 
 const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
@@ -11,9 +10,9 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
   const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
-    console.log('[Lobby] Component mounted. Setting up beacon subscription with App Directory PK:', DIRECTORY_PK);
-    // Subscribe to Beacon events (kind 30000 signed by App Directory)
-    const filters = [{ kinds: [30000], authors: [DIRECTORY_PK], limit: 100 }];
+    console.log('[Lobby] Component mounted. Setting up beacon subscription for NIP-53 Live Activities');
+    // Subscribe to NIP-53 Live Activities (kind 30311)
+    const filters = [{ kinds: [30311], limit: 100 }];
     console.log('[Lobby] Subscription filters:', filters);
 
     const sub = pool.subscribeMany(
@@ -22,33 +21,40 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
       {
         onevent(event) {
           try {
-            console.log(`[Lobby] Received raw event id=${event.id} kind=${event.kind} pubkey=${event.pubkey}`);
-            const data = JSON.parse(event.content);
             const dTag = event.tags.find(t => t[0] === 'd');
-            console.log(`[Lobby] Parsed event content for dTag=${dTag ? dTag[1] : 'NONE'}, data=`, data);
+            const statusTag = event.tags.find(t => t[0] === 'status');
+            const titleTag = event.tags.find(t => t[0] === 'title');
             
-            if (!dTag || !dTag[1].startsWith('lobby-') || !data.roomId) {
-              console.warn(`[Lobby] Ignored event id=${event.id} because it lacks valid lobby dTag or roomId.`);
+            if (!dTag || !dTag[1].startsWith('bloom-') || statusTag?.[1] !== 'live') {
               return;
             }
             
-            console.log('[Lobby] Valid beacon for room:', data.roomId, 'Host PK:', data.hostPk);
+            const roomId = dTag[1].replace('bloom-', '');
+            let parsedContent = {};
+            try { parsedContent = JSON.parse(event.content); } catch(e) {}
+            
+            const activePeers = parsedContent.activePeerIds ? parsedContent.activePeerIds.length : 1;
+            const roomName = titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId;
+            const hostPk = event.pubkey;
+
+            console.log('[Lobby] Valid beacon for room:', roomId, 'Host PK:', hostPk);
             
             setRooms(prev => {
-              const existing = prev[data.roomId];
+              const existing = prev[roomId];
               // Only update if newer
               if (existing && existing.timestamp > event.created_at) {
-                console.log(`[Lobby] Ignored older beacon for ${data.roomId}`);
                 return prev;
               }
               
-              console.log(`[Lobby] Updating state with new beacon for ${data.roomId}. Active Peers:`, data.activePeers);
               return {
                 ...prev,
-                [data.roomId]: {
-                  ...data,
+                [roomId]: {
+                  roomId,
+                  roomName,
+                  hostPk,
+                  activePeers,
                   timestamp: event.created_at,
-                  pubkey: data.hostPk
+                  pubkey: hostPk
                 }
               };
             });
