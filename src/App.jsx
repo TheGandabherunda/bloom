@@ -68,23 +68,6 @@ function App() {
 
   const handleLogin = (loginData) => {
     setIsLoggedIn(true);
-    if (hasInvite && inviteRoomId) {
-      const hashPart = window.location.hash.substring(1);
-      let hostId = null;
-      if (hashPart) {
-        const [, query] = hashPart.split('?');
-        const params = new URLSearchParams(query || '');
-        hostId = params.get('host');
-      }
-      setConfig({
-        roomId: inviteRoomId,
-        isHost: false,
-        displayName: loginData.displayName,
-        nostrPk: loginData.nostrPk,
-        nostrSk: loginData.nostrSk,
-        hostId
-      });
-    }
   };
 
   const handleJoinLobby = (roomId, hostId) => {
