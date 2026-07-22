@@ -300,7 +300,7 @@ export const OrbitProvider = ({ children }) => {
              };
              // Only finalize and publish if we have a real secret key
              if (nostrSk && nostrSk !== 'extension') {
-               const signedBeacon = finalizeEvent(beaconEvent, hexToBytes(nostrSk));
+               const signedBeacon = finalizeEvent(beaconEvent, nostrSk);
                const pubResults = pool.publish(relays, signedBeacon);
                console.log(`[Nostr] Heartbeat beacon (NIP-53 kind: 30312) published.`);
                if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
