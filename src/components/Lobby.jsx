@@ -73,7 +73,6 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
   return () => {
     console.log('[Lobby] Component unmounting, closing subscription.');
     if (sub && sub.close) sub.close();
-    if (relays.length > 0) pool.close(relays);
   };
 }, []);
 
