@@ -137,7 +137,7 @@ export const PlaybackProvider = ({ children }) => {
       }
 
       setIsLoading(false);
-      if (autoPlay) {
+      if (autoPlay || isPlayingRef.current) {
         await playerRef.current.play();
         if (isLocal && stateDb) {
           stateDb.put('isPlaying', { status: true, originator: peerId }).catch(e => console.warn(e));
@@ -214,8 +214,7 @@ export const PlaybackProvider = ({ children }) => {
         const role = originator ? peerRolesRef.current[originator] : null;
         const isAuthorized = role === 'owner' || role === 'admin';
 
-        // Standard Deduplication: Ignore updates originated by this peer
-        if (originator === peerId) return;
+        // Standard Deduplication is handled by OrbitContext deep-equality checks.
         
         // Ignore unauthorized playback changes
         if (!isAuthorized && originator) return;
