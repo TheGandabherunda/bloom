@@ -4,7 +4,7 @@ import { PlaybackProvider } from './context/PlaybackContext';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Lobby from './components/Lobby';
-import { getOrCreateKeys } from './services/nostr';
+import { getOrCreateKeys, getUserRelays } from './services/nostr';
 
 function App() {
   const [config, setConfig] = useState(null);
@@ -35,8 +35,10 @@ function App() {
       console.log(`[App] Successfully loaded local keys. pubkey=${pk}`);
     }
     
-    console.log(`[App] Setting config with nostrPk=${pk} and hasNostrSk=${!!sk}`);
-    setConfig({ ...baseConfig, nostrPk: pk, nostrSk: sk });
+    const userRelays = await getUserRelays();
+    
+    console.log(`[App] Setting config with nostrPk=${pk}, relays=${userRelays.length}`);
+    setConfig({ ...baseConfig, nostrPk: pk, nostrSk: sk, relays: userRelays });
   };
 
   useEffect(() => {

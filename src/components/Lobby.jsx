@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { pool, DEFAULT_RELAYS } from '../services/nostr';
+import { pool, getUserRelays } from '../services/nostr';
 
 
 const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
@@ -10,15 +10,20 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
   const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
-    console.log('[Lobby] Component mounted. Setting up beacon subscription for NIP-53 Live Activities');
-    // Subscribe to NIP-53 Live Activities (kind 30311)
-    const filters = [{ kinds: [30311], limit: 100 }];
-    console.log('[Lobby] Subscription filters:', filters);
-
-    const sub = pool.subscribeMany(
-      DEFAULT_RELAYS,
-      filters,
-      {
+    let sub = null;
+    let relays = [];
+    
+    const initLobby = async () => {
+      relays = await getUserRelays();
+      console.log('[Lobby] Component mounted. Setting up beacon subscription for NIP-53 Live Activities on relays:', relays);
+      // Subscribe to NIP-53 Live Activities (kind 30311)
+      const filters = [{ kinds: [30311], limit: 100 }];
+      console.log('[Lobby] Subscription filters:', filters);
+  
+      sub = pool.subscribeMany(
+        relays,
+        filters,
+        {
         onevent(event) {
           try {
             const dTag = event.tags.find(t => t[0] === 'd');
@@ -62,12 +67,15 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
         }
       }
     );
+  };
+  initLobby();
 
-    return () => {
-      console.log('[Lobby] Component unmounting, closing subscription.');
-      sub.close();
-    };
-  }, []);
+  return () => {
+    console.log('[Lobby] Component unmounting, closing subscription.');
+    if (sub && sub.close) sub.close();
+    if (relays.length > 0) pool.close(relays);
+  };
+}, []);
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();

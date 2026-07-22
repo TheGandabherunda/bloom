@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { pool, DEFAULT_RELAYS, signEvent, hexToBytes } from '../services/nostr';
+import { pool, signEvent, hexToBytes } from '../services/nostr';
 import { finalizeEvent } from 'nostr-tools';
 
 const OrbitContext = createContext(null);
@@ -33,6 +33,7 @@ export const OrbitProvider = ({ children }) => {
   const roomRef = useRef(null);
   
   const skRef = useRef(null);
+  const relaysRef = useRef([]);
   const hostIdRef = useRef(null);
   const isHostRef = useRef(false);
   const isPublicRef = useRef(false);
@@ -62,7 +63,7 @@ export const OrbitProvider = ({ children }) => {
       }
       console.log(`[Nostr] Successfully signed event, publishing to pool...`, signedEvent);
       try {
-        const results = pool.publish(DEFAULT_RELAYS, signedEvent);
+        const results = pool.publish(relays, signedEvent);
         if (Array.isArray(results)) {
           Promise.allSettled(results).then(() => {});
         } else if (results && typeof results.catch === 'function') {
@@ -84,7 +85,7 @@ export const OrbitProvider = ({ children }) => {
     setStatusWrapped('disconnected');
   }, []);
 
-  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, nostrPk = null, nostrSk = null, isPublic = false) => {
+  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, nostrPk = null, nostrSk = null, isPublic = false, relays = []) => {
     if (statusRef.current === 'connected' || statusRef.current === 'initializing') return;
     
     try {
@@ -98,6 +99,7 @@ export const OrbitProvider = ({ children }) => {
       hostIdRef.current = hostId || nostrPk;
       isHostRef.current = isHost;
       isPublicRef.current = isPublic;
+      relaysRef.current = relays;
 
       // Debouncers for state and beacon
       let statePublishTimeout = null;
@@ -193,7 +195,7 @@ export const OrbitProvider = ({ children }) => {
 
       console.log(`[Nostr] Subscribing with filters:`, filters);
 
-      pool.subscribeMany(DEFAULT_RELAYS, filters, {
+      pool.subscribeMany(relays, filters, {
         onevent(event) {
           console.log(`[Nostr] Received event id=${event.id} kind=${event.kind} from pubkey=${event.pubkey}`);
           if (event.kind === 30000) {
@@ -345,7 +347,7 @@ export const OrbitProvider = ({ children }) => {
     }
   }, []);
 
-  const getConnectedRelays = useCallback(() => DEFAULT_RELAYS, []);
+  const getConnectedRelays = useCallback(() => relaysRef.current, []);
 
   const contextValue = React.useMemo(() => ({
     helia: null, orbitdb: null, stateDb: stateDbReady, chatDb: chatDbReady, 

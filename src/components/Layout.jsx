@@ -18,7 +18,8 @@ const Layout = ({ config, onLeave }) => {
   const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
 
   useEffect(() => {
-    initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk, config.isPublic);
+    if (!config) return;
+    initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk, config.isPublic, config.relays);
   }, [config, initP2P]);
 
   useEffect(() => {

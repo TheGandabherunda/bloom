@@ -1,1 +1,1 @@
-Fix ephemeral relay drop using Replaceable events
+Migrate to NIP-53 Live Activities and fix null author bug

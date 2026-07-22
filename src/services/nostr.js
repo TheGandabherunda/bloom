@@ -23,6 +23,26 @@ export const getOrCreateKeys = () => {
   return { sk, pk, privKeyHex };
 };
 
+export const getUserRelays = async () => {
+  let userRelays = [...DEFAULT_RELAYS];
+  const isExtension = !!localStorage.getItem('bloom_nip07');
+  
+  if (isExtension && window.nostr && window.nostr.getRelays) {
+    try {
+      const extRelays = await window.nostr.getRelays();
+      if (extRelays && Object.keys(extRelays).length > 0) {
+        const activeExtRelays = Object.keys(extRelays).filter(r => extRelays[r].read || extRelays[r].write);
+        if (activeExtRelays.length > 0) {
+          userRelays = activeExtRelays;
+        }
+      }
+    } catch(e) {
+      console.warn('[Nostr] Failed to fetch relays from extension:', e);
+    }
+  }
+  return userRelays;
+};
+
 export const signEvent = (eventTemplate, sk) => {
   return finalizeEvent(eventTemplate, sk);
 };
