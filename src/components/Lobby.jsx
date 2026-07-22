@@ -80,7 +80,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
     e.preventDefault();
     let finalRoomId = `bloom-${Math.random().toString(36).substring(2, 8)}`;
     if (newRoomName) {
-      finalRoomId = `bloom-${newRoomName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+      finalRoomId = `bloom-${newRoomName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}-${Math.random().toString(36).substring(2, 8)}`;
     }
     onCreateRoom(finalRoomId, isPublic);
   };

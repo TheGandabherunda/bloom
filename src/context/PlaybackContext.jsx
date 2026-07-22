@@ -183,11 +183,21 @@ export const PlaybackProvider = ({ children }) => {
     if (!stateDb) return;
     const sync = async () => {
       try {
-        const trackData = await stateDb.get('currentTrack');
-        if (trackData) {
-          const track = trackData.track || trackData;
-          const index = trackData.index !== undefined ? trackData.index : -1;
-          loadTrack(track, index, 0, false, 'initial-sync');
+        const syncedTrack = await stateDb.get('currentTrack');
+        if (syncedTrack) {
+          const track = syncedTrack.track || syncedTrack;
+          const index = syncedTrack.index !== undefined ? syncedTrack.index : -1;
+          
+          let liveTime = 0;
+          const ct = await stateDb.get('currentTime');
+          if (ct && typeof ct === 'object') {
+             liveTime = ct.time;
+          }
+          
+          const isPlayingState = await stateDb.get('isPlaying');
+          const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
+          
+          loadTrack(track, index, liveTime, isPlaying, 'initial-sync');
         }
         const syncedQueue = await stateDb.get('queue');
         if (syncedQueue) setQueueState(syncedQueue);

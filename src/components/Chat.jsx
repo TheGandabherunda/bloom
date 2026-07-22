@@ -79,7 +79,11 @@ const Chat = () => {
     }
   }, [messages]);
 
-  const grouped = useMemo(() => groupMessages(messages), [messages]);
+  const sortedMessages = useMemo(() => {
+    return [...messages].sort((a, b) => a.timestamp - b.timestamp);
+  }, [messages]);
+
+  const grouped = useMemo(() => groupMessages(sortedMessages), [sortedMessages]);
 
   const handleSend = async (e) => {
     if (e) e.preventDefault();
