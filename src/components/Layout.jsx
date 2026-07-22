@@ -125,7 +125,7 @@ const Layout = ({ config, onLeave }) => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full pb-[137px] lg:pb-0 z-10">
+      <div className={`flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full lg:pb-0 z-10 ${activeMobileView === 'chat' ? 'pb-[60px]' : 'pb-[137px]'}`}>
         <main className={`w-full h-full flex-1 flex flex-col bg-transparent min-w-0 relative overflow-hidden ${activeMobileView !== 'home' ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
           <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
@@ -273,7 +273,7 @@ const Layout = ({ config, onLeave }) => {
            </div>
         </main>
         
-        <Player />
+        <Player activeMobileView={activeMobileView} />
 
         <Sidebar 
           activeTab={activeSidebarTab} 

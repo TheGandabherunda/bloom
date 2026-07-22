@@ -129,7 +129,7 @@ const Chat = () => {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 pb-[90px] lg:pb-4">
         {!chatDb || status === 'initializing' ? (
           <div className="flex flex-col gap-3">
             {[...Array(6)].map((_, i) => (
