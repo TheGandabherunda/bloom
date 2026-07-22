@@ -1,1 +1,0 @@
-Implement dynamic NIP-07 relay discovery
