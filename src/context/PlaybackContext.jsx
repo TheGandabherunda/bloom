@@ -38,8 +38,17 @@ export const PlaybackProvider = ({ children }) => {
     player.onError = (e) => {
       console.error('[CustomPlayer] Error:', e);
       setError(e.message || 'Playback failed');
-      setIsPlaying(false);
-      isPlayingRef.current = false;
+      
+      const isInteractError = e.message?.toLowerCase().includes('interact') || e.name === 'NotAllowedError';
+      if (!isInteractError) {
+        setIsPlaying(false);
+        isPlayingRef.current = false;
+      } else {
+        // It's an autoplay block. Local UI should reflect it's paused.
+        setIsPlaying(false);
+        // But do NOT set isPlayingRef.current to false. 
+        // This way, the global interaction listener knows we STILL intend to play.
+      }
     };
     player.onEnded = () => {
       if (playNextRef.current) playNextRef.current(true);
@@ -146,8 +155,14 @@ export const PlaybackProvider = ({ children }) => {
       console.error('[Playback] Load Track Error:', err);
       setError(err.message || 'Failed to load track');
       setIsLoading(false);
-      setIsPlaying(false);
-      isPlayingRef.current = false;
+      
+      const isInteractError = err.message?.toLowerCase().includes('interact') || err.name === 'NotAllowedError';
+      if (!isInteractError) {
+        setIsPlaying(false);
+        isPlayingRef.current = false;
+      } else {
+        setIsPlaying(false);
+      }
     } finally {
       if (loadingTrackId.current === currentLoadId) {
         loadingTrackId.current = null;
@@ -170,6 +185,36 @@ export const PlaybackProvider = ({ children }) => {
     peerRolesRef.current = peerRoles;
     statusRef.current = status;
   }, [currentTrack, isPlaying, isRepeat, peerRoles, status]);
+
+  // Global Interaction Listener for Autoplay Fix
+  useEffect(() => {
+    const handleGlobalInteract = async () => {
+      if (playerRef.current && isPlayingRef.current && !isPlaying) {
+        // We intend to play, but we are currently paused locally (likely blocked)
+        if (playerRef.current.audio.paused) {
+          try {
+            await playerRef.current.play();
+            // Clear the interact error once successfully started
+            if (error && (error.toLowerCase().includes('interact') || error.includes('NotAllowedError'))) {
+              setError(null);
+            }
+          } catch (e) {
+            // Still blocked or another error
+          }
+        }
+      }
+    };
+
+    window.addEventListener('click', handleGlobalInteract, { capture: true });
+    window.addEventListener('touchstart', handleGlobalInteract, { capture: true });
+    window.addEventListener('keydown', handleGlobalInteract, { capture: true });
+
+    return () => {
+      window.removeEventListener('click', handleGlobalInteract, { capture: true });
+      window.removeEventListener('touchstart', handleGlobalInteract, { capture: true });
+      window.removeEventListener('keydown', handleGlobalInteract, { capture: true });
+    };
+  }, [isPlaying, error]);
 
   const canControl = useCallback(() => {
     if (statusRef.current !== 'connected') return true;
