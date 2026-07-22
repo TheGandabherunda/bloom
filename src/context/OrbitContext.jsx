@@ -265,6 +265,9 @@ export const OrbitProvider = ({ children }) => {
                   }
                 }
                 
+                if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(value)) {
+                  stateProxy.events.emit('update', { payload: { key, value } });
+                }
                 stateProxy.put(key, value);
               } catch(e) { console.error('[Nostr] Failed to parse intent:', e); }
             } else if (dTag === `join-${roomId}` && isHost) {
