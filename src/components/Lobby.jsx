@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { pool, DEFAULT_RELAYS } from '../services/nostr';
 
 
-const Lobby = ({ onJoin, onCreateRoom }) => {
+const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
   const [rooms, setRooms] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -65,7 +65,15 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
       
       <header className="bg-black/40 backdrop-blur-xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between border-b border-white/10 shrink-0 z-40 relative gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto justify-between">
-          <h2 className="font-bold text-white tracking-wide text-2xl">Bloom</h2>
+          <h2 className="font-bold text-white tracking-wide text-2xl flex items-center gap-2">
+            Bloom
+            {displayName && (
+              <>
+                <span className="text-white/30 text-lg">•</span>
+                <span className="text-lg font-medium text-white/70">{displayName}</span>
+              </>
+            )}
+          </h2>
           <button 
             onClick={() => setShowCreate(true)}
             className="md:hidden bg-white text-black px-4 py-2 rounded-full font-bold text-sm"
@@ -114,7 +122,7 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
               {filteredRooms.map(room => (
                 <div 
                   key={room.roomId} 
-                  onClick={() => onJoin(room.roomId)}
+                  onClick={() => onJoin(room.roomId, room.pubkey)}
                   className="bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/[0.06] p-4 rounded-2xl cursor-pointer transition-all flex flex-col gap-3 group"
                 >
                   <div className="flex justify-between items-start">
@@ -166,37 +174,49 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
       </div>
 
       {showCreate && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-white/10 p-6 rounded-3xl w-full max-w-sm">
-            <h3 className="text-2xl font-bold text-white mb-6">Host a Party</h3>
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-black/90 lg:bg-black lg:backdrop-blur-none backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md transform transition-all relative">
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">Host a Party</h3>
+            <form onSubmit={handleCreateSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-white/60 mb-2">Party Name (Optional)</label>
+                <label className="block text-sm font-medium text-white/60 mb-1.5 ml-2">Party Name (Optional)</label>
                 <input
                   type="text"
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
                   placeholder="e.g., chill-vibes"
-                  className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white focus:border-white/40 outline-none"
+                  autoComplete="off"
+                  className="w-full h-[48px] bg-white/[0.06] border border-white/10 rounded-full px-6 text-lg text-white focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/20 transition-colors shadow-inner"
                 />
               </div>
               
-              <label className="flex items-center gap-3 p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-colors">
+              <label className="flex items-center gap-4 p-4 bg-white/[0.04] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/10 transition-colors mt-2">
                 <input 
                   type="checkbox" 
                   checked={isPublic} 
                   onChange={(e) => setIsPublic(e.target.checked)}
-                  className="w-5 h-5 rounded border-white/20 bg-black text-white focus:ring-0 focus:ring-offset-0"
+                  className="w-5 h-5 rounded border-white/20 bg-black text-[var(--color-primary)] focus:ring-0 focus:ring-offset-0"
                 />
                 <div>
                   <div className="text-white font-medium">Public Party</div>
-                  <div className="text-white/40 text-xs">Visible in the global lobby</div>
+                  <div className="text-white/40 text-xs mt-0.5">Visible in the global lobby</div>
                 </div>
               </label>
               
-              <div className="flex gap-3 mt-6">
-                <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-3 text-white/60 hover:text-white font-bold">Cancel</button>
-                <button type="submit" className="flex-1 bg-white text-black rounded-xl font-bold hover:bg-white/90">Create</button>
+              <div className="flex gap-3 mt-8">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCreate(false)} 
+                  className="flex-1 py-3 text-white/60 hover:text-white font-bold h-[48px] rounded-full transition-colors flex items-center justify-center"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-white hover:bg-white/90 text-black font-bold rounded-full h-[48px] transition-colors flex items-center justify-center text-lg shadow-lg"
+                >
+                  Host
+                </button>
               </div>
             </form>
           </div>

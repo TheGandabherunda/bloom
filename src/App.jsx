@@ -50,11 +50,12 @@ function App() {
     }
   };
 
-  const handleJoinLobby = (roomId) => {
+  const handleJoinLobby = (roomId, hostId) => {
     setConfig({
       roomId,
       isHost: false,
-      displayName: localStorage.getItem('bloom_name')
+      displayName: localStorage.getItem('bloom_name'),
+      hostId
     });
   };
 
@@ -80,7 +81,11 @@ function App() {
             window.location.hash = '';
           }} />
         ) : (
-          <Lobby onJoin={handleJoinLobby} onCreateRoom={handleCreateRoom} />
+          <Lobby 
+            onJoin={handleJoinLobby} 
+            onCreateRoom={handleCreateRoom} 
+            displayName={localStorage.getItem('bloom_name')} 
+          />
         )}
       </PlaybackProvider>
     </OrbitProvider>
