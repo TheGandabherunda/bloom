@@ -36,12 +36,11 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
             }
             
             const roomId = dTag[1];
-            let parsedContent = {};
-            try { parsedContent = JSON.parse(event.content); } catch(e) {}
-            
-            const activePeers = parsedContent.activePeerIds ? parsedContent.activePeerIds.length : 1;
-            const roomName = titleTag ? titleTag[1].replace('Bloom Room: ', '').replace(`Bloom Room `, '') : roomId;
+            const roomName = titleTag ? titleTag[1] : roomId;
             const hostPk = event.pubkey;
+            
+            // Count active peers directly from the 'p' tags in the event
+            const activePeers = event.tags.filter(t => t[0] === 'p').length || 1;
 
             console.log('[Lobby] Valid beacon for room:', roomId, 'Host PK:', hostPk);
             

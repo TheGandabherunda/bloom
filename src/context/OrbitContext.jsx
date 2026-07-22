@@ -285,6 +285,9 @@ export const OrbitProvider = ({ children }) => {
                  ['title', stateProxy.store['roomName'] || `Bloom Room ${roomId}`],
                  ['status', 'live'],
                  ['t', 'music'],
+                 ['streaming', relaysRef.current[0] || 'wss://nos.lol'],
+                 ['auth', 'https://moq-auth.nostrnests.com'],
+                 ['relays', ...relaysRef.current],
                  ['p', nostrPk, relaysRef.current[0] || '', ParticipantRole.HOST],
                  ...activePeerIds.filter(id => id !== nostrPk).map(id => [
                    'p', id, '', 
@@ -293,7 +296,7 @@ export const OrbitProvider = ({ children }) => {
                    ParticipantRole.SPEAKER
                  ])
                ],
-               content: JSON.stringify({ roomId, activePeerIds, hostPk: nostrPk })
+               content: ""
              };
              // Only finalize and publish if we have a real secret key
              if (nostrSk && nostrSk !== 'extension') {
