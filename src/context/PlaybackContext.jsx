@@ -212,7 +212,7 @@ export const PlaybackProvider = ({ children }) => {
 
   // Listen to OrbitDB updates
   useEffect(() => {
-    if (!stateDb || !peerId) return;
+    if (!stateDb) return;
 
     const handleUpdate = async (entry) => {
       try {
@@ -265,7 +265,7 @@ export const PlaybackProvider = ({ children }) => {
 
     stateDb.events.on('update', handleUpdate);
     return () => stateDb.events.off('update', handleUpdate);
-  }, [stateDb, peerId, loadTrack]);
+  }, [stateDb, loadTrack]);
 
   const seek = useCallback((time) => {
     if (!canControl()) return;

@@ -231,9 +231,13 @@ export const OrbitProvider = ({ children }) => {
               // Host state update
               try {
                 const data = JSON.parse(event.content);
+                console.log(`[OrbitContext] Parsed state update from relay:`, data);
+                let stateRecovered = false;
                 Object.keys(data).forEach(key => {
                   if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
+                    console.log(`[OrbitContext] Emitting update for key: ${key}`, data[key]);
                     stateProxy.store[key] = data[key];
+                    stateRecovered = true;
                     stateProxy.events.emit('update', { payload: { key, value: data[key] } });
                     
                     if (key.startsWith('peer_name_')) {
@@ -246,6 +250,20 @@ export const OrbitProvider = ({ children }) => {
                     }
                   }
                 });
+                
+                if (stateRecovered && isHostRef.current) {
+                  // We recovered state from the relay. Publish merged state to avoid partial overwrites.
+                  if (statePublishTimeout) clearTimeout(statePublishTimeout);
+                  statePublishTimeout = setTimeout(async () => {
+                    await publishSigned({
+                      kind: 30000,
+                      created_at: Math.floor(Date.now() / 1000),
+                      tags: [['d', roomId]],
+                      content: JSON.stringify(stateProxy.store)
+                    });
+                  }, 500);
+                }
+
                 if (!isHostRef.current && statusRef.current !== 'connected') {
                   setStatusWrapped('connected');
                 }
