@@ -367,7 +367,7 @@ const RecommendationsFeed = ({ track }) => {
 
   return (
     <div className="space-y-12">
-      <HomeSection title={`More like ${track.title}`} icon="stream" items={recs} onItemClick={loadTrack} addToQueue={addToQueue} />
+      <HomeSection title={`More like ${track.title}`} items={recs} onItemClick={loadTrack} addToQueue={addToQueue} />
     </div>
   );
 };
@@ -375,7 +375,7 @@ const RecommendationsFeed = ({ track }) => {
 const HomeSection = ({ title, icon, items, onItemClick, addToQueue }) => (
   <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
     <h3 className="text-xl font-bold text-white/90 mb-6 flex items-center gap-2">
-      <span className="material-symbols-rounded text-[var(--color-primary)] text-[24px]">{icon}</span>
+      {icon && <span className="material-symbols-rounded text-[var(--color-primary)] text-[24px]">{icon}</span>}
       {title}
     </h3>
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
