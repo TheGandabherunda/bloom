@@ -49,15 +49,20 @@ export const OrbitProvider = ({ children }) => {
 
   const publishSigned = async (eventTemplate) => {
     try {
+      console.log(`[Nostr] Attempting to sign and publish event kind: ${eventTemplate.kind}`, eventTemplate);
       let signedEvent;
       if (skRef.current === 'extension') {
         signedEvent = await window.nostr.signEvent(eventTemplate);
       } else {
+        if (!skRef.current) {
+          console.error('[Nostr] FATAL: skRef.current is null or undefined! Cannot sign event.');
+        }
         signedEvent = signEvent(eventTemplate, skRef.current);
       }
+      console.log(`[Nostr] Successfully signed event, publishing to pool...`, signedEvent);
       pool.publish(DEFAULT_RELAYS, signedEvent);
     } catch (e) {
-      console.warn("Failed to publish event", e);
+      console.error("[Nostr] Failed to publish event", e);
     }
   };
 
@@ -74,6 +79,7 @@ export const OrbitProvider = ({ children }) => {
     
     try {
       setStatusWrapped('initializing');
+      console.log(`[Nostr] initP2P called with: roomId=${roomId}, isHost=${isHost}, hostId=${hostId}, nostrPk=${nostrPk}, hasNostrSk=${!!nostrSk}, isPublic=${isPublic}`);
       console.log('Connecting to Nostr Relays...');
 
       roomRef.current = roomId;

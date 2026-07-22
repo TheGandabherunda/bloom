@@ -69,8 +69,8 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
             Bloom
             {displayName && (
               <>
-                <span className="text-white/30 text-lg">•</span>
-                <span className="text-lg font-medium text-white/70">{displayName}</span>
+                <span className="text-white/30">•</span>
+                <span>{displayName}</span>
               </>
             )}
           </h2>
