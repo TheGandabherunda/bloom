@@ -26,7 +26,7 @@ const GifPicker = ({ onSelect, onClose }) => {
   };
 
   return (
-    <div className="absolute bottom-[80px] left-4 right-4 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl flex flex-col z-[100] h-[350px] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+    <div className="absolute bottom-[160px] lg:bottom-[80px] left-4 right-4 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl flex flex-col z-[100] h-[350px] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
       <div className="p-3 border-b border-slate-700 bg-slate-900/50 flex gap-2 shrink-0">
         <div className="flex-1 relative">
           <span className="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">search</span>

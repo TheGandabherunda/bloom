@@ -129,7 +129,7 @@ const Chat = () => {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 pb-[90px] lg:pb-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {!chatDb || status === 'initializing' ? (
           <div className="flex flex-col gap-3">
             {[...Array(6)].map((_, i) => (
@@ -215,6 +215,9 @@ const Chat = () => {
           onClose={() => setShowGifs(false)}
         />
       )}
+
+      {/* Spacer for floating mobile player */}
+      <div className="h-[80px] lg:hidden shrink-0 pointer-events-none" />
 
       <div className="p-4 border-t border-white/[0.06] bg-black/20">
         <form onSubmit={handleSend} className="flex gap-2 items-center">
