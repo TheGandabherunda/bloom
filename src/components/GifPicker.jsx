@@ -36,7 +36,6 @@ const GifPicker = ({ onSelect, onClose }) => {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search GIFs..."
             className="w-full h-10 bg-white/[0.06] border border-white/10 rounded-full pl-10 pr-4 text-sm text-white focus:outline-none focus:border-white/40 transition-colors"
-            autoFocus
           />
         </div>
         <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 transition-colors">
