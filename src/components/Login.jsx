@@ -90,7 +90,7 @@ const Login = ({ onComplete }) => {
         <div className="text-center mb-6">
           <h1 className="hidden lg:block text-4xl font-bold text-white mb-2 tracking-tight">Bloom</h1>
           <p className="text-white/50 text-base">
-            Login or continue as guest
+            Login or Create Nostr Account
           </p>
         </div>
 
@@ -109,6 +109,22 @@ const Login = ({ onComplete }) => {
           </div>
 
           <div className="flex flex-col gap-3 mt-4">
+            
+            {hasExtension ? (
+              <button
+                type="button"
+                onClick={handleExtensionLogin}
+                disabled={isOptimizing}
+                className="w-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-bold rounded-full h-[48px] transition-colors flex items-center justify-center text-sm border border-purple-500/30"
+              >
+                Login with Nostr Extension
+              </button>
+            ) : (
+               <div className="text-center mb-2">
+                 <p className="text-white/30 text-xs">No Nostr extension detected.</p>
+               </div>
+            )}
+
             <button
               type="submit"
               disabled={isOptimizing}
@@ -120,20 +136,10 @@ const Login = ({ onComplete }) => {
                   <span className="text-sm font-bold uppercase tracking-widest">Connecting...</span>
                 </div>
               ) : (
-                'Continue as Guest'
+                'Create Nostr Account'
               )}
             </button>
             
-            {hasExtension && (
-              <button
-                type="button"
-                onClick={handleExtensionLogin}
-                disabled={isOptimizing}
-                className="w-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-bold rounded-full h-[48px] transition-colors flex items-center justify-center text-sm border border-purple-500/30"
-              >
-                Login with Nostr Extension
-              </button>
-            )}
           </div>
         </form>
       </div>
