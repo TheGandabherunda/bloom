@@ -153,12 +153,12 @@ export const OrbitProvider = ({ children }) => {
                }, 1000);
             }
           } else {
-            // Peer sends intent to host (using #p tag for reliable relay routing)
+            // Peer sends intent to host (using Replaceable event 30000 to prevent ephemeral drops and spam)
             await publishSigned({
-              kind: 20001,
+              kind: 30000,
               created_at: Math.floor(Date.now() / 1000),
-              tags: [['p', hostIdRef.current], ['r', roomId]],
-              content: JSON.stringify({ key, value })
+              tags: [['d', `intent-${roomId}`], ['p', hostIdRef.current]],
+              content: JSON.stringify({ key, value, ts: Date.now() }) // ts ensures content changes
             });
           }
         },
@@ -188,7 +188,7 @@ export const OrbitProvider = ({ children }) => {
       ];
       
       if (isHost) {
-        filters.push({ kinds: [20001, 20002], '#p': [nostrPk] }); // State intents & Join intents from peers
+        filters.push({ kinds: [30000], '#p': [nostrPk] }); // State intents & Join intents from peers
       }
 
       console.log(`[Nostr] Subscribing with filters:`, filters);
@@ -197,28 +197,54 @@ export const OrbitProvider = ({ children }) => {
         onevent(event) {
           console.log(`[Nostr] Received event id=${event.id} kind=${event.kind} from pubkey=${event.pubkey}`);
           if (event.kind === 30000) {
-            // Host state update
-            try {
-              const data = JSON.parse(event.content);
-              Object.keys(data).forEach(key => {
-                if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
-                  stateProxy.store[key] = data[key];
-                  stateProxy.events.emit('update', { payload: { key, value: data[key] } });
-                  
-                  if (key.startsWith('peer_name_')) {
-                    setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: data[key]}));
-                    setPeers(prev => [...new Set([...prev, key.replace('peer_name_', '')])]);
-                  } else if (key.startsWith('peer_role_')) {
-                    setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: data[key]}));
-                  } else if (key === 'banned' && data[key] === nostrPk) {
-                     window.location.reload();
+            const dTag = event.tags.find(t => t[0] === 'd')?.[1];
+            
+            if (dTag === roomId) {
+              // Host state update
+              try {
+                const data = JSON.parse(event.content);
+                Object.keys(data).forEach(key => {
+                  if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
+                    stateProxy.store[key] = data[key];
+                    stateProxy.events.emit('update', { payload: { key, value: data[key] } });
+                    
+                    if (key.startsWith('peer_name_')) {
+                      setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: data[key]}));
+                      setPeers(prev => [...new Set([...prev, key.replace('peer_name_', '')])]);
+                    } else if (key.startsWith('peer_role_')) {
+                      setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: data[key]}));
+                    } else if (key === 'banned' && data[key] === nostrPk) {
+                       window.location.reload();
+                    }
+                  }
+                });
+                if (!isHostRef.current && statusRef.current !== 'connected') {
+                  setStatusWrapped('connected');
+                }
+              } catch(e) { console.error(e); }
+            } else if (dTag === `intent-${roomId}` && isHost) {
+              // State mutation intent from peer
+              try {
+                console.log(`[Nostr] Parsing state mutation intent from peer:`, event.content);
+                const { key, value } = JSON.parse(event.content);
+                const senderRole = peerRolesRef.current[event.pubkey] || 'peer';
+                console.log(`[Nostr] Sender role is ${senderRole}. Requesting mutation of ${key}`);
+                
+                if (key.startsWith('peer_role_') || key === 'banned') {
+                  if (senderRole !== 'owner') {
+                    console.warn(`[Nostr] Rejected role/ban mutation from non-owner peer.`);
+                    return;
                   }
                 }
-              });
-              if (!isHostRef.current && statusRef.current !== 'connected') {
-                setStatusWrapped('connected');
-              }
-            } catch(e) { console.error(e); }
+                
+                stateProxy.put(key, value);
+              } catch(e) { console.error('[Nostr] Failed to parse intent:', e); }
+            } else if (dTag === `join-${roomId}` && isHost) {
+              // Join intent from peer
+              const newPeerName = event.content;
+              console.log(`[Nostr] Received Join Intent from pubkey=${event.pubkey} name=${newPeerName}`);
+              stateProxy.put(`peer_name_${event.pubkey}`, newPeerName);
+            }
           } else if (event.kind === 9) {
             // Chat message
             try {
@@ -229,28 +255,6 @@ export const OrbitProvider = ({ children }) => {
                 chatProxy.events.emit('update', { payload: { value: msg } });
               }
             } catch(e) { console.error(e); }
-          } else if (event.kind === 20001 && isHost) {
-            // State mutation intent from peer
-            try {
-              console.log(`[Nostr] Parsing state mutation intent from peer:`, event.content);
-              const { key, value } = JSON.parse(event.content);
-              const senderRole = peerRolesRef.current[event.pubkey] || 'peer';
-              console.log(`[Nostr] Sender role is ${senderRole}. Requesting mutation of ${key}`);
-              
-              if (key.startsWith('peer_role_') || key === 'banned') {
-                if (senderRole !== 'owner') {
-                  console.warn(`[Nostr] Rejected role/ban mutation from non-owner peer.`);
-                  return;
-                }
-              }
-              
-              stateProxy.put(key, value);
-            } catch(e) { console.error('[Nostr] Failed to parse 20001 intent:', e); }
-          } else if (event.kind === 20002 && isHost) {
-            // Join intent
-            const newPeerName = event.content;
-            console.log(`[Nostr] Received Join Intent (20002) from pubkey=${event.pubkey} name=${newPeerName}`);
-            stateProxy.put(`peer_name_${event.pubkey}`, newPeerName);
           }
         }
       });
@@ -301,11 +305,11 @@ export const OrbitProvider = ({ children }) => {
       } else {
         // Send join intent in a loop until we get connected (Host acks by setting our peer_name)
         const sendJoin = () => {
-          console.log(`[Nostr] Sending Join Intent (20002) to host PK: ${hostIdRef.current}`);
+          console.log(`[Nostr] Sending Join Intent (30000) to host PK: ${hostIdRef.current}`);
           publishSigned({
-            kind: 20002,
+            kind: 30000,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [['p', hostIdRef.current], ['r', roomId]],
+            tags: [['d', `join-${roomId}`], ['p', hostIdRef.current]],
             content: displayName
           });
         };
