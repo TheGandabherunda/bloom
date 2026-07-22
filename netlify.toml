@@ -8,44 +8,44 @@
   node_bundler = "esbuild"
 
 # Playlist fetches can be slow for large playlists — give it max time
-[functions."yt-playlist"]
+[functions."audio-playlist"]
   timeout = 26
 
 
-# Redirect /api/yt/search → function
+# Redirect /api/audio/search → function
 [[redirects]]
-  from = "/api/yt/search"
-  to = "/.netlify/functions/yt-search"
+  from = "/api/audio/search"
+  to = "/.netlify/functions/audio-search"
   status = 200
 
-# Redirect /api/yt/recommend → function
+# Redirect /api/audio/recommend → function
 [[redirects]]
-  from = "/api/yt/recommend"
-  to = "/.netlify/functions/yt-recommend"
+  from = "/api/audio/recommend"
+  to = "/.netlify/functions/audio-recommend"
   status = 200
 
-# Redirect /api/yt/stream/:id → function with id as query param
+# Redirect /api/audio/stream/:id → function with id as query param
 [[redirects]]
-  from = "/api/yt/stream/:id"
-  to = "/.netlify/functions/yt-stream?id=:id"
+  from = "/api/audio/stream/:id"
+  to = "/.netlify/functions/audio-stream?id=:id"
   status = 200
 
-# Redirect /api/yt/image → function
+# Redirect /api/audio/image → function
 [[redirects]]
   from = "api/yt/image"
-  to = "/.netlify/functions/yt-image"
+  to = "/.netlify/functions/audio-image"
   status = 200
 
-# Redirect /api/yt/playlist → function
+# Redirect /api/audio/playlist → function
 [[redirects]]
-  from = "/api/yt/playlist"
-  to = "/.netlify/functions/yt-playlist"
+  from = "/api/audio/playlist"
+  to = "/.netlify/functions/audio-playlist"
   status = 200
 
-# Redirect /api/yt/resolve → function
+# Redirect /api/audio/resolve → function
 [[redirects]]
-  from = "/api/yt/resolve"
-  to = "/.netlify/functions/yt-resolve"
+  from = "/api/audio/resolve"
+  to = "/.netlify/functions/audio-resolve"
   status = 200
 
 # Redirect /api/lyrics → function

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getLyrics } from '../services/monochromeApi';
+import { getLyrics } from '../services/musicApi';
 
 const Lyrics = React.memo(({ currentTrack, playerRef }) => {
   const [lyricsData, setLyricsData] = useState([]);

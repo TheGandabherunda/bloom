@@ -33,13 +33,13 @@ const jioSaavnHeaders = {
   'Origin': 'https://www.jiosaavn.com'
 };
 
-export function ytProxyPlugin() {
+export function audioProxyPlugin() {
   return {
     name: 'vite-plugin-yt-proxy',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         // API Route for Searching
-        if (req.url.startsWith('/api/yt/search?')) {
+        if (req.url.startsWith('/api/audio/search?')) {
           const url = new URL(req.url, `http://${req.headers.host}`);
           let query = url.searchParams.get('q');
           
@@ -96,7 +96,7 @@ export function ytProxyPlugin() {
         }
 
         // API Route for Recommendations
-        else if (req.url.startsWith('/api/yt/recommend?')) {
+        else if (req.url.startsWith('/api/audio/recommend?')) {
           const url = new URL(req.url, `http://${req.headers.host}`);
           const songId = url.searchParams.get('id');
           
@@ -152,8 +152,8 @@ export function ytProxyPlugin() {
         }
 
         // API Route for Streaming Audio
-        else if (req.url.startsWith('/api/yt/stream/')) {
-          const videoId = req.url.split('/api/yt/stream/')[1].split('?')[0];
+        else if (req.url.startsWith('/api/audio/stream/')) {
+          const videoId = req.url.split('/api/audio/stream/')[1].split('?')[0];
           
           if (!videoId) {
             res.statusCode = 400;
@@ -209,7 +209,7 @@ export function ytProxyPlugin() {
         }
 
         // API Route for Image Proxy (CORS bypass for Color Extraction)
-        else if (req.url.startsWith('/api/yt/image?')) {
+        else if (req.url.startsWith('/api/audio/image?')) {
           const url = new URL(req.url, `http://${req.headers.host}`);
           const targetUrl = url.searchParams.get('url');
           if (!targetUrl) {
@@ -234,7 +234,7 @@ export function ytProxyPlugin() {
         }
 
         // API Route for YouTube Playlist Import
-        else if (req.url.startsWith('/api/yt/playlist?')) {
+        else if (req.url.startsWith('/api/audio/playlist?')) {
           const url = new URL(req.url, `http://${req.headers.host}`);
           const playlistUrl = url.searchParams.get('url');
           

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTenorGifs } from '../services/monochromeApi';
+import { getTenorGifs } from '../services/musicApi';
 
 const GifPicker = ({ onSelect, onClose }) => {
   const [query, setQuery] = useState('');

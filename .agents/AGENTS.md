@@ -45,7 +45,7 @@ Bloom is a **decentralized P2P music player** built with:
 ### 5. Netlify Functions — Serverless Backend
 - All functions live in `netlify/functions/` and use ESM (`export const handler = async (event) => {}`).
 - API routes are defined in `netlify.toml` as redirects. When adding a new function, add its redirect to `netlify.toml`.
-- The `yt-playlist` function has a 26s timeout — do not reduce it.
+- The `audio-playlist` function has a 26s timeout — do not reduce it.
 - Never add secrets or API keys directly to function code; use Netlify environment variables.
 - Dev server: **`netlify dev`** — never suggest `npm run dev` for local development.
 
@@ -53,7 +53,7 @@ Bloom is a **decentralized P2P music player** built with:
 Every track object used in playback must have these fields:
 ```js
 {
-  id: string,          // YouTube video ID or unique ID
+  id: string,          // Unique audio ID
   title: string,
   author: string,
   thumbnail: string,   // URL to album art
@@ -61,7 +61,7 @@ Every track object used in playback must have these fields:
   downloadUrl: string  // direct audio stream URL
 }
 ```
-- `downloadUrl` is resolved by the `yt-stream` Netlify function and must be present before calling `loadTrack()`.
+- `downloadUrl` is resolved by the `audio-stream` Netlify function and must be present before calling `loadTrack()`.
 
 ### 7. Animations & Performance
 - CSS animations that run continuously (blobs, `rotate-slow`, `audio-mode::before`) must be declared with `will-change: transform` and `animation-play-state: paused` by default — only `running` when audio is active.
@@ -109,16 +109,16 @@ src/
     OrbitContext.jsx         # All P2P/OrbitDB state
   services/
     CustomAudioPlayer.js     # WebAudio pipeline class
-    monochromeApi.js         # API service layer (search, stream resolution)
+    musicApi.js         # API service layer (search, stream resolution)
   utils/                     # Utility functions
 netlify/
   functions/                 # Serverless API functions
-    yt-search.js
-    yt-stream.js
-    yt-playlist.js
-    yt-recommend.js
-    yt-resolve.js
-    yt-image.js
+    audio-search.js
+    audio-stream.js
+    audio-playlist.js
+    audio-recommend.js
+    audio-resolve.js
+    audio-image.js
     lyrics.js
 ```
 

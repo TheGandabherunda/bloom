@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { searchTracks } from '../services/monochromeApi';
+import { searchTracks } from '../services/musicApi';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import TrackCard from './TrackCard';

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import { extractPrimaryColor } from '../utils/colorExtractor';
-import { importPlaylist, searchTracks } from '../services/monochromeApi';
+import { importPlaylist, searchTracks } from '../services/musicApi';
 
 const formatTime = (seconds) => {
   if (isNaN(seconds)) return "0:00";

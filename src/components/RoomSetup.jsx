@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { findBestMirror, getApiBase, getMirrorStatus } from '../services/monochromeApi';
+import { findBestMirror, getApiBase, getMirrorStatus } from '../services/musicApi';
 
 const RoomSetup = ({ config, onComplete }) => {
   const [name, setName] = useState(localStorage.getItem('bloom_name') || '');

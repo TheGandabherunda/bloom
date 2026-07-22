@@ -148,7 +148,7 @@ export const importPlaylist = async (url) => {
     const match = url.match(/[?&]list=([^&]+)/);
     if (match && match[1]) {
       // Call the Netlify backend directly to scrape the full YouTube playlist (bypasses CORS)
-      const res = await fetch(`https://bloom-music-player.netlify.app/api/yt/playlist?url=${encodeURIComponent(url)}`);
+      const res = await fetch(`https://bloom-music-player.netlify.app/api/audio/playlist?url=${encodeURIComponent(url)}`);
       
       if (!res.ok) throw new Error('Failed to fetch YouTube playlist from backend');
       const tracks = await res.json();

@@ -4,7 +4,7 @@ import { usePlayback } from '../context/PlaybackContext';
 import Search from './Search';
 import Player from './Player';
 import Sidebar from './Sidebar';
-import { getRecommendations, getTopVideos, getMix } from '../services/monochromeApi';
+import { getRecommendations, getTopVideos, getMix } from '../services/musicApi';
 import { extractDominantColors, extractPrimaryColor } from '../utils/colorExtractor';
 import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';

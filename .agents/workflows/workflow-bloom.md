@@ -58,12 +58,12 @@ Get visualizer data via `playerRef.current.getFrequencyData()` → `Uint8Array`.
 
 ```js
 {
-  id: string,           // YouTube video ID
+  id: string,           // Unique audio ID
   title: string,
   author: string,
   thumbnail: string,    // album art URL
   duration: number,     // seconds
-  downloadUrl: string   // direct audio stream (from yt-stream function)
+  downloadUrl: string   // direct audio stream (from audio-stream function)
 }
 ```
 
@@ -91,12 +91,12 @@ Get visualizer data via `playerRef.current.getFrequencyData()` → `Uint8Array`.
 
 | Route | Function | Purpose |
 |---|---|---|
-| `/api/yt/search` | `yt-search.js` | YouTube search |
-| `/api/yt/stream/:id` | `yt-stream.js` | Resolve audio stream URL |
-| `/api/yt/playlist` | `yt-playlist.js` | Fetch playlist (26s timeout) |
-| `/api/yt/recommend` | `yt-recommend.js` | Recommendations |
-| `/api/yt/resolve` | `yt-resolve.js` | Resolve YT URL to ID |
-| `/api/yt/image` | `yt-image.js` | Image proxy |
+| `/api/audio/search` | `audio-search.js` | Audio search |
+| `/api/audio/stream/:id` | `audio-stream.js` | Resolve audio stream URL |
+| `/api/audio/playlist` | `audio-playlist.js` | Fetch playlist (26s timeout) |
+| `/api/audio/recommend` | `audio-recommend.js` | Recommendations |
+| `/api/audio/resolve` | `audio-resolve.js` | Resolve URL to ID |
+| `/api/audio/image` | `audio-image.js` | Image proxy |
 | `/api/lyrics` | `lyrics.js` | Lyrics fetch |
 
 ---

@@ -2,14 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import https from 'https'
-import { ytProxyPlugin } from './vite-plugin-yt-proxy.js'
+import { audioProxyPlugin } from './vite-plugin-audio-proxy.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: './',
   plugins: [
     react(),
-    ytProxyPlugin(),
+    audioProxyPlugin(),
     nodePolyfills({
       globals: {
         Buffer: true,
