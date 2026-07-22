@@ -13,13 +13,14 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
     // Subscribe to Beacon events (kind 31337)
     const sub = pool.subscribeMany(
       DEFAULT_RELAYS,
-      [{ kinds: [31337], limit: 50 }],
+      [{ kinds: [31337], limit: 100 }],
       {
         onevent(event) {
           try {
             const data = JSON.parse(event.content);
             const rTag = event.tags.find(t => t[0] === 'r');
             if (!rTag || !data.roomId) return;
+            console.log('[Lobby] Received beacon for:', data.roomId, data);
             
             setRooms(prev => {
               const existing = prev[data.roomId];
@@ -74,15 +75,27 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
               </>
             )}
           </h2>
-          <button 
-            onClick={() => setShowCreate(true)}
-            className="md:hidden bg-white text-black px-4 py-2 rounded-full font-bold text-sm"
-          >
-            Host
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                setRooms({});
+                // Force a re-mount of the subscription in a real app, 
+                // but for now clearing the state lets new events come in clean
+              }}
+              className="md:hidden text-white/50 hover:text-white p-2 transition-colors"
+            >
+              <span className="material-symbols-rounded">refresh</span>
+            </button>
+            <button 
+              onClick={() => setShowCreate(true)}
+              className="md:hidden bg-white text-black px-4 py-2 rounded-full font-bold text-sm"
+            >
+              Host
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 w-full max-w-xl mx-0 md:mx-8 relative group">
+        <div className="flex-1 w-full max-w-xl mx-0 md:mx-4 relative group">
           <span className="material-symbols-rounded absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-white transition-colors">search</span>
           <input
             type="text"
@@ -93,13 +106,22 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
           />
         </div>
 
-        <button 
-          onClick={() => setShowCreate(true)}
-          className="hidden md:flex bg-white hover:bg-white/90 text-black px-6 py-2.5 rounded-full font-bold transition-colors items-center gap-2"
-        >
-          <span className="material-symbols-rounded text-[20px]">music_cast</span>
-          Host Party
-        </button>
+        <div className="hidden md:flex items-center gap-3">
+          <button 
+            onClick={() => setRooms({})}
+            title="Refresh Parties"
+            className="text-white/40 hover:text-white transition-colors p-2 flex items-center justify-center rounded-full hover:bg-white/10"
+          >
+            <span className="material-symbols-rounded">refresh</span>
+          </button>
+          <button 
+            onClick={() => setShowCreate(true)}
+            className="bg-white hover:bg-white/90 text-black px-6 py-2.5 rounded-full font-bold transition-colors items-center gap-2 flex"
+          >
+            <span className="material-symbols-rounded text-[20px]">music_cast</span>
+            Host Party
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 z-10 flex flex-col">
