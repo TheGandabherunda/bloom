@@ -561,11 +561,19 @@ const Player = ({ activeMobileView }) => {
           {isLoading ? (
             <PlayerTrackSkeleton />
           ) : error ? (
-            <div className="flex items-center gap-3 text-red-400 bg-red-900/20 px-4 py-2 rounded-xl border border-red-500/20 max-w-sm animate-in fade-in">
-              <span className="material-symbols-rounded text-2xl">error</span>
+            <div 
+              className={`flex items-center gap-3 px-4 py-2 rounded-xl border max-w-sm animate-in fade-in ${error.toLowerCase().includes('interact') ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/20 border-[var(--color-primary)]/20 cursor-pointer hover:bg-[var(--color-primary)]/30' : 'text-red-400 bg-red-900/20 border-red-500/20'}`}
+              onClick={(e) => {
+                if (error.toLowerCase().includes('interact')) {
+                  e.stopPropagation();
+                  togglePlay(true);
+                }
+              }}
+            >
+              <span className="material-symbols-rounded text-2xl">{error.toLowerCase().includes('interact') ? 'play_circle' : 'error'}</span>
               <div className="min-w-0 flex-1">
-                <h4 className="text-xs font-bold uppercase tracking-widest truncate">Playback Error</h4>
-                <p className="text-[10px] opacity-80 truncate" title={error}>{error}</p>
+                <h4 className="text-xs font-bold uppercase tracking-widest truncate">{error.toLowerCase().includes('interact') ? 'Tap to Play' : 'Playback Error'}</h4>
+                <p className="text-[10px] opacity-80 truncate" title={error}>{error.toLowerCase().includes('interact') ? 'Browser blocked autoplay' : error}</p>
               </div>
             </div>
           ) : currentTrack ? (
@@ -658,10 +666,18 @@ const Player = ({ activeMobileView }) => {
           {isLoading ? (
             <PlayerTrackSkeleton />
           ) : error ? (
-            <div className="flex items-center gap-2 text-red-400 min-w-0">
-              <span className="material-symbols-rounded text-xl">error</span>
+            <div 
+              className={`flex items-center gap-2 min-w-0 ${error.toLowerCase().includes('interact') ? 'text-[var(--color-primary)] cursor-pointer' : 'text-red-400'}`}
+              onClick={(e) => {
+                if (error.toLowerCase().includes('interact')) {
+                  e.stopPropagation();
+                  togglePlay(true);
+                }
+              }}
+            >
+              <span className="material-symbols-rounded text-xl">{error.toLowerCase().includes('interact') ? 'play_circle' : 'error'}</span>
               <div className="min-w-0 flex-1">
-                <h4 className="text-[11px] font-bold uppercase truncate">Error</h4>
+                <h4 className="text-[11px] font-bold uppercase truncate">{error.toLowerCase().includes('interact') ? 'Tap to Play' : 'Error'}</h4>
               </div>
             </div>
           ) : currentTrack ? (

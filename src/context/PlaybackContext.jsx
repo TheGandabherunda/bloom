@@ -94,6 +94,11 @@ export const PlaybackProvider = ({ children }) => {
 
       console.log(`[Playback] Stream URL resolved: ${streamUrl}`);
       
+      const updatedTrack = { ...track, audioQuality: track.audioQuality || 'AUDIO' };
+      setCurrentTrack(updatedTrack);
+      setCurrentIndex(targetIndex);
+      console.log(`[Playback] setCurrentTrack to: ${updatedTrack.id}, targetIndex to: ${targetIndex}`);
+      
       // Ensure player is ready before loading
       if (!playerRef.current) throw new Error('Player not initialized');
 
@@ -104,12 +109,6 @@ export const PlaybackProvider = ({ children }) => {
         console.log(`[Playback] loadTrack superseded for trackId: ${track.id}, aborting state update.`);
         return;
       }
-      
-      const updatedTrack = { ...track, audioQuality: track.audioQuality || 'AUDIO' };
-      setCurrentTrack(updatedTrack);
-      console.log(`[Playback] setCurrentTrack to: ${updatedTrack.id}, targetIndex to: ${targetIndex}`);
-      
-      setCurrentIndex(targetIndex);
 
       // Broadcast if local change
       if (isLocal && stateDb) {
@@ -278,8 +277,15 @@ export const PlaybackProvider = ({ children }) => {
     }
   }, [stateDb, peerId]);
 
-  const togglePlay = useCallback(async () => {
-    if (!canControl()) return;
+  const togglePlay = useCallback(async (forceLocal = false) => {
+    if (!forceLocal && !canControl()) return;
+    
+    if (forceLocal && isPlayingRef.current) {
+      setError(null);
+      await playerRef.current?.play().catch(e => console.warn('Still blocked', e));
+      return;
+    }
+
     console.log(`[Playback] togglePlay called. currentTrack: ${currentTrackRef.current?.id}`);
     if (!currentTrackRef.current) {
       if (queue.length > 0) {
@@ -293,14 +299,15 @@ export const PlaybackProvider = ({ children }) => {
     const newState = !isPlayingRef.current;
     console.log(`[Playback] togglePlay: toggling to ${newState}`);
     if (newState) {
+      setError(null);
       await playerRef.current?.play();
     } else {
       playerRef.current?.pause();
     }
     setIsPlaying(newState);
     isPlayingRef.current = newState;
-    if (stateDb) stateDb.put('isPlaying', { status: newState, originator: peerId }).catch(e => console.warn('Sync Failed', e));
-  }, [stateDb, peerId, queue, loadTrack]);
+    if (canControl() && stateDb) stateDb.put('isPlaying', { status: newState, originator: peerId }).catch(e => console.warn('Sync Failed', e));
+  }, [stateDb, peerId, queue, loadTrack, canControl]);
 
   const playNext = useCallback((autoPlay = true) => {
     if (!canControl()) return;

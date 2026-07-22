@@ -264,6 +264,14 @@ export const OrbitProvider = ({ children }) => {
                     return;
                   }
                 }
+
+                const playbackKeys = ['currentTrack', 'isPlaying', 'currentTime', 'queue', 'originalQueue', 'isShuffled'];
+                if (playbackKeys.includes(key)) {
+                  if (senderRole !== 'owner' && senderRole !== 'admin') {
+                    console.warn(`[Nostr] Rejected playback mutation from non-admin peer.`);
+                    return;
+                  }
+                }
                 
                 if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(value)) {
                   stateProxy.events.emit('update', { payload: { key, value } });
