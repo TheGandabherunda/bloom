@@ -88,10 +88,7 @@ const Login = ({ onComplete }) => {
 
       <div className="bg-black/90 lg:bg-black lg:backdrop-blur-none backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md transform transition-all pointer-events-auto relative z-10">
         <div className="text-center mb-6">
-          <h1 className="hidden lg:block text-4xl font-bold text-white mb-2 tracking-tight">Bloom</h1>
-          <p className="text-white/50 text-base">
-            Login or Create Nostr Account
-          </p>
+          <h1 className="hidden lg:block text-4xl font-bold text-white tracking-tight">Bloom</h1>
         </div>
 
         <form onSubmit={handleGuestLogin} className="space-y-5">
@@ -109,8 +106,7 @@ const Login = ({ onComplete }) => {
           </div>
 
           <div className="flex flex-col gap-3 mt-4">
-            
-            {hasExtension ? (
+            {hasExtension && (
               <button
                 type="button"
                 onClick={handleExtensionLogin}
@@ -119,10 +115,6 @@ const Login = ({ onComplete }) => {
               >
                 Login with Nostr Extension
               </button>
-            ) : (
-               <div className="text-center mb-2">
-                 <p className="text-white/30 text-xs">No Nostr extension detected.</p>
-               </div>
             )}
 
             <button
@@ -136,12 +128,18 @@ const Login = ({ onComplete }) => {
                   <span className="text-sm font-bold uppercase tracking-widest">Connecting...</span>
                 </div>
               ) : (
-                'Create Nostr Account'
+                'Join Bloom'
               )}
             </button>
-            
           </div>
         </form>
+
+        <div className="mt-8 text-center border-t border-white/10 pt-6">
+          <p className="text-white/30 text-xs flex items-center justify-center gap-1.5">
+            <span className="material-symbols-rounded text-[14px]">public</span>
+            Bloom uses the decentralized Nostr network for secure, peer-to-peer connection handling.
+          </p>
+        </div>
       </div>
     </div>
   );
