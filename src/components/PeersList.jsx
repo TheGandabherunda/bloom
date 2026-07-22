@@ -27,7 +27,7 @@ const PeersList = () => {
     await stateDb.put('banned', targetId);
   };
 
-  const allPeers = [peerId, ...peers].filter(Boolean); // Include self
+  const allPeers = [...new Set([peerId, ...peers])].filter(Boolean); // Include self
   const isOwner = peerRoles[peerId] === 'owner';
   const canManage = isOwner || peerRoles[peerId] === 'admin';
 

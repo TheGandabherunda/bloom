@@ -139,7 +139,9 @@ export const OrbitProvider = ({ children }) => {
             
             // Check for names/roles directly
             if (key.startsWith('peer_name_')) {
-              setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: value}));
+              const pubkey = key.replace('peer_name_', '');
+              setPeerNames(prev => ({...prev, [pubkey]: value}));
+              setPeers(prev => [...new Set([...prev, pubkey])]);
             } else if (key.startsWith('peer_role_')) {
               setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: value}));
             }
