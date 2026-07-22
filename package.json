@@ -19,7 +19,7 @@
     "datastore-core": "^12.0.1",
     "fast-xml-parser": "^5.10.1",
     "lucide-react": "^0.263.1",
-    "nostr-tools": "^2.24.1",
+    "nostr-tools": "^2.13.0",
     "play-dl": "^1.9.7",
     "playwright": "^1.61.1",
     "react": "^18.2.0",
