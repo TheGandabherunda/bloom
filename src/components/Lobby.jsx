@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { pool, getUserRelays } from '../services/nostr';
-import { ROOM_KIND } from '../lib/const';
 
 
 const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
@@ -17,8 +16,8 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
     const initLobby = async () => {
       relays = await getUserRelays();
       console.log('[Lobby] Component mounted. Setting up beacon subscription for NIP-53 Live Activities on relays:', relays);
-      // Subscribe to NIP-53 Live Activities (kind 30312)
-      const filters = [{ kinds: [ROOM_KIND], limit: 100 }];
+      // Subscribe to NIP-53 Live Activities (kind 30311)
+      const filters = [{ kinds: [30311], limit: 100 }];
       console.log('[Lobby] Subscription filters:', filters);
   
       sub = pool.subscribeMany(
@@ -31,16 +30,17 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
             const statusTag = event.tags.find(t => t[0] === 'status');
             const titleTag = event.tags.find(t => t[0] === 'title');
             
-            if (!dTag || statusTag?.[1] !== 'live') {
+            if (!dTag || !dTag[1].startsWith('bloom-') || statusTag?.[1] !== 'live') {
               return;
             }
             
-            const roomId = dTag[1];
-            const roomName = titleTag ? titleTag[1] : roomId;
-            const hostPk = event.pubkey;
+            const roomId = dTag[1].replace('bloom-', '');
+            let parsedContent = {};
+            try { parsedContent = JSON.parse(event.content); } catch(e) {}
             
-            // Count active peers directly from the 'p' tags in the event
-            const activePeers = event.tags.filter(t => t[0] === 'p').length || 1;
+            const activePeers = parsedContent.activePeerIds ? parsedContent.activePeerIds.length : 1;
+            const roomName = titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId;
+            const hostPk = event.pubkey;
 
             console.log('[Lobby] Valid beacon for room:', roomId, 'Host PK:', hostPk);
             

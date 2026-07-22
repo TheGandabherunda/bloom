@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { pool, signEvent, hexToBytes } from '../services/nostr';
 import { finalizeEvent } from 'nostr-tools';
-import { ROOM_KIND, ROOM_PRESENCE, LIVE_CHAT, ParticipantRole } from '../lib/const';
 
 const OrbitContext = createContext(null);
 
@@ -32,7 +31,6 @@ export const OrbitProvider = ({ children }) => {
   const peerNamesRef = useRef({});
   const statusRef = useRef('disconnected');
   const roomRef = useRef(null);
-  const initializingRef = useRef(false);
   
   const skRef = useRef(null);
   const relaysRef = useRef([]);
@@ -65,7 +63,7 @@ export const OrbitProvider = ({ children }) => {
       }
       console.log(`[Nostr] Successfully signed event, publishing to pool...`, signedEvent);
       try {
-        const results = pool.publish(relaysRef.current, signedEvent);
+        const results = pool.publish(relays, signedEvent);
         if (Array.isArray(results)) {
           Promise.allSettled(results).then(() => {});
         } else if (results && typeof results.catch === 'function') {
@@ -81,7 +79,6 @@ export const OrbitProvider = ({ children }) => {
 
   const stopP2P = useCallback(async () => {
     roomRef.current = null;
-    initializingRef.current = false;
     setStateDbReady(null);
     setChatDbReady(null);
     setPeers([]);
@@ -89,8 +86,7 @@ export const OrbitProvider = ({ children }) => {
   }, []);
 
   const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, nostrPk = null, nostrSk = null, isPublic = false, relays = []) => {
-    if (initializingRef.current || statusRef.current === 'connected') return;
-    initializingRef.current = true;
+    if (statusRef.current === 'connected' || statusRef.current === 'initializing') return;
     
     try {
       setStatusWrapped('initializing');
@@ -105,8 +101,9 @@ export const OrbitProvider = ({ children }) => {
       isPublicRef.current = isPublic;
       relaysRef.current = relays;
 
-      // Debouncers for state
+      // Debouncers for state and beacon
       let statePublishTimeout = null;
+      let beaconPublishTimeout = null;
 
       const stateProxy = {
         events: new MiniEmitter(),
@@ -133,6 +130,29 @@ export const OrbitProvider = ({ children }) => {
                 content: JSON.stringify(stateProxy.store)
               });
             }, 500);
+
+            // Debounce beacon publish if public
+            if (isPublicRef.current && (key === 'currentTrack' || key.startsWith('peer_name_'))) {
+               if (beaconPublishTimeout) clearTimeout(beaconPublishTimeout);
+               beaconPublishTimeout = setTimeout(() => {
+                 const beaconEvent = {
+                   kind: 30000,
+                   created_at: Math.floor(Date.now() / 1000),
+                   tags: [['d', `lobby-${roomId}`]],
+                   content: JSON.stringify({ 
+                     roomId, 
+                     roomName: stateProxy.store['roomName'] || roomId,
+                     hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                     currentTrack: stateProxy.store['currentTrack'],
+                     activePeers: Object.keys(peerNamesRef.current).length,
+                     hostPk: hostIdRef.current
+                   })
+                 };
+                 const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
+                 const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
+                 if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
+               }, 1000);
+            }
           } else {
             // Peer sends intent to host (using Replaceable event 30000 to prevent ephemeral drops and spam)
             await publishSigned({
@@ -153,9 +173,9 @@ export const OrbitProvider = ({ children }) => {
         add: async (msg) => {
           // Both host and peers can publish chat
           await publishSigned({
-            kind: LIVE_CHAT,
+            kind: 9,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [['a', `${ROOM_KIND}:${hostIdRef.current}:${roomId}`]],
+            tags: [['h', roomId]],
             content: JSON.stringify(msg)
           });
         },
@@ -166,12 +186,11 @@ export const OrbitProvider = ({ children }) => {
       const hostPubKey = isHost ? nostrPk : hostIdRef.current;
       const filters = [
         { kinds: [30000], '#d': [roomId], authors: [hostPubKey] }, // State sync from host
-        { kinds: [ROOM_PRESENCE], '#a': [`${ROOM_KIND}:${hostPubKey}:${roomId}`] }, // Presence from peers
-        { kinds: [LIVE_CHAT], '#a': [`${ROOM_KIND}:${hostPubKey}:${roomId}`] }, // Chat
+        { kinds: [9], '#h': [roomId] }, // Chat
       ];
       
       if (isHost) {
-        filters.push({ kinds: [30000], '#p': [nostrPk] }); // State intents from peers
+        filters.push({ kinds: [30000], '#p': [nostrPk] }); // State intents & Join intents from peers
       }
 
       console.log(`[Nostr] Subscribing with filters:`, filters);
@@ -222,24 +241,13 @@ export const OrbitProvider = ({ children }) => {
                 
                 stateProxy.put(key, value);
               } catch(e) { console.error('[Nostr] Failed to parse intent:', e); }
+            } else if (dTag === `join-${roomId}` && isHost) {
+              // Join intent from peer
+              const newPeerName = event.content;
+              console.log(`[Nostr] Received Join Intent from pubkey=${event.pubkey} name=${newPeerName}`);
+              stateProxy.put(`peer_name_${event.pubkey}`, newPeerName);
             }
-          } else if (event.kind === ROOM_PRESENCE) {
-            const nameTag = event.tags.find(t => t[0] === 'name')?.[1] || "Guest";
-            // Populate our local peer cache
-            setPeerNames(prev => {
-              if (prev[event.pubkey] !== nameTag) return { ...prev, [event.pubkey]: nameTag };
-              return prev;
-            });
-            setPeers(prev => {
-              if (!prev.includes(event.pubkey)) return [...prev, event.pubkey];
-              return prev;
-            });
-            // If host sees a new peer, assign them a role in local state, which then gets published!
-            if (isHostRef.current && !peerRolesRef.current[event.pubkey] && event.pubkey !== nostrPk) {
-               stateProxy.put(`peer_role_${event.pubkey}`, ParticipantRole.SPEAKER);
-               stateProxy.put(`peer_name_${event.pubkey}`, nameTag);
-            }
-          } else if (event.kind === LIVE_CHAT) {
+          } else if (event.kind === 9) {
             // Chat message
             try {
               const msg = JSON.parse(event.content);
@@ -261,7 +269,7 @@ export const OrbitProvider = ({ children }) => {
         setPeerNames(prev => ({ ...prev, [nostrPk]: displayName }));
         setPeerRoles(prev => ({ ...prev, [nostrPk]: 'owner' }));
         
-        // Wait briefly for subscriptions to open before slamming them with the initial state
+        // Wait briefly for WebSockets to open before slamming them with the initial state
         setTimeout(() => {
           if (roomRef.current !== roomId) return;
           stateProxy.put(`peer_name_${nostrPk}`, displayName);
@@ -278,83 +286,64 @@ export const OrbitProvider = ({ children }) => {
           if (isPublicRef.current) {
              const activePeerIds = Object.keys(peerNamesRef.current);
              const beaconEvent = {
-               kind: ROOM_KIND,
+               kind: 30311,
                created_at: Math.floor(Date.now() / 1000),
                tags: [
-                 ['d', roomId],
-                 ['title', stateProxy.store['roomName'] || `Bloom Room ${roomId}`],
+                 ['d', `bloom-${roomId}`],
+                 ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
                  ['status', 'live'],
                  ['t', 'music'],
-                 ['streaming', relaysRef.current[0] || 'wss://nos.lol'],
-                 ['auth', 'https://moq-auth.nostrnests.com'],
-                 ['relays', ...relaysRef.current],
-                 ['p', nostrPk, relaysRef.current[0] || '', ParticipantRole.HOST],
-                 ...activePeerIds.filter(id => id !== nostrPk).map(id => [
-                   'p', id, '', 
-                   peerRolesRef.current[id] === 'owner' ? ParticipantRole.HOST : 
-                   peerRolesRef.current[id] === 'admin' ? ParticipantRole.ADMIN : 
-                   ParticipantRole.SPEAKER
-                 ])
+                 ['p', nostrPk, 'host']
                ],
-               content: ""
+               content: JSON.stringify({ roomId, activePeerIds, hostPk: nostrPk })
              };
-             // Only finalize and publish if we have a real secret key
-             if (nostrSk && nostrSk !== 'extension') {
-               const signedBeacon = finalizeEvent(beaconEvent, nostrSk);
-               const pubResults = pool.publish(relays, signedBeacon);
-               console.log(`[Nostr] Heartbeat beacon (NIP-53 kind: 30312) published.`);
-               if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
-             } else {
-               // Extension users need to manually sign the beacon which is annoying for an interval.
-               // We could prompt signEvent, but it blocks. Let's skip automatic beacon for extension users for now,
-               // or handle it upstream.
-               publishSigned(beaconEvent);
-             }
+             const signedBeacon = finalizeEvent(beaconEvent, nostrSk);
+             const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
+             console.log(`[Nostr] Heartbeat beacon (NIP-53) published to pool.`);
+             if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
           }
         }, 30000);
-      }
 
-      // Publish NIP-53 Room Presence (kind 10312) heartbeat for ALL peers
-      const publishPresence = () => {
-        console.log(`[Nostr] Publishing Presence (10312) for room: ${roomId}`);
-        publishSigned({
-          kind: ROOM_PRESENCE,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['a', `${ROOM_KIND}:${hostIdRef.current}:${roomId}`],
-            ['hand', '0'],
-            ['publishing', '0'],
-            ['muted', '0'],
-            ['onstage', '1'],
-            ['name', displayName]
-          ],
-          content: ""
-        });
-      };
+      } else {
+        // Send join intent in a loop until we get connected (Host acks by setting our peer_name)
+        const sendJoin = () => {
+          console.log(`[Nostr] Sending Join Intent (30000) to host PK: ${hostIdRef.current}`);
+          publishSigned({
+            kind: 30000,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [['d', `join-${roomId}`], ['p', hostIdRef.current]],
+            content: displayName
+          });
+        };
 
-      publishPresence(); // Try immediately
-      
-      const presenceInterval = setInterval(() => {
-         if (roomRef.current !== roomId) {
-           clearInterval(presenceInterval);
-           return;
-         }
-         publishPresence();
-      }, 120000); // 2 minutes heartbeat
-      
-      if (!isHost) {
-        // As a guest, once we publish presence, we assume we are connected
-        setTimeout(() => { 
-          if (statusRef.current !== 'connected' && roomRef.current === roomId) {
-            setStatusWrapped('connected'); 
+        sendJoin(); // Try immediately
+        
+        const joinInterval = setInterval(() => {
+          if (roomRef.current !== roomId) {
+            clearInterval(joinInterval);
+            return;
           }
-        }, 2000);
+          if (statusRef.current === 'initializing') {
+            console.log(`[Nostr] Re-sending join intent... (Retry #, Still initializing)`);
+            sendJoin();
+          } else {
+            console.log(`[Nostr] Peer connected or failed! Stopping join intent loop.`);
+            clearInterval(joinInterval);
+          }
+        }, 8000);
+        
+        // Fallback timeout
+        setTimeout(() => {
+          clearInterval(joinInterval);
+          if (statusRef.current === 'initializing') {
+            setStatusWrapped('failed');
+          }
+        }, 30000);
       }
 
     } catch (err) {
       console.error('Nostr Init Error:', err);
       setStatusWrapped('failed');
-      initializingRef.current = false;
     }
   }, []);
 
