@@ -60,7 +60,13 @@ export const OrbitProvider = ({ children }) => {
         signedEvent = signEvent(eventTemplate, skRef.current);
       }
       console.log(`[Nostr] Successfully signed event, publishing to pool...`, signedEvent);
-      pool.publish(DEFAULT_RELAYS, signedEvent);
+      try {
+        const pubPromise = pool.publish(DEFAULT_RELAYS, signedEvent);
+        if (pubPromise instanceof Promise) pubPromise.catch(e => console.log('[Nostr] Publish notice:', e.message));
+        else if (Array.isArray(pubPromise)) pubPromise.forEach(p => p instanceof Promise && p.catch(e => {}));
+      } catch (err) {
+        console.warn('[Nostr] pool.publish error:', err);
+      }
     } catch (e) {
       console.error("[Nostr] Failed to publish event", e);
     }

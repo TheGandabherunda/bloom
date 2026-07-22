@@ -70,7 +70,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
             {displayName && (
               <>
                 <span className="text-white/30">•</span>
-                <span>{displayName}</span>
+                <span className="font-medium text-white/70">{displayName}</span>
               </>
             )}
           </h2>

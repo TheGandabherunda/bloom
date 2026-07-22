@@ -165,7 +165,8 @@ const Layout = ({ config, onLeave }) => {
                       const [hashPath, hashQuery] = url.hash.substring(1).split('?');
                       const params = new URLSearchParams(hashQuery || '');
                       params.set('r', rString);
-                      inviteLink = `${url.origin}${url.pathname}#${hashPath}?${params.toString()}`;
+                      params.set('host', config.hostId || peerId);
+                      inviteLink = `${url.origin}${url.pathname}#${hashPath || config.roomId}?${params.toString()}`;
                     }
                   } catch (e) {}
                   navigator.clipboard.writeText(inviteLink).catch(() => {});
