@@ -63,9 +63,12 @@ export const OrbitProvider = ({ children }) => {
       }
       console.log(`[Nostr] Successfully signed event, publishing to pool...`, signedEvent);
       try {
-        const pubPromise = pool.publish(DEFAULT_RELAYS, signedEvent);
-        if (pubPromise instanceof Promise) pubPromise.catch(e => console.log('[Nostr] Publish notice:', e.message));
-        else if (Array.isArray(pubPromise)) pubPromise.forEach(p => p instanceof Promise && p.catch(e => {}));
+        const results = pool.publish(DEFAULT_RELAYS, signedEvent);
+        if (Array.isArray(results)) {
+          Promise.allSettled(results).then(() => {});
+        } else if (results && typeof results.catch === 'function') {
+          results.catch(() => {});
+        }
       } catch (err) {
         console.warn('[Nostr] pool.publish error:', err);
       }
@@ -97,12 +100,16 @@ export const OrbitProvider = ({ children }) => {
       isHostRef.current = isHost;
       isPublicRef.current = isPublic;
 
+      // Debouncers for state and beacon
+      let statePublishTimeout = null;
+      let beaconPublishTimeout = null;
+
       const stateProxy = {
         events: new MiniEmitter(),
         store: {},
         put: async (key, value) => {
           if (isHostRef.current) {
-            // Host updates local state and publishes
+            // Host updates local state
             stateProxy.store[key] = value;
             
             // Check for names/roles directly
@@ -112,32 +119,38 @@ export const OrbitProvider = ({ children }) => {
               setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: value}));
             }
             
-            // Publish full state
-            await publishSigned({
-              kind: 30000,
-              created_at: Math.floor(Date.now() / 1000),
-              tags: [['d', roomId]],
-              content: JSON.stringify(stateProxy.store)
-            });
+            // Debounce state publish
+            if (statePublishTimeout) clearTimeout(statePublishTimeout);
+            statePublishTimeout = setTimeout(async () => {
+              await publishSigned({
+                kind: 30000,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [['d', roomId]],
+                content: JSON.stringify(stateProxy.store)
+              });
+            }, 500);
 
-            // Update beacon if public
+            // Debounce beacon publish if public
             if (isPublicRef.current && (key === 'currentTrack' || key.startsWith('peer_name_'))) {
-               // Use standard kind 30000 signed by Directory SK for global lobby discovery
-               const beaconEvent = {
-                 kind: 30000,
-                 created_at: Math.floor(Date.now() / 1000),
-                 tags: [['d', `lobby-${roomId}`]],
-                 content: JSON.stringify({ 
-                   roomId, 
-                   roomName: stateProxy.store['roomName'] || roomId,
-                   hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
-                   currentTrack: stateProxy.store['currentTrack'],
-                   activePeers: Object.keys(peerNamesRef.current).length,
-                   hostPk: hostIdRef.current
-                 })
-               };
-               const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
-               pool.publish(DEFAULT_RELAYS, signedBeacon);
+               if (beaconPublishTimeout) clearTimeout(beaconPublishTimeout);
+               beaconPublishTimeout = setTimeout(() => {
+                 const beaconEvent = {
+                   kind: 30000,
+                   created_at: Math.floor(Date.now() / 1000),
+                   tags: [['d', `lobby-${roomId}`]],
+                   content: JSON.stringify({ 
+                     roomId, 
+                     roomName: stateProxy.store['roomName'] || roomId,
+                     hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                     currentTrack: stateProxy.store['currentTrack'],
+                     activePeers: Object.keys(peerNamesRef.current).length,
+                     hostPk: hostIdRef.current
+                   })
+                 };
+                 const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
+                 const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
+                 if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
+               }, 1000);
             }
           } else {
             // Peer sends intent to host (using #p tag for reliable relay routing)
@@ -249,7 +262,7 @@ export const OrbitProvider = ({ children }) => {
           setStatusWrapped('connected');
         }, 1500);
 
-        // Heartbeat beacon every 15s to ensure Lobby visibility even if connection dropped
+        // Heartbeat beacon every 30s to ensure Lobby visibility without spamming
         const beaconInterval = setInterval(() => {
           if (roomRef.current !== roomId) {
             clearInterval(beaconInterval);
@@ -270,9 +283,10 @@ export const OrbitProvider = ({ children }) => {
                })
              };
              const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
-             pool.publish(DEFAULT_RELAYS, signedBeacon);
+             const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
+             if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
           }
-        }, 15000);
+        }, 30000);
 
       } else {
         // Send join intent in a loop until we get connected (Host acks by setting our peer_name)
@@ -298,7 +312,7 @@ export const OrbitProvider = ({ children }) => {
           } else {
             clearInterval(joinInterval);
           }
-        }, 2000);
+        }, 8000);
         
         // Fallback timeout
         setTimeout(() => {
