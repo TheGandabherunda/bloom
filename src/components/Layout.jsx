@@ -9,8 +9,8 @@ import { extractDominantColors, extractPrimaryColor } from '../utils/colorExtrac
 import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
-const Layout = ({ config }) => {
-  const { initP2P, status, peerId, getConnectedRelays } = useOrbit();
+const Layout = ({ config, onLeave }) => {
+  const { initP2P, stopP2P, status, peerId, getConnectedRelays } = useOrbit();
   const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
   const [showSearch, setShowSearch] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,7 +18,7 @@ const Layout = ({ config }) => {
   const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
 
   useEffect(() => {
-    initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk);
+    initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk, config.isPublic);
   }, [config, initP2P]);
 
   useEffect(() => {
@@ -49,10 +49,10 @@ const Layout = ({ config }) => {
         extractDominantColors(currentTrack.thumbnail)
           .then(colors => {
             if (colors && colors.rawRgbStrings && colors.rawRgbStrings.length >= 4) {
-              root.style.setProperty('--color-1', `rgb(${colors.rawRgbStrings[0].split(' ').join(', ')})`);
-              root.style.setProperty('--color-2', `rgb(${colors.rawRgbStrings[1].split(' ').join(', ')})`);
-              root.style.setProperty('--color-3', `rgb(${colors.rawRgbStrings[2].split(' ').join(', ')})`);
-              root.style.setProperty('--color-4', `rgb(${colors.rawRgbStrings[3].split(' ').join(', ')})`);
+               root.style.setProperty('--color-1', `rgb(${colors.rawRgbStrings[0].split(' ').join(', ')})`);
+               root.style.setProperty('--color-2', `rgb(${colors.rawRgbStrings[1].split(' ').join(', ')})`);
+               root.style.setProperty('--color-3', `rgb(${colors.rawRgbStrings[2].split(' ').join(', ')})`);
+               root.style.setProperty('--color-4', `rgb(${colors.rawRgbStrings[3].split(' ').join(', ')})`);
             }
           })
           .catch(e => console.error('Dominant color extraction failed:', e));
@@ -77,6 +77,28 @@ const Layout = ({ config }) => {
     }
   }, [currentTrack]);
 
+
+  const [roomName, setRoomName] = useState(config.roomId);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const { stateDb } = useOrbit();
+
+  useEffect(() => {
+    if (!stateDb) return;
+    const handleUpdate = (e) => {
+      if (e.payload.key === 'roomName') setRoomName(e.payload.value);
+    };
+    stateDb.events.on('update', handleUpdate);
+    stateDb.get('roomName').then(val => { if (val) setRoomName(val); });
+    return () => stateDb.events.off('update', handleUpdate);
+  }, [stateDb]);
+
+  const handleNameSave = (e) => {
+    e.preventDefault();
+    setIsEditingName(false);
+    if (stateDb && config.isHost) {
+      stateDb.put('roomName', roomName);
+    }
+  };
 
   return (
     <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
@@ -109,7 +131,28 @@ const Layout = ({ config }) => {
             <div className="flex items-center gap-3">
               <h2 className="font-bold text-white tracking-wide text-lg lg:text-xl">Bloom</h2>
               <span className="text-white/30 font-bold">•</span>
-              <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl">{config.roomId}</span>
+              
+              {isEditingName && config.isHost ? (
+                <form onSubmit={handleNameSave} className="flex items-center">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={roomName}
+                    onChange={(e) => setRoomName(e.target.value)}
+                    onBlur={handleNameSave}
+                    className="bg-white/10 border border-white/20 rounded-md px-2 py-1 text-white text-sm focus:outline-none w-32 lg:w-48"
+                  />
+                </form>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                  <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl truncate max-w-[120px] lg:max-w-[200px]">{roomName}</span>
+                  {config.isHost && (
+                    <button onClick={() => setIsEditingName(true)} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-white transition-opacity">
+                      <span className="material-symbols-rounded text-[18px]">edit</span>
+                    </button>
+                  )}
+                </div>
+              )}
               <button
                 title="Copy invite link"
                 onClick={() => {
@@ -127,9 +170,19 @@ const Layout = ({ config }) => {
                   } catch (e) {}
                   navigator.clipboard.writeText(inviteLink).catch(() => {});
                 }}
-                className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center"
+                className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center ml-2"
               >
                 <span className="material-symbols-rounded text-[26px] leading-none">link</span>
+              </button>
+              <button
+                title={config.isHost ? "End Broadcast" : "Leave Room"}
+                onClick={() => {
+                   stopP2P();
+                   if (onLeave) onLeave();
+                }}
+                className="text-white/30 hover:text-red-500 transition-colors flex items-center justify-center ml-2"
+              >
+                <span className="material-symbols-rounded text-[26px] leading-none">logout</span>
               </button>
             </div>
 

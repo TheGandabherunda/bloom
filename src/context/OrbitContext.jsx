@@ -112,12 +112,13 @@ export const OrbitProvider = ({ children }) => {
                  kind: 31337,
                  created_at: Math.floor(Date.now() / 1000),
                  tags: [['r', roomId]],
-                 content: JSON.stringify({ 
-                   roomId, 
-                   hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
-                   currentTrack: stateProxy.store['currentTrack'],
-                   activePeers: Object.keys(peerNamesRef.current).length
-                 })
+                   content: JSON.stringify({ 
+                     roomId, 
+                     roomName: stateProxy.store['roomName'] || roomId,
+                     hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                     currentTrack: stateProxy.store['currentTrack'],
+                     activePeers: Object.keys(peerNamesRef.current).length
+                   })
                });
             }
           } else {

@@ -74,7 +74,11 @@ function App() {
         {!isLoggedIn ? (
           <Login onComplete={handleLogin} />
         ) : config ? (
-          <Layout config={config} />
+          <Layout config={config} onLeave={() => {
+            sessionStorage.removeItem(`bloom_host_${config.roomId}`);
+            setConfig(null);
+            window.location.hash = '';
+          }} />
         ) : (
           <Lobby onJoin={handleJoinLobby} onCreateRoom={handleCreateRoom} />
         )}
