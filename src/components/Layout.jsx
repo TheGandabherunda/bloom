@@ -10,7 +10,7 @@ import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config, onLeave }) => {
-  const { initP2P, stopP2P, status, peerId, getConnectedRelays } = useOrbit();
+  const { initP2P, stopP2P, status, peerId, getConnectedRelays, deleteRoom } = useOrbit();
   const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
   const [showSearch, setShowSearch] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -178,9 +178,12 @@ const Layout = ({ config, onLeave }) => {
               </button>
               <button
                 title={config.isHost ? "End Party" : "Leave Party"}
-                onClick={() => {
-                   stopP2P();
-                   if (onLeave) onLeave();
+                onClick={async () => {
+                  if (config.isHost) {
+                    await deleteRoom();
+                  }
+                  stopP2P();
+                  if (onLeave) onLeave();
                 }}
                 className="text-white/30 hover:text-red-500 transition-colors flex items-center justify-center ml-2"
               >

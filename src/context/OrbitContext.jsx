@@ -77,6 +77,30 @@ export const OrbitProvider = ({ children }) => {
     }
   };
 
+  const deleteRoom = useCallback(async () => {
+    if (isHostRef.current && roomRef.current && skRef.current) {
+      console.log(`[Nostr] Deleting room ${roomRef.current} from network...`);
+      const beaconEvent = {
+        kind: 30311,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['d', `bloom-${roomRef.current}`],
+          ['status', 'ended'],
+          ['p', peerId, 'host']
+        ],
+        content: JSON.stringify({ roomId: roomRef.current, activePeerIds: [], hostPk: peerId })
+      };
+      try {
+        const signedBeacon = finalizeEvent(beaconEvent, skRef.current);
+        const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
+        await Promise.allSettled(pubResults);
+        console.log(`[Nostr] Room marked as ended on relays.`);
+      } catch (err) {
+        console.error('[Nostr] Error deleting room:', err);
+      }
+    }
+  }, [peerId]);
+
   const stopP2P = useCallback(async () => {
     roomRef.current = null;
     setStateDbReady(null);
@@ -351,8 +375,8 @@ export const OrbitProvider = ({ children }) => {
 
   const contextValue = React.useMemo(() => ({
     helia: null, orbitdb: null, stateDb: stateDbReady, chatDb: chatDbReady, 
-    status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays
-  }), [stateDbReady, chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays]);
+    status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays, deleteRoom
+  }), [stateDbReady, chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays, deleteRoom]);
 
   return (
     <OrbitContext.Provider value={contextValue}>

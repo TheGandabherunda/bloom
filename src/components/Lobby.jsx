@@ -42,6 +42,10 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
             const roomName = titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId;
             const hostPk = event.pubkey;
 
+            if (hostPk === '562ac17154841cf9e58ce2d2ca5419f2a515103d63e65cf2f33476fb166aecba') {
+              return;
+            }
+
             console.log('[Lobby] Valid beacon for room:', roomId, 'Host PK:', hostPk);
             
             setRooms(prev => {
