@@ -136,12 +136,12 @@ const Login = ({ onComplete }) => {
       </div>
 
       <div className="absolute bottom-4 left-0 right-0 text-center z-10 pointer-events-none px-4 hidden lg:block">
-        <p className="text-white/30 text-[11px] uppercase tracking-widest">
+        <p className="text-white/30 text-xs">
           Bloom uses the decentralized Nostr network for secure, peer-to-peer connection handling.
         </p>
       </div>
       <div className="lg:hidden w-full text-center mt-6 z-10 pointer-events-none px-4">
-        <p className="text-white/30 text-[10px] uppercase tracking-widest">
+        <p className="text-white/30 text-xs">
           Bloom uses the decentralized Nostr network for secure, peer-to-peer connection handling.
         </p>
       </div>
