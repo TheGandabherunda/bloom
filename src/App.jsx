@@ -2,56 +2,81 @@ import React, { useState, useEffect } from 'react';
 import { OrbitProvider } from './context/OrbitContext';
 import { PlaybackProvider } from './context/PlaybackContext';
 import Layout from './components/Layout';
-import RoomSetup from './components/RoomSetup';
+import Login from './components/Login';
+import Lobby from './components/Lobby';
 
 function App() {
-  const [setupComplete, setSetupComplete] = useState(false);
-  const [config, setConfig] = useState({ roomId: '', displayName: '', isHost: false, hostId: null });
+  const [config, setConfig] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('bloom_name'));
+  const [hasInvite, setHasInvite] = useState(false);
+  const [inviteRoomId, setInviteRoomId] = useState(null);
 
   useEffect(() => {
+    // Parse URL hash for invites
     const hashPart = window.location.hash.substring(1);
     if (hashPart) {
       const [roomId, query] = hashPart.split('?');
-      const params = new URLSearchParams(query || '');
-      const hostId = params.get('host');
-      const relaysParam = params.get('r');
-      let customRelays = null;
-      if (relaysParam) {
-        customRelays = relaysParam.split(',').map(r => 'wss://' + r);
-      }
-      
-      if (hostId) {
-        const isActuallyHost = sessionStorage.getItem(`bloom_host_${roomId}`) === 'true';
-        if (isActuallyHost) {
-          // Reclaim host status
-          window.history.replaceState(null, '', `#${roomId}`);
-          setConfig(prev => ({ ...prev, roomId, isHost: true }));
-        } else {
-          setConfig(prev => ({ ...prev, roomId, hostId, customRelays, isHost: false }));
+      if (roomId) {
+        setHasInvite(true);
+        setInviteRoomId(roomId);
+        
+        // If already logged in and have an invite, go straight to the room
+        if (isLoggedIn) {
+          const params = new URLSearchParams(query || '');
+          const hostId = params.get('host');
+          
+          setConfig({
+            roomId,
+            isHost: sessionStorage.getItem(`bloom_host_${roomId}`) === 'true',
+            displayName: localStorage.getItem('bloom_name'),
+            nostrPk: localStorage.getItem('bloom_nip07') ? null : null, // The real keys are handled inside Layout/Context now or passed via Login
+            hostId
+          });
         }
-      } else {
-        // Invalid join attempt (missing host ID). Clear the hash and treat as a new host.
-        window.history.replaceState(null, '', window.location.pathname);
-        setConfig(prev => ({ ...prev, isHost: true }));
       }
-    } else {
-      setConfig(prev => ({ ...prev, isHost: true }));
     }
-  }, []);
+  }, [isLoggedIn]);
 
-  const handleSetup = (newConfig) => {
-    setConfig(newConfig);
-    setSetupComplete(true);
-    // Let Layout.jsx handle updating the hash once the peerId is known
+  const handleLogin = (loginData) => {
+    setIsLoggedIn(true);
+    if (hasInvite && inviteRoomId) {
+      setConfig({
+        roomId: inviteRoomId,
+        isHost: false,
+        displayName: loginData.displayName,
+        nostrPk: loginData.nostrPk,
+        nostrSk: loginData.nostrSk
+      });
+    }
+  };
+
+  const handleJoinLobby = (roomId) => {
+    setConfig({
+      roomId,
+      isHost: false,
+      displayName: localStorage.getItem('bloom_name')
+    });
+  };
+
+  const handleCreateRoom = (roomId, isPublic) => {
+    sessionStorage.setItem(`bloom_host_${roomId}`, 'true');
+    setConfig({
+      roomId,
+      isHost: true,
+      isPublic,
+      displayName: localStorage.getItem('bloom_name')
+    });
   };
 
   return (
     <OrbitProvider>
       <PlaybackProvider>
-        {!setupComplete ? (
-          <RoomSetup config={config} onComplete={handleSetup} />
-        ) : (
+        {!isLoggedIn ? (
+          <Login onComplete={handleLogin} />
+        ) : config ? (
           <Layout config={config} />
+        ) : (
+          <Lobby onJoin={handleJoinLobby} onCreateRoom={handleCreateRoom} />
         )}
       </PlaybackProvider>
     </OrbitProvider>
