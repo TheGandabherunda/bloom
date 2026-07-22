@@ -191,8 +191,11 @@ export const OrbitProvider = ({ children }) => {
         filters.push({ kinds: [20001, 20002], '#p': [nostrPk] }); // State intents & Join intents from peers
       }
 
+      console.log(`[Nostr] Subscribing with filters:`, filters);
+
       pool.subscribeMany(DEFAULT_RELAYS, filters, {
         onevent(event) {
+          console.log(`[Nostr] Received event id=${event.id} kind=${event.kind} from pubkey=${event.pubkey}`);
           if (event.kind === 30000) {
             // Host state update
             try {
@@ -229,18 +232,24 @@ export const OrbitProvider = ({ children }) => {
           } else if (event.kind === 20001 && isHost) {
             // State mutation intent from peer
             try {
+              console.log(`[Nostr] Parsing state mutation intent from peer:`, event.content);
               const { key, value } = JSON.parse(event.content);
               const senderRole = peerRolesRef.current[event.pubkey] || 'peer';
+              console.log(`[Nostr] Sender role is ${senderRole}. Requesting mutation of ${key}`);
               
               if (key.startsWith('peer_role_') || key === 'banned') {
-                if (senderRole !== 'owner') return; // Only owner can promote/ban
+                if (senderRole !== 'owner') {
+                  console.warn(`[Nostr] Rejected role/ban mutation from non-owner peer.`);
+                  return;
+                }
               }
               
               stateProxy.put(key, value);
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error('[Nostr] Failed to parse 20001 intent:', e); }
           } else if (event.kind === 20002 && isHost) {
             // Join intent
             const newPeerName = event.content;
+            console.log(`[Nostr] Received Join Intent (20002) from pubkey=${event.pubkey} name=${newPeerName}`);
             stateProxy.put(`peer_name_${event.pubkey}`, newPeerName);
           }
         }
@@ -284,6 +293,7 @@ export const OrbitProvider = ({ children }) => {
              };
              const signedBeacon = finalizeEvent(beaconEvent, DIRECTORY_SK);
              const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
+             console.log(`[Nostr] Heartbeat beacon published to pool.`);
              if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
           }
         }, 30000);
@@ -291,6 +301,7 @@ export const OrbitProvider = ({ children }) => {
       } else {
         // Send join intent in a loop until we get connected (Host acks by setting our peer_name)
         const sendJoin = () => {
+          console.log(`[Nostr] Sending Join Intent (20002) to host PK: ${hostIdRef.current}`);
           publishSigned({
             kind: 20002,
             created_at: Math.floor(Date.now() / 1000),
@@ -307,9 +318,10 @@ export const OrbitProvider = ({ children }) => {
             return;
           }
           if (statusRef.current === 'initializing') {
-            console.log('[Nostr] Re-sending join intent...');
+            console.log(`[Nostr] Re-sending join intent... (Retry #, Still initializing)`);
             sendJoin();
           } else {
+            console.log(`[Nostr] Peer connected or failed! Stopping join intent loop.`);
             clearInterval(joinInterval);
           }
         }, 8000);

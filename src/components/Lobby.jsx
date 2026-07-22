@@ -11,23 +11,38 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
   const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
+    console.log('[Lobby] Component mounted. Setting up beacon subscription with App Directory PK:', DIRECTORY_PK);
     // Subscribe to Beacon events (kind 30000 signed by App Directory)
+    const filters = [{ kinds: [30000], authors: [DIRECTORY_PK], limit: 100 }];
+    console.log('[Lobby] Subscription filters:', filters);
+
     const sub = pool.subscribeMany(
       DEFAULT_RELAYS,
-      [{ kinds: [30000], authors: [DIRECTORY_PK], limit: 100 }],
+      filters,
       {
         onevent(event) {
           try {
+            console.log(`[Lobby] Received raw event id=${event.id} kind=${event.kind} pubkey=${event.pubkey}`);
             const data = JSON.parse(event.content);
             const dTag = event.tags.find(t => t[0] === 'd');
-            if (!dTag || !dTag[1].startsWith('lobby-') || !data.roomId) return;
-            console.log('[Lobby] Received beacon for:', data.roomId, data);
+            console.log(`[Lobby] Parsed event content for dTag=${dTag ? dTag[1] : 'NONE'}, data=`, data);
+            
+            if (!dTag || !dTag[1].startsWith('lobby-') || !data.roomId) {
+              console.warn(`[Lobby] Ignored event id=${event.id} because it lacks valid lobby dTag or roomId.`);
+              return;
+            }
+            
+            console.log('[Lobby] Valid beacon for room:', data.roomId, 'Host PK:', data.hostPk);
             
             setRooms(prev => {
               const existing = prev[data.roomId];
               // Only update if newer
-              if (existing && existing.timestamp > event.created_at) return prev;
+              if (existing && existing.timestamp > event.created_at) {
+                console.log(`[Lobby] Ignored older beacon for ${data.roomId}`);
+                return prev;
+              }
               
+              console.log(`[Lobby] Updating state with new beacon for ${data.roomId}. Active Peers:`, data.activePeers);
               return {
                 ...prev,
                 [data.roomId]: {
@@ -37,12 +52,15 @@ const Lobby = ({ onJoin, onCreateRoom, displayName }) => {
                 }
               };
             });
-          } catch (e) { console.error(e); }
+          } catch (e) { console.error('[Lobby] Failed to parse beacon event:', e); }
         }
       }
     );
 
-    return () => sub.close();
+    return () => {
+      console.log('[Lobby] Component unmounting, closing subscription.');
+      sub.close();
+    };
   }, []);
 
   const handleCreateSubmit = (e) => {
