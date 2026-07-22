@@ -70,7 +70,7 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
             onClick={() => setShowCreate(true)}
             className="md:hidden bg-white text-black px-4 py-2 rounded-full font-bold text-sm"
           >
-            Broadcast
+            Host
           </button>
         </div>
 
@@ -80,7 +80,7 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search active rooms..."
+            placeholder="Search active parties..."
             className="w-full h-11 bg-white/[0.06] border border-white/10 rounded-full pl-12 pr-4 text-white focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/40 transition-all shadow-inner"
           />
         </div>
@@ -89,8 +89,8 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
           onClick={() => setShowCreate(true)}
           className="hidden md:flex bg-white hover:bg-white/90 text-black px-6 py-2.5 rounded-full font-bold transition-colors items-center gap-2"
         >
-          <span className="material-symbols-rounded text-[20px]">podcast</span>
-          Start Broadcasting
+          <span className="material-symbols-rounded text-[20px]">music_cast</span>
+          Host Party
         </button>
       </header>
 
@@ -99,14 +99,14 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
           
           {filteredRooms.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-white/30 pb-20">
-              <span className="material-symbols-rounded text-6xl mb-4 opacity-50">satellite_alt</span>
-              <p className="text-lg">No active public rooms found.</p>
+              <span className="material-symbols-rounded text-6xl mb-4 opacity-50">music_off</span>
+              <p className="text-lg">No active public parties found.</p>
               <button 
                 onClick={() => setShowCreate(true)}
                 className="mt-6 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-full font-bold transition-colors items-center gap-2 flex"
               >
-                <span className="material-symbols-rounded text-[20px]">podcast</span>
-                Start Broadcasting
+                <span className="material-symbols-rounded text-[20px]">music_cast</span>
+                Host Party
               </button>
             </div>
           ) : (
@@ -162,16 +162,16 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
       </div>
 
       <div className="fixed bottom-4 left-4 z-40">
-        <p className="text-white/30 text-xs font-medium">Total live rooms: {filteredRooms.length}</p>
+        <p className="text-white/30 text-xs font-medium">Total live parties: {filteredRooms.length}</p>
       </div>
 
       {showCreate && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-white/10 p-6 rounded-3xl w-full max-w-sm">
-            <h3 className="text-2xl font-bold text-white mb-6">Create Room</h3>
+            <h3 className="text-2xl font-bold text-white mb-6">Host a Party</h3>
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-white/60 mb-2">Room Name (Optional)</label>
+                <label className="block text-sm font-medium text-white/60 mb-2">Party Name (Optional)</label>
                 <input
                   type="text"
                   value={newRoomName}
@@ -189,7 +189,7 @@ const Lobby = ({ onJoin, onCreateRoom }) => {
                   className="w-5 h-5 rounded border-white/20 bg-black text-white focus:ring-0 focus:ring-offset-0"
                 />
                 <div>
-                  <div className="text-white font-medium">Public Room</div>
+                  <div className="text-white font-medium">Public Party</div>
                   <div className="text-white/40 text-xs">Visible in the global lobby</div>
                 </div>
               </label>

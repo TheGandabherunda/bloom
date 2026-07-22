@@ -175,7 +175,7 @@ const Layout = ({ config, onLeave }) => {
                 <span className="material-symbols-rounded text-[26px] leading-none">link</span>
               </button>
               <button
-                title={config.isHost ? "End Broadcast" : "Leave Room"}
+                title={config.isHost ? "End Party" : "Leave Party"}
                 onClick={() => {
                    stopP2P();
                    if (onLeave) onLeave();
