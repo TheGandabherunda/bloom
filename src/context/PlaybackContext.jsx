@@ -25,11 +25,16 @@ export const PlaybackProvider = ({ children }) => {
   const loadingTrackId = useRef(null);
   const playNextRef = useRef(null);
   const queueRef = useRef([]);
+  const currentIndexRef = useRef(-1);
   const networkIsPlayingRef = useRef(false);
 
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
   useEffect(() => {
     // Initialize WebAudio Player
@@ -112,9 +117,14 @@ export const PlaybackProvider = ({ children }) => {
         author: decodeHtml(track.author || ''),
         audioQuality: track.audioQuality || 'AUDIO' 
       };
+      const resolvedIndex = targetIndex !== -1 
+        ? targetIndex 
+        : (queueRef.current ? queueRef.current.findIndex(t => t.id === track.id) : -1);
+
       setCurrentTrack(updatedTrack);
-      setCurrentIndex(targetIndex);
-      console.log(`[Playback] setCurrentTrack to: ${updatedTrack.id}, targetIndex to: ${targetIndex}`);
+      setCurrentIndex(resolvedIndex);
+      currentIndexRef.current = resolvedIndex;
+      console.log(`[Playback] setCurrentTrack to: ${updatedTrack.id}, resolvedIndex to: ${resolvedIndex}`);
       
       // Ensure player is ready before loading
       if (!playerRef.current) throw new Error('Player not initialized');
@@ -321,8 +331,15 @@ export const PlaybackProvider = ({ children }) => {
 
         if (key === 'currentTrack') {
           const track = value.track || value;
-          const index = value.index !== undefined ? value.index : -1;
+          let index = value.index !== undefined ? value.index : -1;
           
+          if (track?.id && queueRef.current?.length > 0) {
+            const actualQueueIdx = queueRef.current.findIndex(t => t.id === track.id);
+            if (actualQueueIdx !== -1) {
+              index = actualQueueIdx;
+            }
+          }
+
           let computedLiveTime = value.startTime || 0;
           const ct = stateDb ? await stateDb.get('currentTime') : null;
           const isPlayingState = stateDb ? await stateDb.get('isPlaying') : false;
@@ -343,7 +360,11 @@ export const PlaybackProvider = ({ children }) => {
              console.log(`[Orbit Sync] Loading synced track...`);
              loadTrack(track, index, computedLiveTime, networkIsPlayingRef.current, originator);
           } else {
-             console.log(`[Orbit Sync] Ignored currentTrack update (already playing)`);
+             if (index !== -1) {
+               setCurrentIndex(index);
+               currentIndexRef.current = index;
+             }
+             console.log(`[Orbit Sync] Updated index for currently playing track: ${index}`);
           }
         } else if (key === 'isPlaying') {
           const status = typeof value === 'object' ? value.status : value;
@@ -361,7 +382,19 @@ export const PlaybackProvider = ({ children }) => {
             playerRef.current?.seek(time);
           }
         } else if (key === 'queue') {
-          setQueueState(value);
+          const newQueue = value || [];
+          setQueueState(newQueue);
+          queueRef.current = newQueue;
+
+          // Re-index currentTrack in the new queue so peers stay on the right track & index
+          if (currentTrackRef.current) {
+            const newIndex = newQueue.findIndex(t => t.id === currentTrackRef.current.id);
+            if (newIndex !== -1) {
+              console.log(`[Queue Sync] Re-indexed currentTrack "${currentTrackRef.current.title}" to ${newIndex}`);
+              setCurrentIndex(newIndex);
+              currentIndexRef.current = newIndex;
+            }
+          }
         } else if (key === 'originalQueue') {
           setOriginalQueue(value);
         }
@@ -456,15 +489,23 @@ export const PlaybackProvider = ({ children }) => {
       return;
     }
     
-    if (queue.length === 0) { setIsPlaying(false); return; }
+    const activeQueue = queueRef.current;
+    if (activeQueue.length === 0) { setIsPlaying(false); return; }
     
-    let nextIndex = currentIndex + 1;
-    if (nextIndex >= queue.length) {
+    let activeIdx = currentIndexRef.current;
+    if (currentTrackRef.current) {
+      const actualIdx = activeQueue.findIndex(t => t.id === currentTrackRef.current.id);
+      if (actualIdx !== -1) activeIdx = actualIdx;
+    }
+
+    let nextIndex = activeIdx + 1;
+    if (nextIndex >= activeQueue.length) {
       nextIndex = 0; // Loop back
     }
     setCurrentIndex(nextIndex);
-    loadTrack(queue[nextIndex], nextIndex, 0, autoPlay, peerId);
-  }, [queue, currentIndex, loadTrack, seek, peerId]);
+    currentIndexRef.current = nextIndex;
+    loadTrack(activeQueue[nextIndex], nextIndex, 0, autoPlay, peerId);
+  }, [loadTrack, seek, peerId, canControl]);
 
   useEffect(() => {
     playNextRef.current = playNext;
@@ -477,14 +518,23 @@ export const PlaybackProvider = ({ children }) => {
       seek(0);
       return;
     }
-    if (queue.length === 0) return;
-    let prevIndex = currentIndex - 1;
+    const activeQueue = queueRef.current;
+    if (activeQueue.length === 0) return;
+
+    let activeIdx = currentIndexRef.current;
+    if (currentTrackRef.current) {
+      const actualIdx = activeQueue.findIndex(t => t.id === currentTrackRef.current.id);
+      if (actualIdx !== -1) activeIdx = actualIdx;
+    }
+
+    let prevIndex = activeIdx - 1;
     if (prevIndex < 0) {
-      prevIndex = queue.length - 1;
+      prevIndex = activeQueue.length - 1;
     }
     setCurrentIndex(prevIndex);
-    loadTrack(queue[prevIndex], prevIndex, 0, true, peerId);
-  }, [queue, currentIndex, seek, loadTrack, peerId]);
+    currentIndexRef.current = prevIndex;
+    loadTrack(activeQueue[prevIndex], prevIndex, 0, true, peerId);
+  }, [seek, loadTrack, peerId, canControl]);
 
   const addToQueue = useCallback((track) => {
     if (!canControl()) return;
@@ -534,20 +584,41 @@ export const PlaybackProvider = ({ children }) => {
       const [movedItem] = newQ.splice(fromIndex, 1);
       newQ.splice(toIndex, 0, movedItem);
 
-      if (currentIndex === fromIndex) {
-        setCurrentIndex(toIndex);
-      } else if (fromIndex < currentIndex && toIndex >= currentIndex) {
-        setCurrentIndex(c => c - 1);
-      } else if (fromIndex > currentIndex && toIndex <= currentIndex) {
-        setCurrentIndex(c => c + 1);
+      queueRef.current = newQ;
+
+      let newCurrentIndex = currentIndexRef.current;
+      if (currentTrackRef.current) {
+        const foundIdx = newQ.findIndex(t => t.id === currentTrackRef.current.id);
+        if (foundIdx !== -1) {
+          newCurrentIndex = foundIdx;
+        }
+      } else {
+        if (currentIndexRef.current === fromIndex) {
+          newCurrentIndex = toIndex;
+        } else if (fromIndex < currentIndexRef.current && toIndex >= currentIndexRef.current) {
+          newCurrentIndex = currentIndexRef.current - 1;
+        } else if (fromIndex > currentIndexRef.current && toIndex <= currentIndexRef.current) {
+          newCurrentIndex = currentIndexRef.current + 1;
+        }
       }
+
+      setCurrentIndex(newCurrentIndex);
+      currentIndexRef.current = newCurrentIndex;
 
       if (stateDb) {
         stateDb.put('queue', newQ).catch(e => console.warn('Failed to sync reordered queue:', e));
+        if (currentTrackRef.current && newCurrentIndex !== -1) {
+          stateDb.put('currentTrack', {
+            track: currentTrackRef.current,
+            index: newCurrentIndex,
+            originator: peerId,
+            timestamp: Date.now()
+          }).catch(e => console.warn(e));
+        }
       }
       return newQ;
     });
-  }, [canControl, currentIndex, stateDb]);
+  }, [canControl, stateDb, peerId]);
 
   const moveQueueItem = useCallback((index, direction) => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
