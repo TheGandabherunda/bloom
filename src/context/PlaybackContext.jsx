@@ -23,6 +23,7 @@ export const PlaybackProvider = ({ children }) => {
   const loadingTrackId = useRef(null);
   const playNextRef = useRef(null);
   const queueRef = useRef([]);
+  const networkIsPlayingRef = useRef(false);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -87,9 +88,9 @@ export const PlaybackProvider = ({ children }) => {
 
       setError(null);
       setIsLoading(true);
-      // Reset playing state immediately so button reflects loading
+      // Reset playing UI state immediately so button reflects loading, but preserve isPlayingRef 
+      // so we know if we INTEND to play after load finishes.
       setIsPlaying(false);
-      isPlayingRef.current = false;
       const currentLoadId = Symbol();
       loadingTrackId.current = currentLoadId;
       
@@ -161,7 +162,12 @@ export const PlaybackProvider = ({ children }) => {
         setIsPlaying(false);
         isPlayingRef.current = false;
       } else {
+        // It's an autoplay block. Keep isPlayingRef.current true if we intended to play,
+        // so the Global Interact Listener can resume it on next click.
         setIsPlaying(false);
+        if (autoPlay) {
+          isPlayingRef.current = true;
+        }
       }
     } finally {
       if (loadingTrackId.current === currentLoadId) {
@@ -240,6 +246,7 @@ export const PlaybackProvider = ({ children }) => {
           
           const isPlayingState = await stateDb.get('isPlaying');
           const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
+          networkIsPlayingRef.current = isPlaying;
           
           loadTrack(track, index, liveTime, isPlaying, 'initial-sync');
         }
@@ -295,12 +302,13 @@ export const PlaybackProvider = ({ children }) => {
           console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}, liveTime=${liveTime}`);
           if (track?.id !== currentTrackRef.current?.id) {
              console.log(`[Orbit Sync] Loading synced track...`);
-             loadTrack(track, index, liveTime, isPlayingRef.current, originator);
+             loadTrack(track, index, liveTime, networkIsPlayingRef.current, originator);
           } else {
              console.log(`[Orbit Sync] Ignored currentTrack update (already playing)`);
           }
         } else if (key === 'isPlaying') {
           const status = typeof value === 'object' ? value.status : value;
+          networkIsPlayingRef.current = status;
           console.log(`[Orbit Sync] Received isPlaying update: ${status}`);
           if (status) {
             playerRef.current?.play().catch(e => console.warn(e));
