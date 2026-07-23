@@ -25,6 +25,18 @@ const Layout = ({ config, onLeave, onMinimize }) => {
   const [loadingTrending, setLoadingTrending] = useState(true);
 
   useEffect(() => {
+    console.log('[Autoplay Debug]', {
+      networkIsPlaying,
+      isPlaying,
+      isLoading,
+      canControl,
+      hasCurrentTrack: !!currentTrack,
+      role,
+      status
+    });
+  }, [networkIsPlaying, isPlaying, isLoading, canControl, currentTrack, role, status]);
+
+  useEffect(() => {
     let isMounted = true;
     getTrendingByLocation().then(tracks => {
       if (isMounted) {
