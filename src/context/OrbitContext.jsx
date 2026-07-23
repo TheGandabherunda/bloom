@@ -120,12 +120,12 @@ export const OrbitProvider = ({ children }) => {
     setStatusWrapped('disconnected');
   }, []);
 
-  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, nostrPk = null, nostrSk = null, isPublic = false, relays = []) => {
+  const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, nostrPk = null, nostrSk = null, isPublic = false, relays = [], roomName = null) => {
     if (statusRef.current === 'connected' || statusRef.current === 'initializing') return;
     
     try {
       setStatusWrapped('initializing');
-      console.log(`[Nostr] initP2P called with: roomId=${roomId}, isHost=${isHost}, hostId=${hostId}, nostrPk=${nostrPk}, hasNostrSk=${!!nostrSk}, isPublic=${isPublic}`);
+      console.log(`[Nostr] initP2P called with: roomId=${roomId}, isHost=${isHost}, hostId=${hostId}, nostrPk=${nostrPk}, hasNostrSk=${!!nostrSk}, isPublic=${isPublic}, roomName=${roomName}`);
       console.log('Connecting to Nostr Relays...');
 
       roomRef.current = roomId;
@@ -147,6 +147,8 @@ export const OrbitProvider = ({ children }) => {
           if (isHostRef.current) {
             // Host updates local state
             stateProxy.store[key] = value;
+            stateProxy.events.emit('update', { payload: { key, value } });
+            window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value }, payload: { key, value } }));
             
             // Check for names/roles directly
             if (key.startsWith('peer_name_')) {
@@ -169,22 +171,23 @@ export const OrbitProvider = ({ children }) => {
             }, 500);
 
             // Debounce beacon publish if public
-            if (isPublicRef.current && (key === 'currentTrack' || key.startsWith('peer_name_'))) {
+            if (isPublicRef.current && (key === 'currentTrack' || key === 'roomName' || key.startsWith('peer_name_'))) {
                if (beaconPublishTimeout) clearTimeout(beaconPublishTimeout);
                beaconPublishTimeout = setTimeout(() => {
+                  const activeRoomName = stateProxy.store['roomName'] || roomName || 'Bloom Party';
                   const beaconEvent = {
                     kind: 30311,
                     created_at: Math.floor(Date.now() / 1000),
                     tags: [
                       ['d', `bloom-${roomId}`],
-                      ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
+                      ['title', `Bloom Room: ${activeRoomName}`],
                       ['status', 'live'],
                       ['t', 'music'],
                       ['p', hostIdRef.current, 'host']
                     ],
                     content: JSON.stringify({ 
                       roomId, 
-                      roomName: stateProxy.store['roomName'] || roomId,
+                      roomName: activeRoomName,
                       hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
                       currentTrack: stateProxy.store['currentTrack'],
                       activePeers: Object.keys(peerNamesRef.current).length,
@@ -210,9 +213,10 @@ export const OrbitProvider = ({ children }) => {
         all: async () => Object.entries(stateProxy.store).map(([key, value]) => ({ key, value }))
       };
 
+      setStateDbReady(stateProxy);
+
       const chatProxy = {
         events: new MiniEmitter(),
-        arr: [],
         add: async (msg) => {
           // Both host and peers can publish chat
           await publishSigned({
@@ -221,9 +225,10 @@ export const OrbitProvider = ({ children }) => {
             tags: [['h', roomId]],
             content: JSON.stringify(msg)
           });
-        },
-        all: async () => chatProxy.arr.map(value => ({ payload: { value } }))
+        }
       };
+
+      setChatDbReady(chatProxy);
 
       // Set up subscriptions
       const hostPubKey = isHost ? nostrPk : hostIdRef.current;
@@ -256,6 +261,7 @@ export const OrbitProvider = ({ children }) => {
                     stateProxy.store[key] = data[key];
                     stateRecovered = true;
                     stateProxy.events.emit('update', { payload: { key, value: data[key] } });
+                    window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value: data[key] }, payload: { key, value: data[key] } }));
                     
                     if (key.startsWith('peer_name_')) {
                       setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: data[key]}));
@@ -286,59 +292,60 @@ export const OrbitProvider = ({ children }) => {
                 if (!isHostRef.current && statusRef.current !== 'connected') {
                   setStatusWrapped('connected');
                 }
-              } catch(e) { console.error(e); }
+              } catch (e) {
+                console.error('[OrbitContext] Failed to parse state event from relay:', e);
+              }
             } else if (dTag === `intent-${roomId}` && isHost) {
-              // State mutation intent from peer
+              // Peer intent to host
               try {
-                console.log(`[Nostr] Parsing state mutation intent from peer:`, event.content);
-                const { key, value } = JSON.parse(event.content);
-                const senderRole = peerRolesRef.current[event.pubkey] || 'peer';
-                console.log(`[Nostr] Sender role is ${senderRole}. Requesting mutation of ${key}`);
+                const intent = JSON.parse(event.content);
+                console.log(`[OrbitContext] Host received state intent from peer ${event.pubkey}:`, intent);
                 
-                if (key.startsWith('peer_role_') || key === 'banned') {
-                  if (senderRole !== 'owner') {
-                    console.warn(`[Nostr] Rejected role/ban mutation from non-owner peer.`);
-                    return;
-                  }
-                }
-
-                const playbackKeys = ['currentTrack', 'isPlaying', 'currentTime', 'queue', 'originalQueue', 'isShuffled'];
-                if (playbackKeys.includes(key)) {
-                  if (senderRole !== 'owner' && senderRole !== 'admin') {
-                    console.warn(`[Nostr] Rejected playback mutation from non-admin peer.`);
-                    return;
-                  }
-                }
+                // Validate peer has permission (or setting own name)
+                const role = peerRolesRef.current[event.pubkey] || 'peer';
+                const isSelfName = intent.key === `peer_name_${event.pubkey}`;
+                const canModifyTrack = intent.key === 'currentTrack' || intent.key === 'playbackState';
                 
-                if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(value)) {
-                  stateProxy.events.emit('update', { payload: { key, value } });
+                if (role === 'owner' || role === 'admin' || isSelfName || (canModifyTrack && role === 'peer')) {
+                  stateProxy.put(intent.key, intent.value);
+                } else {
+                  console.warn(`[OrbitContext] Peer ${event.pubkey} denied intent for key ${intent.key}`);
                 }
-                stateProxy.put(key, value);
-              } catch(e) { console.error('[Nostr] Failed to parse intent:', e); }
+              } catch (e) {
+                console.error('[OrbitContext] Failed to parse intent from peer:', e);
+              }
             } else if (dTag === `join-${roomId}` && isHost) {
-              // Join intent from peer
-              const newPeerName = event.content;
-              console.log(`[Nostr] Received Join Intent from pubkey=${event.pubkey} name=${newPeerName}`);
-              stateProxy.put(`peer_name_${event.pubkey}`, newPeerName);
+              // Peer join intent to host
+              try {
+                const joinData = JSON.parse(event.content);
+                console.log(`[OrbitContext] Host received join intent from peer ${event.pubkey}:`, joinData);
+                
+                // Add peer to roles as 'peer' if not already assigned, and set their name
+                if (!peerRolesRef.current[event.pubkey]) {
+                  stateProxy.put(`peer_role_${event.pubkey}`, 'peer');
+                }
+                if (joinData.displayName) {
+                  stateProxy.put(`peer_name_${event.pubkey}`, joinData.displayName);
+                }
+              } catch (e) {
+                console.error('[OrbitContext] Failed to parse join intent:', e);
+              }
             }
           } else if (event.kind === 9) {
-            // Chat message
+            // Chat event
             try {
               const msg = JSON.parse(event.content);
-              const isDuplicate = chatProxy.arr.some(m => m.id === msg.id && m.timestamp === msg.timestamp);
-              if (!isDuplicate) {
-                chatProxy.arr.push(msg);
-                chatProxy.events.emit('update', { payload: { value: msg } });
-              }
-            } catch(e) { console.error(e); }
+              console.log('[OrbitContext] Received chat message from relay:', msg);
+              chatProxy.events.emit('add', msg);
+              window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
+            } catch (e) {
+              console.error('[OrbitContext] Failed to parse chat event:', e);
+            }
           }
         }
       });
 
       // Initial Local State Setup
-      setStateDbReady(stateProxy);
-      setChatDbReady(chatProxy);
-      
       if (isHost) {
         setPeerNames(prev => ({ ...prev, [nostrPk]: displayName }));
         setPeerRoles(prev => ({ ...prev, [nostrPk]: 'owner' }));
@@ -348,6 +355,9 @@ export const OrbitProvider = ({ children }) => {
           if (roomRef.current !== roomId) return;
           stateProxy.put(`peer_name_${nostrPk}`, displayName);
           stateProxy.put(`peer_role_${nostrPk}`, 'owner');
+          if (roomName) {
+            stateProxy.put('roomName', roomName);
+          }
           setStatusWrapped('connected');
         }, 1500);
 
@@ -359,19 +369,20 @@ export const OrbitProvider = ({ children }) => {
           }
           if (isPublicRef.current) {
              const activePeerIds = Object.keys(peerNamesRef.current);
+             const activeRoomName = stateProxy.store['roomName'] || roomName || 'Bloom Party';
               const beaconEvent = {
                 kind: 30311,
                 created_at: Math.floor(Date.now() / 1000),
                 tags: [
                   ['d', `bloom-${roomId}`],
-                  ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
+                  ['title', `Bloom Room: ${activeRoomName}`],
                   ['status', 'live'],
                   ['t', 'music'],
                   ['p', nostrPk, 'host']
                 ],
                 content: JSON.stringify({ 
                   roomId, 
-                  roomName: stateProxy.store['roomName'] || roomId,
+                  roomName: activeRoomName,
                   hostName: peerNamesRef.current[nostrPk] || displayName,
                   currentTrack: stateProxy.store['currentTrack'],
                   activePeers: activePeerIds.length, 

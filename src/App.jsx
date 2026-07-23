@@ -71,19 +71,22 @@ function App() {
     setIsLoggedIn(true);
   };
 
-  const handleJoinLobby = (roomId, hostId) => {
+  const handleJoinLobby = (roomId, hostId, roomName) => {
     fetchKeysAndSetConfig({
       roomId,
+      roomName: roomName && !roomName.startsWith('bloom-') ? roomName : null,
       isHost: false,
       displayName: localStorage.getItem('bloom_name'),
       hostId
     });
   };
 
-  const handleCreateRoom = (roomId, isPublic) => {
+  const handleCreateRoom = (roomId, isPublic, roomName) => {
     sessionStorage.setItem(`bloom_host_${roomId}`, 'true');
+    const finalName = roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party';
     fetchKeysAndSetConfig({
       roomId,
+      roomName: finalName,
       isHost: true,
       isPublic,
       displayName: localStorage.getItem('bloom_name')

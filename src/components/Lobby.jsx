@@ -49,16 +49,38 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
   // Context hooks for mini-player
   const { currentTrack, isPlaying, togglePlay, playNext, playPrev, playerRef, duration } = usePlayback();
   const { status, peerNames, stateDb } = useOrbit();
-  const [roomName, setRoomName] = useState(minimizedConfig ? minimizedConfig.roomId : '');
+  const [roomName, setRoomName] = useState(
+    minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')
+      ? minimizedConfig.roomName
+      : ''
+  );
 
   useEffect(() => {
-    if (minimizedConfig && stateDb) {
-      stateDb.get('roomName').then(val => { if (val) setRoomName(val); });
-      const handleState = (e) => {
-        if (e.payload.key === 'roomName') setRoomName(e.payload.value);
-      };
-      window.addEventListener('orbit:state:update', handleState);
-      return () => window.removeEventListener('orbit:state:update', handleState);
+    if (minimizedConfig) {
+      if (minimizedConfig.roomName && !minimizedConfig.roomName.startsWith('bloom-')) {
+        setRoomName(minimizedConfig.roomName);
+      }
+      if (stateDb) {
+        stateDb.get('roomName').then(val => {
+          if (val && typeof val === 'string' && !val.startsWith('bloom-')) setRoomName(val);
+        });
+        const handleState = (e) => {
+          const payload = e.detail || e.payload;
+          if (payload && payload.key === 'roomName' && payload.value && !payload.value.startsWith('bloom-')) {
+            setRoomName(payload.value);
+          }
+        };
+        if (stateDb.events?.on) {
+          stateDb.events.on('update', handleState);
+        }
+        window.addEventListener('orbit:state:update', handleState);
+        return () => {
+          if (stateDb.events?.off) {
+            stateDb.events.off('update', handleState);
+          }
+          window.removeEventListener('orbit:state:update', handleState);
+        };
+      }
     }
   }, [minimizedConfig, stateDb]);
 
@@ -124,7 +146,8 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             try { parsedContent = JSON.parse(event.content); } catch(e) {}
             
             const activePeers = parsedContent.activePeers || (parsedContent.activePeerIds ? parsedContent.activePeerIds.length : 1);
-            const roomName = parsedContent.roomName || (titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId);
+            const beaconRoomName = parsedContent.roomName || (titleTag ? titleTag[1].replace('Bloom Room: ', '') : null);
+            const finalBeaconRoomName = beaconRoomName && !beaconRoomName.startsWith('bloom-') ? beaconRoomName : 'Bloom Party';
             const hostPk = event.pubkey;
             const hostName = parsedContent.hostName;
             const currentTrack = parsedContent.currentTrack;
@@ -149,7 +172,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                 ...prev,
                 [roomId]: {
                   roomId,
-                  roomName,
+                  roomName: finalBeaconRoomName,
                   hostName,
                   currentTrack,
                   hostPk,
@@ -174,11 +197,11 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
-    let finalRoomId = `bloom-${Math.random().toString(36).substring(2, 8)}`;
-    if (newRoomName) {
-      finalRoomId = `bloom-${newRoomName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}-${Math.random().toString(36).substring(2, 8)}`;
-    }
-    onCreateRoom(finalRoomId, isPublic);
+    const partyName = newRoomName.trim();
+    const finalRoomName = partyName || 'Bloom Party';
+    // Generate clean unique alphanumeric room ID for P2P network and URLs
+    const finalRoomId = `bloom-${Math.random().toString(36).substring(2, 10)}`;
+    onCreateRoom(finalRoomId, isPublic, finalRoomName);
   };
 
   const filteredRooms = Object.values(rooms)
@@ -291,12 +314,12 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
               {filteredRooms.map((room, index) => (
                 <React.Fragment key={room.roomId}>
                   <div 
-                    onClick={() => onJoin(room.roomId, room.pubkey)}
+                    onClick={() => onJoin(room.roomId, room.pubkey, room.roomName)}
                     className="w-full max-w-xl bg-white/[0.03] hover:bg-white/[0.06] p-5 rounded-2xl cursor-pointer transition-all flex flex-col gap-3 group"
                   >
                     <div className="flex flex-col items-start w-full">
                       <h4 className="font-bold text-white tracking-wide text-lg flex items-center flex-wrap gap-2">
-                        {room.roomName || room.roomId}
+                        {room.roomName && !room.roomName.startsWith('bloom-') ? room.roomName : 'Bloom Party'}
                         <span className="text-white/30">•</span>
                         <span className="font-bold tracking-wide text-white/70">{room.hostName || 'Unknown'}</span>
                         
@@ -385,7 +408,13 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
           <div className="flex items-center justify-center gap-2 px-2 opacity-80 cursor-pointer" onClick={onRestore}>
             <span className="text-white/60 text-xs font-medium tracking-wide">Inside</span>
             <span className="text-[var(--color-primary)] text-[10px]">•</span>
-            <span className="font-bold text-white text-xs tracking-wider">{roomName || minimizedConfig.roomId}</span>
+            <span className="font-bold text-white text-xs tracking-wider">
+              {roomName && !roomName.startsWith('bloom-') 
+                ? roomName 
+                : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
+                  ? minimizedConfig.roomName 
+                  : 'Bloom Party'}
+            </span>
             <span className="text-[var(--color-primary)] text-[10px]">•</span>
             <span className="text-white/60 text-xs font-medium tracking-widest">
               {minimizedConfig.isHost 

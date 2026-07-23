@@ -48,7 +48,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
 
   useEffect(() => {
     if (!config) return;
-    initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk, config.isPublic, config.relays);
+    initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk, config.isPublic, config.relays, config.roomName);
   }, [config, initP2P]);
 
   useEffect(() => {
@@ -108,27 +108,51 @@ const Layout = ({ config, onLeave, onMinimize }) => {
   }, [currentTrack]);
 
 
-  const [roomName, setRoomName] = useState(config.roomId);
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [roomName, setRoomName] = useState(
+    config.roomName && !config.roomName.startsWith('bloom-')
+      ? config.roomName
+      : (config.roomId && !config.roomId.startsWith('bloom-') ? config.roomId : 'Bloom Party')
+  );
   const { stateDb } = useOrbit();
 
   useEffect(() => {
-    if (!stateDb) return;
-    const handleUpdate = (e) => {
-      if (e.payload.key === 'roomName') setRoomName(e.payload.value);
-    };
-    stateDb.events.on('update', handleUpdate);
-    stateDb.get('roomName').then(val => { if (val) setRoomName(val); });
-    return () => stateDb.events.off('update', handleUpdate);
-  }, [stateDb]);
-
-  const handleNameSave = (e) => {
-    e.preventDefault();
-    setIsEditingName(false);
-    if (stateDb && config.isHost) {
-      stateDb.put('roomName', roomName);
+    if (config.roomName && !config.roomName.startsWith('bloom-')) {
+      setRoomName(config.roomName);
     }
-  };
+  }, [config.roomName]);
+
+  useEffect(() => {
+    if (!stateDb) return;
+
+    if (config.isHost && config.roomName) {
+      stateDb.put('roomName', config.roomName);
+    }
+
+    const handleUpdate = (e) => {
+      const payload = e.detail || e.payload;
+      if (payload && payload.key === 'roomName' && payload.value && !payload.value.startsWith('bloom-')) {
+        setRoomName(payload.value);
+      }
+    };
+
+    if (stateDb.events?.on) {
+      stateDb.events.on('update', handleUpdate);
+    }
+    window.addEventListener('orbit:state:update', handleUpdate);
+
+    stateDb.get('roomName').then(val => {
+      if (val && typeof val === 'string' && !val.startsWith('bloom-')) {
+        setRoomName(val);
+      }
+    });
+
+    return () => {
+      if (stateDb.events?.off) {
+        stateDb.events.off('update', handleUpdate);
+      }
+      window.removeEventListener('orbit:state:update', handleUpdate);
+    };
+  }, [stateDb, config.isHost, config.roomName]);
 
   return (
     <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
@@ -172,7 +196,9 @@ const Layout = ({ config, onLeave, onMinimize }) => {
               <span className="text-white/30 font-bold">•</span>
               
               <div className="flex items-center gap-2">
-                <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl truncate max-w-[120px] lg:max-w-[200px]">{roomName}</span>
+                <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl truncate max-w-[120px] lg:max-w-[200px]" title={roomName}>
+                  {roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party'}
+                </span>
               </div>
               <button
                 title="Copy invite link"
