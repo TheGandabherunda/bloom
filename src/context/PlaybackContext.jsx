@@ -229,6 +229,12 @@ export const PlaybackProvider = ({ children }) => {
     };
   }, [isPlaying, error]);
 
+  const canControl = useCallback(() => {
+    if (statusRef.current !== 'connected') return true;
+    const role = peerRolesRef.current[peerId];
+    return role === 'owner' || role === 'admin';
+  }, [peerId]);
+
   // Host periodically syncs real audio playhead position to stateDb
   useEffect(() => {
     if (!isPlaying || !canControl() || !stateDb) return;
@@ -244,12 +250,6 @@ export const PlaybackProvider = ({ children }) => {
 
     return () => clearInterval(interval);
   }, [isPlaying, canControl, stateDb, peerId]);
-
-  const canControl = useCallback(() => {
-    if (statusRef.current !== 'connected') return true;
-    const role = peerRolesRef.current[peerId];
-    return role === 'owner' || role === 'admin';
-  }, [peerId]);
 
   // Initial Sync from OrbitDB
   useEffect(() => {
