@@ -113,12 +113,26 @@ export const OrbitProvider = ({ children }) => {
   }, [peerId]);
 
   const stopP2P = useCallback(async () => {
+    if (roomRef.current && !isHostRef.current && skRef.current) {
+      const myName = peerNamesRef.current[peerId] || localStorage.getItem('bloom_name') || 'A user';
+      console.log(`[Nostr] Sending leave intent for room ${roomRef.current}`);
+      try {
+        await publishSigned({
+          kind: 30000,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [['d', `leave-${roomRef.current}`], ['p', hostIdRef.current]],
+          content: JSON.stringify({ displayName: myName })
+        });
+      } catch (e) {}
+    }
     roomRef.current = null;
     setStateDbReady(null);
     setChatDbReady(null);
     setPeers([]);
+    setPeerNames({});
+    setPeerRoles({});
     setStatusWrapped('disconnected');
-  }, []);
+  }, [peerId]);
 
   const initP2P = useCallback(async (roomId, displayName, isHost = false, hostId = null, nostrPk = null, nostrSk = null, isPublic = false, relays = [], roomName = null) => {
     if (statusRef.current === 'connected' || statusRef.current === 'initializing') return;
@@ -450,13 +464,55 @@ export const OrbitProvider = ({ children }) => {
 
                 console.log(`[OrbitContext] Host received join intent from peer ${event.pubkey}: name=${peerName}`);
                 
-                // Add peer to roles as 'peer' if not already assigned, and set their name
+                const isNewPeer = !peerRolesRef.current[event.pubkey];
                 stateProxy.put(`peer_role_${event.pubkey}`, 'peer');
                 if (peerName) {
                   stateProxy.put(`peer_name_${event.pubkey}`, peerName);
                 }
+
+                if (isNewPeer && peerName) {
+                  const joinMsg = {
+                    text: `${peerName} joined the party`,
+                    type: 'system',
+                    sender: 'System',
+                    timestamp: Date.now()
+                  };
+                  if (chatProxy?.add) {
+                    chatProxy.add(joinMsg);
+                  }
+                }
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse join intent:', e);
+              }
+            } else if (dTag === `leave-${roomId}` && isHost) {
+              // Peer leave intent to host
+              try {
+                const leavingPk = event.pubkey;
+                let leavingName = peerNamesRef.current[leavingPk];
+                try {
+                  const parsed = JSON.parse(event.content);
+                  if (parsed && parsed.displayName) leavingName = parsed.displayName;
+                } catch (e) {}
+
+                if (!leavingName) leavingName = 'A user';
+
+                console.log(`[OrbitContext] Host received leave intent from peer ${leavingPk} (${leavingName})`);
+
+                stateProxy.put(`peer_name_${leavingPk}`, null);
+                stateProxy.put(`peer_role_${leavingPk}`, null);
+
+                const leaveMsg = {
+                  text: `${leavingName} left the party`,
+                  type: 'system',
+                  sender: 'System',
+                  timestamp: Date.now()
+                };
+
+                if (chatProxy?.add) {
+                  chatProxy.add(leaveMsg);
+                }
+              } catch (e) {
+                console.error('[OrbitContext] Failed to parse leave intent:', e);
               }
             }
           } else if (event.kind === 9) {
