@@ -226,7 +226,6 @@ export class CustomAudioPlayer {
 
     return new Promise((resolve, reject) => {
       this.audio.src = manifestUrl;
-      this.audio.currentTime = startTime;
       
       let timeoutId;
 
@@ -239,6 +238,13 @@ export class CustomAudioPlayer {
       const onCanPlay = () => {
         cleanup();
         if (this.activeLoadId !== currentLoadId) return;
+        if (startTime > 0 && !isNaN(this.audio.duration) && startTime < this.audio.duration) {
+          try {
+            this.audio.currentTime = startTime;
+          } catch (e) {
+            console.warn('[AudioPlayer] Failed to set startTime in onCanPlay:', e);
+          }
+        }
         resolve();
       };
 

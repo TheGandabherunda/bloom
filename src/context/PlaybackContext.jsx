@@ -124,7 +124,13 @@ export const PlaybackProvider = ({ children }) => {
       // Broadcast if local change
       if (isLocal && stateDb) {
         try {
-          await stateDb.put('currentTrack', { track: updatedTrack, index: targetIndex, originator: peerId });
+          await stateDb.put('currentTrack', { 
+            track: updatedTrack, 
+            index: targetIndex, 
+            originator: peerId,
+            startTime: startTime || 0,
+            timestamp: Date.now()
+          });
         } catch (err) {
           console.error("Failed to sync playback state:", err);
         }
@@ -239,18 +245,23 @@ export const PlaybackProvider = ({ children }) => {
           const track = syncedTrack.track || syncedTrack;
           const index = syncedTrack.index !== undefined ? syncedTrack.index : -1;
           
-          let liveTime = 0;
-          const ct = await stateDb.get('currentTime');
-          if (ct && typeof ct === 'object') {
-             liveTime = ct.time;
-          }
-          
           const isPlayingState = await stateDb.get('isPlaying');
           const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
           networkIsPlayingRef.current = isPlaying;
           setNetworkIsPlaying(isPlaying);
           
-          loadTrack(track, index, liveTime, isPlaying, 'initial-sync');
+          let computedLiveTime = syncedTrack.startTime || 0;
+          if (syncedTrack.timestamp && isPlaying) {
+             const elapsed = (Date.now() - syncedTrack.timestamp) / 1000;
+             computedLiveTime = (syncedTrack.startTime || 0) + elapsed;
+          } else {
+             const ct = await stateDb.get('currentTime');
+             if (ct && typeof ct === 'object') {
+                computedLiveTime = ct.time;
+             }
+          }
+          
+          loadTrack(track, index, computedLiveTime, isPlaying, 'initial-sync');
         }
         const syncedQueue = await stateDb.get('queue');
         if (syncedQueue) setQueueState(syncedQueue);
@@ -303,11 +314,19 @@ export const PlaybackProvider = ({ children }) => {
         if (key === 'currentTrack') {
           const track = value.track || value;
           const index = value.index !== undefined ? value.index : -1;
-          const liveTime = value.liveTime || 0;
-          console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}, liveTime=${liveTime}`);
+          
+          let computedLiveTime = value.startTime || 0;
+          if (value.timestamp && networkIsPlayingRef.current) {
+             const elapsed = (Date.now() - value.timestamp) / 1000;
+             computedLiveTime = (value.startTime || 0) + elapsed;
+          } else if (value.liveTime !== undefined) {
+             computedLiveTime = value.liveTime;
+          }
+
+          console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}, computedLiveTime=${computedLiveTime}`);
           if (track?.id !== currentTrackRef.current?.id) {
              console.log(`[Orbit Sync] Loading synced track...`);
-             loadTrack(track, index, liveTime, networkIsPlayingRef.current, originator);
+             loadTrack(track, index, computedLiveTime, networkIsPlayingRef.current, originator);
           } else {
              console.log(`[Orbit Sync] Ignored currentTrack update (already playing)`);
           }
@@ -355,6 +374,19 @@ export const PlaybackProvider = ({ children }) => {
     
     if (forceLocal && isPlayingRef.current) {
       setError(null);
+      if (stateDb) {
+        try {
+          const syncedTrack = await stateDb.get('currentTrack');
+          if (syncedTrack && syncedTrack.timestamp) {
+            const elapsed = (Date.now() - syncedTrack.timestamp) / 1000;
+            const currentPos = (syncedTrack.startTime || 0) + elapsed;
+            if (playerRef.current && currentPos > 0 && Math.abs(playerRef.current.getCurrentTime() - currentPos) > 3) {
+               console.log(`[Playback] Resyncing audio seek position to ${currentPos.toFixed(1)}s on user unblock.`);
+               playerRef.current.seek(currentPos);
+            }
+          }
+        } catch (e) {}
+      }
       await playerRef.current?.play().catch(e => console.warn('Still blocked', e));
       return;
     }
