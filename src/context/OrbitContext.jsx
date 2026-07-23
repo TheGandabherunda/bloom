@@ -465,7 +465,10 @@ export const OrbitProvider = ({ children }) => {
                 console.log(`[OrbitContext] Host received join intent from peer ${event.pubkey}: name=${peerName}`);
                 
                 const isNewPeer = !peerRolesRef.current[event.pubkey];
-                stateProxy.put(`peer_role_${event.pubkey}`, 'peer');
+                const existingRole = stateProxy.store[`peer_role_${event.pubkey}`] || peerRolesRef.current[event.pubkey];
+                if (!existingRole) {
+                  stateProxy.put(`peer_role_${event.pubkey}`, 'peer');
+                }
                 if (peerName) {
                   stateProxy.put(`peer_name_${event.pubkey}`, peerName);
                 }
