@@ -90,7 +90,17 @@ const Chat = () => {
   }, [messages]);
 
   const sortedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => a.timestamp - b.timestamp);
+    return [...messages]
+      .filter(m => {
+        if (m.type === 'system' && m.text) {
+          const lower = m.text.toLowerCase();
+          if (lower.includes('is now playing') || lower.includes('started playing') || lower.includes('started this song') || lower.includes('now playing')) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
   }, [messages]);
 
   const grouped = useMemo(() => groupMessages(sortedMessages), [sortedMessages]);

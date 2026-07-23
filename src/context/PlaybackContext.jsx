@@ -142,21 +142,7 @@ export const PlaybackProvider = ({ children }) => {
         }
       }
 
-      // Send system message about song change (only when user explicitly loads a track)
-      if (isLocal && chatDb) {
-        const senderName = localStorage.getItem('bloom_name') || 'Someone';
-        const systemMsg = {
-          text: `${senderName} is now playing ${updatedTrack.title}`,
-          type: 'system',
-          sender: 'System',
-          timestamp: Date.now()
-        };
-        // Dispatch a local event so Chat component picks it up immediately
-        window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
-        try {
-          await chatDb.add(systemMsg);
-        } catch (e) { /* silent — no peers */ }
-      }
+
 
       setIsLoading(false);
       if (autoPlay || isPlayingRef.current) {
