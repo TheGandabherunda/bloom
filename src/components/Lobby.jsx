@@ -4,6 +4,7 @@ import { pool, getUserRelays } from '../services/nostr';
 import { LobbyTileSkeleton } from './Skeleton';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
+import Imprints from './Imprints';
 
 const MiniProgressBar = React.memo(({ playerRef, duration }) => {
   const progressRef = useRef(null);
@@ -39,6 +40,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
   const [rooms, setRooms] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [showImprints, setShowImprints] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   
@@ -397,9 +399,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
         </div>
       </div>
 
-      <div className="fixed bottom-4 left-4 z-40 pointer-events-none">
-        <p className="text-white/30 text-xs font-medium">Total live parties: {filteredRooms.length}</p>
-      </div>
+
 
       {/* Mini Player when minimized */}
       {minimizedConfig && status === 'connected' && (
@@ -493,10 +493,28 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
       </div>
       )}
 
-      <div className="fixed bottom-4 right-4 z-40 pointer-events-none text-right">
-        <p className="text-white/30 text-xs font-medium tracking-wide">
-          {locationCode} · {formatTimeDate(currentTime)}
-        </p>
+      {/* Bottom Bar: Left = Date & Time, Middle = Live Parties Count, Right = Imprints Button */}
+      <div className="fixed bottom-4 left-4 right-4 z-40 pointer-events-none flex items-center justify-between px-2">
+        <div className="pointer-events-auto">
+          <p className="text-white/30 text-xs font-medium tracking-wide">
+            {locationCode} · {formatTimeDate(currentTime)}
+          </p>
+        </div>
+
+        <div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 hidden sm:block">
+          <p className="text-white/30 text-xs font-medium">
+            Total live parties: {filteredRooms.length}
+          </p>
+        </div>
+
+        <div className="pointer-events-auto text-right">
+          <button
+            onClick={() => setShowImprints(true)}
+            className="text-white/40 hover:text-white text-xs font-semibold tracking-wider uppercase transition-colors hover:underline focus:outline-none"
+          >
+            Imprints
+          </button>
+        </div>
       </div>
 
       {showCreate && (
@@ -584,6 +602,10 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             }
           `}</style>
         </div>
+      )}
+
+      {showImprints && (
+        <Imprints onClose={() => setShowImprints(false)} />
       )}
 
     </div>
