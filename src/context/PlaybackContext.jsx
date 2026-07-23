@@ -316,9 +316,13 @@ export const PlaybackProvider = ({ children }) => {
           const index = value.index !== undefined ? value.index : -1;
           
           let computedLiveTime = value.startTime || 0;
-          if (value.timestamp && networkIsPlayingRef.current) {
-             const elapsed = (Date.now() - value.timestamp) / 1000;
-             computedLiveTime = (value.startTime || 0) + elapsed;
+          if (value.timestamp) {
+             const isPlayingState = stateDb ? await stateDb.get('isPlaying') : false;
+             const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
+             if (isPlaying) {
+               const elapsed = (Date.now() - value.timestamp) / 1000;
+               computedLiveTime = (value.startTime || 0) + elapsed;
+             }
           } else if (value.liveTime !== undefined) {
              computedLiveTime = value.liveTime;
           }
@@ -372,20 +376,25 @@ export const PlaybackProvider = ({ children }) => {
   const togglePlay = useCallback(async (forceLocal = false) => {
     if (!forceLocal && !canControl()) return;
     
-    if (forceLocal && isPlayingRef.current) {
+    if (forceLocal) {
       setError(null);
       if (stateDb) {
         try {
           const syncedTrack = await stateDb.get('currentTrack');
-          if (syncedTrack && syncedTrack.timestamp) {
+          const isPlayingState = await stateDb.get('isPlaying');
+          const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
+          
+          if (syncedTrack && syncedTrack.timestamp && isPlaying) {
             const elapsed = (Date.now() - syncedTrack.timestamp) / 1000;
             const currentPos = (syncedTrack.startTime || 0) + elapsed;
-            if (playerRef.current && currentPos > 0 && Math.abs(playerRef.current.getCurrentTime() - currentPos) > 3) {
-               console.log(`[Playback] Resyncing audio seek position to ${currentPos.toFixed(1)}s on user unblock.`);
+            if (playerRef.current && currentPos > 0) {
+               console.log(`[Playback] Force resyncing audio seek position to ${currentPos.toFixed(1)}s on user unblock.`);
                playerRef.current.seek(currentPos);
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('[Playback] Force resync error:', e);
+        }
       }
       await playerRef.current?.play().catch(e => console.warn('Still blocked', e));
       return;
