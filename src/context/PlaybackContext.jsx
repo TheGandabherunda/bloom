@@ -38,9 +38,9 @@ export const PlaybackProvider = ({ children }) => {
     player.onDurationChange = (dur) => setDuration(dur);
     player.onError = (e) => {
       console.error('[CustomPlayer] Error:', e);
-      setError(e.message || 'Playback failed');
-      
       const isInteractError = e.message?.toLowerCase().includes('interact') || e.name === 'NotAllowedError';
+      setError(isInteractError ? 'autoplay-interact-blocked' : (e.message || 'Playback failed'));
+      
       if (!isInteractError) {
         setIsPlaying(false);
         isPlayingRef.current = false;
@@ -154,10 +154,10 @@ export const PlaybackProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('[Playback] Load Track Error:', err);
-      setError(err.message || 'Failed to load track');
+      const isInteractError = err.message?.toLowerCase().includes('interact') || err.name === 'NotAllowedError';
+      setError(isInteractError ? 'autoplay-interact-blocked' : (err.message || 'Failed to load track'));
       setIsLoading(false);
       
-      const isInteractError = err.message?.toLowerCase().includes('interact') || err.name === 'NotAllowedError';
       if (!isInteractError) {
         setIsPlaying(false);
         isPlayingRef.current = false;

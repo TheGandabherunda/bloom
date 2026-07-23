@@ -11,7 +11,7 @@ import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config, onLeave, onMinimize }) => {
   const { initP2P, stopP2P, status, peerId, peerRoles, getConnectedRelays, deleteRoom } = useOrbit();
-  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback } = usePlayback();
+  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback, error, togglePlay } = usePlayback();
   const [showSearch, setShowSearch] = useState(false);
   
   const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
@@ -416,6 +416,25 @@ const Layout = ({ config, onLeave, onMinimize }) => {
               100% { opacity: 1; transform: translateY(0) scale(1); }
             }
           `}</style>
+        </div>
+      )}
+
+      {/* Autoplay Blocked Overlay */}
+      {error && error.toLowerCase().includes('interact') && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500"
+          onClick={() => togglePlay(true)}
+        >
+          <div className="bg-white/10 p-8 rounded-[32px] flex flex-col items-center shadow-2xl border border-white/20 text-center max-w-sm w-full hover:bg-white/15 transition-colors cursor-pointer group">
+            <div className="w-24 h-24 bg-[var(--color-primary)] rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(var(--color-primary-rgb),0.6)] group-hover:scale-110 transition-transform">
+              <span className="material-symbols-rounded text-white text-[56px] leading-none icon-fill" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+            </div>
+            <h2 className="text-3xl font-serif text-white mb-2" style={{ fontFamily: '"Gloock", serif' }}>Listen In</h2>
+            <p className="text-white/70 text-sm mb-8 leading-relaxed">The party is already playing. Tap anywhere to sync audio.</p>
+            <button className="bg-white text-black px-8 py-3.5 rounded-full font-bold uppercase tracking-wider text-sm hover:scale-105 active:scale-95 transition-transform w-full shadow-lg">
+              Start Listening
+            </button>
+          </div>
         </div>
       )}
     </div>
