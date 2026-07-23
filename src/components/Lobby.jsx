@@ -47,7 +47,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
   const [isInitializing, setIsInitializing] = useState(true);
   
   // Context hooks for mini-player
-  const { currentTrack, isPlaying, togglePlayPause, nextTrack, prevTrack, playerRef, duration } = usePlayback();
+  const { currentTrack, isPlaying, togglePlay, playNext, playPrev, playerRef, duration } = usePlayback();
   const { status, peerNames, stateDb } = useOrbit();
   const [roomName, setRoomName] = useState(minimizedConfig ? minimizedConfig.roomId : '');
 
@@ -424,13 +424,13 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             {/* Right: Controls */}
             <div className="flex items-center gap-0 shrink-0 pr-1">
               <button
-                onClick={(e) => { e.stopPropagation(); prevTrack(); }}
+                onClick={(e) => { e.stopPropagation(); playPrev(); }}
                 className="text-white/60 hover:text-white p-1 flex items-center justify-center rounded-full"
               >
                 <span className="material-symbols-rounded text-[24px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>skip_previous</span>
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); togglePlayPause(); }}
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
                 className="text-white p-1 flex items-center justify-center rounded-full hover:scale-105 transition-transform"
               >
                 <span className="material-symbols-rounded text-[38px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -438,7 +438,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                 </span>
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); nextTrack(); }}
+                onClick={(e) => { e.stopPropagation(); playNext(true); }}
                 className="text-white/60 hover:text-white p-1 flex items-center justify-center rounded-full"
               >
                 <span className="material-symbols-rounded text-[24px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>skip_next</span>
