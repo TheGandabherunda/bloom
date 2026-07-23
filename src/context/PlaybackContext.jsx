@@ -235,9 +235,10 @@ export const PlaybackProvider = ({ children }) => {
     return role === 'owner' || role === 'admin';
   }, [peerId]);
 
-  // Host periodically syncs real audio playhead position to stateDb
+  // ONLY Host (Room Owner) periodically syncs real audio playhead position to stateDb
   useEffect(() => {
-    if (!isPlaying || !canControl() || !stateDb) return;
+    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    if (!isPlaying || !isOwner || !stateDb) return;
     
     const interval = setInterval(() => {
       if (playerRef.current && isPlaying) {
@@ -249,7 +250,7 @@ export const PlaybackProvider = ({ children }) => {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, canControl, stateDb, peerId]);
+  }, [isPlaying, stateDb, peerId, peerRoles]);
 
   // Initial Sync from OrbitDB
   useEffect(() => {
@@ -397,6 +398,8 @@ export const PlaybackProvider = ({ children }) => {
     if (forceLocal) {
       setError(null);
       await playerRef.current?.play().catch(e => console.warn('Still blocked', e));
+      setIsPlaying(true);
+      isPlayingRef.current = true;
       if (stateDb) {
         try {
           const isPlayingState = await stateDb.get('isPlaying');

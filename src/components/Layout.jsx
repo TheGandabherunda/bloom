@@ -446,7 +446,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
       )}
 
       {/* Autoplay Blocked Overlay */}
-      {networkIsPlaying && !isPlaying && !isLoading && !canControl && currentTrack && (
+      {networkIsPlaying && !isPlaying && !isLoading && currentTrack && (
         <div 
           className="fixed inset-0 bg-black/70 backdrop-blur-2xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300 cursor-pointer"
           onClick={() => togglePlay(true)}
