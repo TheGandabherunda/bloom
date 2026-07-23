@@ -6,6 +6,7 @@ import { PlayerTrackSkeleton } from './Skeleton';
 
 const Visualizer = React.memo(({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
   const barsRef = useRef([]);
+  const smoothValsRef = useRef(new Array(48).fill(0));
 
   useEffect(() => {
     // Prevent heavy JS loop when visualizer is hidden OR when audio is paused!
@@ -27,15 +28,26 @@ const Visualizer = React.memo(({ playerRef, isExpanded, isFullscreen, isPlaying 
       
       for (let i = 0; i < numBars; i++) {
         if (barsRef.current[i]) {
-           let val = 0;
+           let targetVal = 0;
            if (usableBins > 0) {
              const { ratio, powerRatio } = ratioMap[i];
              const binIndex = Math.floor(powerRatio * (usableBins - 1));
-             val = data[binIndex] || 0;
-             val = val * (1 + (ratio * 0.5));
+             const raw = data[binIndex] || 0;
+             // Scale 0-255 to 0-1
+             let norm = raw / 255;
+             // Boost high frequencies slightly to counteract natural spectral roll-off
+             norm = norm * (1 + ratio * 0.8);
+             // Apply steep curve to increase dynamic range (spiky rather than blocky)
+             targetVal = Math.min(1, Math.pow(norm, 2.2));
            }
-           const normalized = Math.min(1, Math.pow(val / 255, 1.3) * 1.25);
-           barsRef.current[i].style.transform = `scaleY(${Math.max(0.01, normalized)})`;
+           
+           // Fast attack, slow release smoothing
+           const prev = smoothValsRef.current[i];
+           // If target is higher, move quickly (or instantly). If lower, decay smoothly.
+           const smoothed = targetVal < prev ? (prev * 0.85) + (targetVal * 0.15) : targetVal;
+           smoothValsRef.current[i] = smoothed;
+
+           barsRef.current[i].style.transform = `scaleY(${Math.max(0.01, smoothed)})`;
         }
       }
     };
