@@ -274,6 +274,7 @@ export class CustomAudioPlayer {
     } catch (e) {
       if (e.name !== 'AbortError') {
         console.error('[AudioPlayer] play error:', e);
+        this.pause();
         if (this.onError) this.onError(e);
       }
     }

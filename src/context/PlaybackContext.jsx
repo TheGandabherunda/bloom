@@ -321,7 +321,6 @@ export const PlaybackProvider = ({ children }) => {
           } else {
             playerRef.current?.pause();
           }
-          setIsPlaying(status);
         } else if (key === 'currentTime') {
           const time = typeof value === 'object' ? value.time : value;
           if (Math.abs(playerRef.current?.getCurrentTime() - time) > 3) {
