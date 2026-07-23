@@ -150,13 +150,48 @@ export const OrbitProvider = ({ children }) => {
             stateProxy.events.emit('update', { payload: { key, value } });
             window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value }, payload: { key, value } }));
             
-            // Check for names/roles directly
-            if (key.startsWith('peer_name_')) {
+            // Check for names/roles/banned directly
+            if (key === 'banned') {
+              const bannedPk = value;
+              delete stateProxy.store[`peer_name_${bannedPk}`];
+              delete stateProxy.store[`peer_role_${bannedPk}`];
+              setPeers(prev => prev.filter(p => p !== bannedPk));
+              setPeerNames(prev => {
+                const next = { ...prev };
+                delete next[bannedPk];
+                return next;
+              });
+              setPeerRoles(prev => {
+                const next = { ...prev };
+                delete next[bannedPk];
+                return next;
+              });
+            } else if (key.startsWith('peer_name_')) {
               const pubkey = key.replace('peer_name_', '');
-              setPeerNames(prev => ({...prev, [pubkey]: value}));
-              setPeers(prev => [...new Set([...prev, pubkey])]);
+              if (!value) {
+                delete stateProxy.store[key];
+                setPeers(prev => prev.filter(p => p !== pubkey));
+                setPeerNames(prev => {
+                  const next = { ...prev };
+                  delete next[pubkey];
+                  return next;
+                });
+              } else {
+                setPeerNames(prev => ({...prev, [pubkey]: value}));
+                setPeers(prev => [...new Set([...prev, pubkey])]);
+              }
             } else if (key.startsWith('peer_role_')) {
-              setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: value}));
+              const pubkey = key.replace('peer_role_', '');
+              if (!value) {
+                delete stateProxy.store[key];
+                setPeerRoles(prev => {
+                  const next = { ...prev };
+                  delete next[pubkey];
+                  return next;
+                });
+              } else {
+                setPeerRoles(prev => ({...prev, [pubkey]: value}));
+              }
             }
             
             // Debounce state publish
@@ -273,6 +308,7 @@ export const OrbitProvider = ({ children }) => {
                 const newPeerNames = {};
                 const newPeerRoles = {};
                 const peerList = [];
+                const bannedPk = data['banned'];
 
                 Object.keys(data).forEach(key => {
                   if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
@@ -282,14 +318,18 @@ export const OrbitProvider = ({ children }) => {
                     stateProxy.events.emit('update', { payload: { key, value: data[key] } });
                     window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value: data[key] }, payload: { key, value: data[key] } }));
                     
-                    if (key.startsWith('peer_name_')) {
+                    if (key.startsWith('peer_name_') && data[key]) {
                       const pk = key.replace('peer_name_', '');
-                      newPeerNames[pk] = data[key];
-                      peerList.push(pk);
-                    } else if (key.startsWith('peer_role_')) {
+                      if (pk !== bannedPk) {
+                        newPeerNames[pk] = data[key];
+                        peerList.push(pk);
+                      }
+                    } else if (key.startsWith('peer_role_') && data[key]) {
                       const pk = key.replace('peer_role_', '');
-                      newPeerRoles[pk] = data[key];
-                      peerList.push(pk);
+                      if (pk !== bannedPk) {
+                        newPeerRoles[pk] = data[key];
+                        peerList.push(pk);
+                      }
                     } else if (key === 'chat_history' && Array.isArray(data[key])) {
                       data[key].forEach(msg => {
                         const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
@@ -305,14 +345,18 @@ export const OrbitProvider = ({ children }) => {
                        window.location.href = window.location.pathname;
                     }
                   } else {
-                    if (key.startsWith('peer_name_')) {
+                    if (key.startsWith('peer_name_') && data[key]) {
                       const pk = key.replace('peer_name_', '');
-                      newPeerNames[pk] = data[key];
-                      peerList.push(pk);
-                    } else if (key.startsWith('peer_role_')) {
+                      if (pk !== bannedPk) {
+                        newPeerNames[pk] = data[key];
+                        peerList.push(pk);
+                      }
+                    } else if (key.startsWith('peer_role_') && data[key]) {
                       const pk = key.replace('peer_role_', '');
-                      newPeerRoles[pk] = data[key];
-                      peerList.push(pk);
+                      if (pk !== bannedPk) {
+                        newPeerRoles[pk] = data[key];
+                        peerList.push(pk);
+                      }
                     } else if (key === 'chat_history' && Array.isArray(data[key])) {
                       data[key].forEach(msg => {
                         const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
@@ -325,15 +369,33 @@ export const OrbitProvider = ({ children }) => {
                     }
                   }
                 });
-                
-                if (Object.keys(newPeerNames).length > 0) {
-                  setPeerNames(prev => ({ ...prev, ...newPeerNames }));
-                }
-                if (Object.keys(newPeerRoles).length > 0) {
-                  setPeerRoles(prev => ({ ...prev, ...newPeerRoles }));
-                }
-                if (peerList.length > 0) {
-                  setPeers(prev => [...new Set([...prev, ...peerList])]);
+
+                if (bannedPk) {
+                  delete stateProxy.store[`peer_name_${bannedPk}`];
+                  delete stateProxy.store[`peer_role_${bannedPk}`];
+                  delete newPeerNames[bannedPk];
+                  delete newPeerRoles[bannedPk];
+                  setPeers(prev => prev.filter(p => p !== bannedPk));
+                  setPeerNames(prev => {
+                    const copy = { ...prev };
+                    delete copy[bannedPk];
+                    return copy;
+                  });
+                  setPeerRoles(prev => {
+                    const copy = { ...prev };
+                    delete copy[bannedPk];
+                    return copy;
+                  });
+                } else {
+                  if (Object.keys(newPeerNames).length > 0) {
+                    setPeerNames(prev => ({ ...prev, ...newPeerNames }));
+                  }
+                  if (Object.keys(newPeerRoles).length > 0) {
+                    setPeerRoles(prev => ({ ...prev, ...newPeerRoles }));
+                  }
+                  if (peerList.length > 0) {
+                    setPeers(prev => [...new Set([...prev, ...peerList])]);
+                  }
                 }
 
                 if (stateRecovered && isHostRef.current) {

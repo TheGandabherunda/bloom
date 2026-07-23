@@ -4,7 +4,7 @@ import { useOrbit } from '../context/OrbitContext';
 import { getPeerColor } from '../utils/peerColors';
 
 const PeersList = () => {
-  const { peers, peerId, peerNames, peerRoles, stateDb, status } = useOrbit();
+  const { peers, peerId, peerNames, peerRoles, stateDb, chatDb, status } = useOrbit();
   const [loading, setLoading] = useState(true);
   const [kickConfirmPeer, setKickConfirmPeer] = useState(null);
 
@@ -26,10 +26,33 @@ const PeersList = () => {
 
   const handleKick = async (targetId) => {
     if (!stateDb) return;
+    const targetName = peerNames[targetId] || 'User';
+
+    // 1. Mark banned in stateDb and delete name/role entries
     await stateDb.put('banned', targetId);
+    await stateDb.put(`peer_name_${targetId}`, null);
+    await stateDb.put(`peer_role_${targetId}`, null);
+
+    // 2. Post system message in chat
+    const systemMsg = {
+      text: `${targetName} was kicked from the party`,
+      type: 'system',
+      sender: 'System',
+      timestamp: Date.now()
+    };
+    
+    window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
+    if (chatDb?.add) {
+      try {
+        await chatDb.add(systemMsg);
+      } catch (e) {}
+    }
   };
 
-  const allPeers = [...new Set([peerId, ...peers])].filter(Boolean); // Include self
+  const bannedPeer = stateDb?.store?.['banned'];
+  const allPeers = [...new Set([peerId, ...peers])]
+    .filter(Boolean)
+    .filter(p => p !== bannedPeer && peerNames[p] && peerRoles[p]);
   const isOwner = peerRoles[peerId] === 'owner';
   const canManage = isOwner || peerRoles[peerId] === 'admin';
 
