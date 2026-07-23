@@ -25,18 +25,6 @@ const Layout = ({ config, onLeave, onMinimize }) => {
   const [loadingTrending, setLoadingTrending] = useState(true);
 
   useEffect(() => {
-    console.log('[Autoplay Debug]', {
-      networkIsPlaying,
-      isPlaying,
-      isLoading,
-      canControl,
-      hasCurrentTrack: !!currentTrack,
-      role,
-      status
-    });
-  }, [networkIsPlaying, isPlaying, isLoading, canControl, currentTrack, role, status]);
-
-  useEffect(() => {
     let isMounted = true;
     getTrendingByLocation().then(tracks => {
       if (isMounted) {
@@ -434,17 +422,16 @@ const Layout = ({ config, onLeave, onMinimize }) => {
       {/* Autoplay Blocked Overlay */}
       {networkIsPlaying && !isPlaying && !isLoading && !canControl && currentTrack && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500"
+          className="fixed inset-0 bg-black/70 backdrop-blur-2xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300 cursor-pointer"
           onClick={() => togglePlay(true)}
         >
-          <div className="bg-white/10 p-8 rounded-[32px] flex flex-col items-center shadow-2xl border border-white/20 text-center max-w-sm w-full hover:bg-white/15 transition-colors cursor-pointer group">
-            <div className="w-24 h-24 bg-[var(--color-primary)] rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(var(--color-primary-rgb),0.6)] group-hover:scale-110 transition-transform">
-              <span className="material-symbols-rounded text-white text-[56px] leading-none icon-fill" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+          <div className="flex flex-col items-center text-center max-w-sm w-full">
+            <div className="w-20 h-20 bg-[var(--color-primary)] rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(var(--color-primary-rgb),0.7)] animate-pulse">
+              <span className="material-symbols-rounded text-white text-[44px] leading-none icon-fill" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
             </div>
-            <h2 className="text-3xl font-serif text-white mb-2" style={{ fontFamily: '"Gloock", serif' }}>Listen In</h2>
-            <p className="text-white/70 text-sm mb-8 leading-relaxed">The party is already playing. Tap anywhere to sync audio.</p>
-            <button className="bg-white text-black px-8 py-3.5 rounded-full font-bold uppercase tracking-wider text-sm hover:scale-105 active:scale-95 transition-transform w-full shadow-lg">
-              Start Listening
+            <p className="text-white/90 text-lg font-medium mb-6 tracking-wide">The party is already playing</p>
+            <button className="bg-white hover:bg-white/90 text-black px-8 py-3.5 rounded-full font-semibold text-base transition-all hover:scale-105 active:scale-95 shadow-xl">
+              Start listening
             </button>
           </div>
         </div>
