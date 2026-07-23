@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useOrbit } from './OrbitContext';
 import { CustomAudioPlayer } from '../services/CustomAudioPlayer';
+import { decodeHtml } from '../services/musicApi';
 
 const PlaybackContext = createContext(null);
 
@@ -105,7 +106,12 @@ export const PlaybackProvider = ({ children }) => {
 
       console.log(`[Playback] Stream URL resolved: ${streamUrl}`);
       
-      const updatedTrack = { ...track, audioQuality: track.audioQuality || 'AUDIO' };
+      const updatedTrack = { 
+        ...track, 
+        title: decodeHtml(track.title || ''),
+        author: decodeHtml(track.author || ''),
+        audioQuality: track.audioQuality || 'AUDIO' 
+      };
       setCurrentTrack(updatedTrack);
       setCurrentIndex(targetIndex);
       console.log(`[Playback] setCurrentTrack to: ${updatedTrack.id}, targetIndex to: ${targetIndex}`);

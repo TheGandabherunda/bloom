@@ -1,14 +1,37 @@
 // The backend proxy now handles all high-res streams natively via Jiosaavn CDN.
 // External monochrome mirrors are permanently stripped.
 
-// Decode HTML entities without DOM mutations (no textarea/DOMParser overhead)
-const decodeHtml = (str) => str
-  .replace(/&amp;/g, '&')
-  .replace(/&lt;/g, '<')
-  .replace(/&gt;/g, '>')
-  .replace(/&quot;/g, '"')
-  .replace(/&#039;/g, "'")
-  .replace(/&apos;/g, "'");
+// Decode HTML entities robustly
+export const decodeHtml = (str) => {
+  if (!str || typeof str !== 'string') return str || '';
+  let decoded = str;
+  if (typeof document !== 'undefined') {
+    try {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      decoded = txt.value;
+      if (decoded.includes('&')) {
+        txt.innerHTML = decoded;
+        decoded = txt.value;
+      }
+      return decoded;
+    } catch (e) {}
+  }
+
+  return decoded
+    .replace(/&quot;/g, '"')
+    .replace(/&#034;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#039;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&#38;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&#60;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#62;/g, '>');
+};
 
 const fetchJSONP = (url) => new Promise((resolve, reject) => {
   const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
@@ -53,7 +76,7 @@ export const searchTracks = async (query) => {
       return {
         id: song.id,
         title: title,
-        author: author,
+        author: decodeHtml(author),
         thumbnail: thumbnail,
         duration: parseInt(song.duration || 0),
         isMusic: true,
@@ -89,7 +112,7 @@ export const getRecommendations = async (track) => {
       return {
         id: song.id,
         title: title,
-        author: author,
+        author: decodeHtml(author),
         thumbnail: thumbnail,
         duration: parseInt(song.duration || 0),
         isMusic: true,
@@ -120,15 +143,18 @@ export const getTrendingByLocation = async () => {
     const country = locationData.country || 'Global';
     const isIndia = country === 'India';
 
-    const normalizeSong = (song, forceLanguage = null) => ({
-      id: song.id,
-      title: song.name || song.title,
-      author: song.primaryArtists || (song.artists && song.artists.primary && song.artists.primary[0]?.name) || 'Unknown Artist',
-      thumbnail: song.image?.[song.image?.length - 1]?.url || song.image?.[0]?.url || '/placeholder.png',
-      duration: song.duration,
-      downloadUrl: song.downloadUrl?.[song.downloadUrl.length - 1]?.url || '',
-      language: forceLanguage || song.language || 'unknown'
-    });
+    const normalizeSong = (song, forceLanguage = null) => {
+      const rawAuthor = song.primaryArtists || (song.artists && song.artists.primary && song.artists.primary[0]?.name) || 'Unknown Artist';
+      return {
+        id: song.id,
+        title: decodeHtml(song.name || song.title || ''),
+        author: decodeHtml(rawAuthor),
+        thumbnail: song.image?.[song.image?.length - 1]?.url || song.image?.[0]?.url || '/placeholder.png',
+        duration: song.duration,
+        downloadUrl: song.downloadUrl?.[song.downloadUrl.length - 1]?.url || '',
+        language: forceLanguage || song.language || 'unknown'
+      };
+    };
 
     let arraysToInterleave = [];
 
