@@ -217,6 +217,7 @@ export const OrbitProvider = ({ children }) => {
 
       const chatProxy = {
         events: new MiniEmitter(),
+        arr: [],
         add: async (msg) => {
           // Both host and peers can publish chat
           await publishSigned({
@@ -225,7 +226,8 @@ export const OrbitProvider = ({ children }) => {
             tags: [['h', roomId]],
             content: JSON.stringify(msg)
           });
-        }
+        },
+        all: async () => chatProxy.arr.map(value => ({ payload: { value } }))
       };
 
       setChatDbReady(chatProxy);
@@ -255,6 +257,11 @@ export const OrbitProvider = ({ children }) => {
                 const data = JSON.parse(event.content);
                 console.log(`[OrbitContext] Parsed state update from relay:`, data);
                 let stateRecovered = false;
+
+                const newPeerNames = {};
+                const newPeerRoles = {};
+                const peerList = [];
+
                 Object.keys(data).forEach(key => {
                   if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
                     console.log(`[OrbitContext] Emitting update for key: ${key}`, data[key]);
@@ -264,18 +271,41 @@ export const OrbitProvider = ({ children }) => {
                     window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value: data[key] }, payload: { key, value: data[key] } }));
                     
                     if (key.startsWith('peer_name_')) {
-                      setPeerNames(prev => ({...prev, [key.replace('peer_name_', '')]: data[key]}));
-                      setPeers(prev => [...new Set([...prev, key.replace('peer_name_', '')])]);
+                      const pk = key.replace('peer_name_', '');
+                      newPeerNames[pk] = data[key];
+                      peerList.push(pk);
                     } else if (key.startsWith('peer_role_')) {
-                      setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: data[key]}));
+                      const pk = key.replace('peer_role_', '');
+                      newPeerRoles[pk] = data[key];
+                      peerList.push(pk);
                     } else if (key === 'banned' && data[key] === nostrPk) {
                        window.location.href = window.location.pathname;
                     } else if (key === 'room_ended' && data[key] === true) {
                        window.location.href = window.location.pathname;
                     }
+                  } else {
+                    if (key.startsWith('peer_name_')) {
+                      const pk = key.replace('peer_name_', '');
+                      newPeerNames[pk] = data[key];
+                      peerList.push(pk);
+                    } else if (key.startsWith('peer_role_')) {
+                      const pk = key.replace('peer_role_', '');
+                      newPeerRoles[pk] = data[key];
+                      peerList.push(pk);
+                    }
                   }
                 });
                 
+                if (Object.keys(newPeerNames).length > 0) {
+                  setPeerNames(prev => ({ ...prev, ...newPeerNames }));
+                }
+                if (Object.keys(newPeerRoles).length > 0) {
+                  setPeerRoles(prev => ({ ...prev, ...newPeerRoles }));
+                }
+                if (peerList.length > 0) {
+                  setPeers(prev => [...new Set([...prev, ...peerList])]);
+                }
+
                 if (stateRecovered && isHostRef.current) {
                   // We recovered state from the relay. Publish merged state to avoid partial overwrites.
                   if (statePublishTimeout) clearTimeout(statePublishTimeout);
@@ -317,15 +347,21 @@ export const OrbitProvider = ({ children }) => {
             } else if (dTag === `join-${roomId}` && isHost) {
               // Peer join intent to host
               try {
-                const joinData = JSON.parse(event.content);
-                console.log(`[OrbitContext] Host received join intent from peer ${event.pubkey}:`, joinData);
+                let peerName = null;
+                try {
+                  const parsed = JSON.parse(event.content);
+                  if (typeof parsed === 'string') peerName = parsed;
+                  else if (parsed && parsed.displayName) peerName = parsed.displayName;
+                } catch (e) {
+                  peerName = event.content;
+                }
+
+                console.log(`[OrbitContext] Host received join intent from peer ${event.pubkey}: name=${peerName}`);
                 
                 // Add peer to roles as 'peer' if not already assigned, and set their name
-                if (!peerRolesRef.current[event.pubkey]) {
-                  stateProxy.put(`peer_role_${event.pubkey}`, 'peer');
-                }
-                if (joinData.displayName) {
-                  stateProxy.put(`peer_name_${event.pubkey}`, joinData.displayName);
+                stateProxy.put(`peer_role_${event.pubkey}`, 'peer');
+                if (peerName) {
+                  stateProxy.put(`peer_name_${event.pubkey}`, peerName);
                 }
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse join intent:', e);
@@ -336,7 +372,11 @@ export const OrbitProvider = ({ children }) => {
             try {
               const msg = JSON.parse(event.content);
               console.log('[OrbitContext] Received chat message from relay:', msg);
-              chatProxy.events.emit('add', msg);
+              const isDuplicate = chatProxy.arr.some(m => m.id === msg.id && m.timestamp === msg.timestamp);
+              if (!isDuplicate) {
+                chatProxy.arr.push(msg);
+                chatProxy.events.emit('update', { payload: { value: msg } });
+              }
               window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
             } catch (e) {
               console.error('[OrbitContext] Failed to parse chat event:', e);
@@ -349,6 +389,7 @@ export const OrbitProvider = ({ children }) => {
       if (isHost) {
         setPeerNames(prev => ({ ...prev, [nostrPk]: displayName }));
         setPeerRoles(prev => ({ ...prev, [nostrPk]: 'owner' }));
+        setPeers(prev => [...new Set([...prev, nostrPk])]);
         
         // Wait briefly for WebSockets to open before slamming them with the initial state
         setTimeout(() => {
@@ -404,7 +445,7 @@ export const OrbitProvider = ({ children }) => {
             kind: 30000,
             created_at: Math.floor(Date.now() / 1000),
             tags: [['d', `join-${roomId}`], ['p', hostIdRef.current]],
-            content: displayName
+            content: JSON.stringify({ displayName })
           });
         };
 
