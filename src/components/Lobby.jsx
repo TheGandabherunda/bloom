@@ -127,6 +127,13 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             const roomName = titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId;
             const hostPk = event.pubkey;
 
+            // Ignore stale beacons (older than 5 minutes). Active hosts broadcast every 30s.
+            const now = Math.floor(Date.now() / 1000);
+            if (now - event.created_at > 300) {
+               console.log(`[Lobby] Ignoring stale beacon for room: ${roomId} (${now - event.created_at}s old)`);
+               return;
+            }
+
             console.log('[Lobby] Valid beacon for room:', roomId, 'Host PK:', hostPk);
             
             setRooms(prev => {
