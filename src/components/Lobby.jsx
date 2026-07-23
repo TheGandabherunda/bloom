@@ -123,9 +123,11 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             let parsedContent = {};
             try { parsedContent = JSON.parse(event.content); } catch(e) {}
             
-            const activePeers = parsedContent.activePeerIds ? parsedContent.activePeerIds.length : 1;
-            const roomName = titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId;
+            const activePeers = parsedContent.activePeers || (parsedContent.activePeerIds ? parsedContent.activePeerIds.length : 1);
+            const roomName = parsedContent.roomName || (titleTag ? titleTag[1].replace('Bloom Room: ', '') : roomId);
             const hostPk = event.pubkey;
+            const hostName = parsedContent.hostName;
+            const currentTrack = parsedContent.currentTrack;
 
             // Ignore stale beacons (older than 5 minutes). Active hosts broadcast every 30s.
             const now = Math.floor(Date.now() / 1000);
@@ -148,6 +150,8 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                 [roomId]: {
                   roomId,
                   roomName,
+                  hostName,
+                  currentTrack,
                   hostPk,
                   activePeers,
                   timestamp: event.created_at,

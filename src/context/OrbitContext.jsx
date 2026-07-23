@@ -172,19 +172,25 @@ export const OrbitProvider = ({ children }) => {
             if (isPublicRef.current && (key === 'currentTrack' || key.startsWith('peer_name_'))) {
                if (beaconPublishTimeout) clearTimeout(beaconPublishTimeout);
                beaconPublishTimeout = setTimeout(() => {
-                 const beaconEvent = {
-                   kind: 30000,
-                   created_at: Math.floor(Date.now() / 1000),
-                   tags: [['d', `lobby-${roomId}`]],
-                   content: JSON.stringify({ 
-                     roomId, 
-                     roomName: stateProxy.store['roomName'] || roomId,
-                     hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
-                     currentTrack: stateProxy.store['currentTrack'],
-                     activePeers: Object.keys(peerNamesRef.current).length,
-                     hostPk: hostIdRef.current
-                   })
-                 };
+                  const beaconEvent = {
+                    kind: 30311,
+                    created_at: Math.floor(Date.now() / 1000),
+                    tags: [
+                      ['d', `bloom-${roomId}`],
+                      ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
+                      ['status', 'live'],
+                      ['t', 'music'],
+                      ['p', hostIdRef.current, 'host']
+                    ],
+                    content: JSON.stringify({ 
+                      roomId, 
+                      roomName: stateProxy.store['roomName'] || roomId,
+                      hostName: peerNamesRef.current[hostIdRef.current] || displayName, 
+                      currentTrack: stateProxy.store['currentTrack'],
+                      activePeers: Object.keys(peerNamesRef.current).length,
+                      hostPk: hostIdRef.current
+                    })
+                  };
                  const signedBeacon = finalizeEvent(beaconEvent, skRef.current);
                  const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
                  if (Array.isArray(pubResults)) Promise.allSettled(pubResults).then(()=>{});
@@ -353,18 +359,25 @@ export const OrbitProvider = ({ children }) => {
           }
           if (isPublicRef.current) {
              const activePeerIds = Object.keys(peerNamesRef.current);
-             const beaconEvent = {
-               kind: 30311,
-               created_at: Math.floor(Date.now() / 1000),
-               tags: [
-                 ['d', `bloom-${roomId}`],
-                 ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
-                 ['status', 'live'],
-                 ['t', 'music'],
-                 ['p', nostrPk, 'host']
-               ],
-               content: JSON.stringify({ roomId, activePeerIds, hostPk: nostrPk })
-             };
+              const beaconEvent = {
+                kind: 30311,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                  ['d', `bloom-${roomId}`],
+                  ['title', `Bloom Room: ${stateProxy.store['roomName'] || roomId}`],
+                  ['status', 'live'],
+                  ['t', 'music'],
+                  ['p', nostrPk, 'host']
+                ],
+                content: JSON.stringify({ 
+                  roomId, 
+                  roomName: stateProxy.store['roomName'] || roomId,
+                  hostName: peerNamesRef.current[nostrPk] || displayName,
+                  currentTrack: stateProxy.store['currentTrack'],
+                  activePeers: activePeerIds.length, 
+                  hostPk: nostrPk 
+                })
+              };
              const signedBeacon = finalizeEvent(beaconEvent, nostrSk);
              const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
              console.log(`[Nostr] Heartbeat beacon (NIP-53) published to pool.`);
