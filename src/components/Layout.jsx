@@ -9,13 +9,26 @@ import { extractDominantColors, extractPrimaryColor } from '../utils/colorExtrac
 import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
-const Layout = ({ config, onLeave }) => {
+const Layout = ({ config, onLeave, onMinimize }) => {
   const { initP2P, stopP2P, status, peerId, getConnectedRelays, deleteRoom } = useOrbit();
   const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
   const [showSearch, setShowSearch] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMobileView, setActiveMobileView] = useState('home');
   const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+
+  useEffect(() => {
+    if (status === 'connected') {
+      const timer = setTimeout(() => {
+        setShowSkeleton(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowSkeleton(true);
+    }
+  }, [status]);
 
   useEffect(() => {
     if (!config) return;
@@ -103,7 +116,7 @@ const Layout = ({ config, onLeave }) => {
 
   return (
     <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
-      {status !== 'connected' && (
+      {showSkeleton && (
         <AppInitSkeleton status={status} />
       )}
 
@@ -130,30 +143,19 @@ const Layout = ({ config, onLeave }) => {
           {/* Header */}
           <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
             <div className="flex items-center gap-3">
+              <button
+                onClick={onMinimize}
+                title="Back to Lobby"
+                className="text-white/40 hover:text-white transition-colors flex items-center justify-center -ml-1 mr-1"
+              >
+                <span className="material-symbols-rounded text-[26px]">keyboard_arrow_down</span>
+              </button>
               <h2 className="font-bold text-white tracking-wide text-lg lg:text-xl">Bloom</h2>
               <span className="text-white/30 font-bold">•</span>
               
-              {isEditingName && config.isHost ? (
-                <form onSubmit={handleNameSave} className="flex items-center">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    onBlur={handleNameSave}
-                    className="bg-white/10 border border-white/20 rounded-md px-2 py-1 text-white text-sm focus:outline-none w-32 lg:w-48"
-                  />
-                </form>
-              ) : (
-                <div className="flex items-center gap-2 group">
-                  <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl truncate max-w-[120px] lg:max-w-[200px]">{roomName}</span>
-                  {config.isHost && (
-                    <button onClick={() => setIsEditingName(true)} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-white transition-opacity">
-                      <span className="material-symbols-rounded text-[18px]">edit</span>
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl truncate max-w-[120px] lg:max-w-[200px]">{roomName}</span>
+              </div>
               <button
                 title="Copy invite link"
                 onClick={() => {
@@ -175,19 +177,6 @@ const Layout = ({ config, onLeave }) => {
                 className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center ml-2"
               >
                 <span className="material-symbols-rounded text-[26px] leading-none">link</span>
-              </button>
-              <button
-                title={config.isHost ? "End Party" : "Leave Party"}
-                onClick={async () => {
-                  if (config.isHost) {
-                    await deleteRoom();
-                  }
-                  stopP2P();
-                  if (onLeave) onLeave();
-                }}
-                className="text-white/30 hover:text-red-500 transition-colors flex items-center justify-center ml-2"
-              >
-                <span className="material-symbols-rounded text-[26px] leading-none">logout</span>
               </button>
             </div>
 
@@ -219,8 +208,15 @@ const Layout = ({ config, onLeave }) => {
               </div>
             </div>
 
-            {/* Spacer to keep search centered with flex justify-between on desktop */}
-            <div className="w-[120px] hidden lg:block"></div>
+            <div className="flex items-center justify-end min-w-[120px]">
+              <button
+                title={config.isHost ? "End Party" : "Leave Party"}
+                onClick={() => setShowEndConfirm(true)}
+                className="text-white/30 hover:text-red-500 transition-colors flex items-center justify-center"
+              >
+                <span className="material-symbols-rounded text-[26px] leading-none">logout</span>
+              </button>
+            </div>
           </header>
 
           {/* Mobile Search Bar (Below Header) */}
@@ -313,6 +309,66 @@ const Layout = ({ config, onLeave }) => {
           </button>
         </div>
       </div>
+      
+      {/* End/Leave Party Confirmation Modal */}
+      {showEndConfirm && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[200] flex flex-col justify-end md:justify-center items-center p-4 sm:p-6 pb-6 md:pb-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowEndConfirm(false);
+          }}
+        >
+          <div 
+            className="w-full max-w-[420px] bg-[#0a0a0a] rounded-[32px] p-8 shadow-2xl relative"
+            style={{ animation: 'slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+          >
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/10 rounded-full md:hidden"></div>
+            
+            <button 
+              type="button"
+              onClick={() => setShowEndConfirm(false)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors z-10"
+            >
+              <span className="material-symbols-rounded text-[20px]">close</span>
+            </button>
+
+            <div className="mt-2 mb-8 text-center px-4">
+              <h3 className="text-2xl font-bold text-white tracking-tight">{config.isHost ? 'End Party?' : 'Leave Party?'}</h3>
+              <p className="text-white/40 text-sm mt-3 leading-relaxed">
+                Are you sure you want to {config.isHost ? 'end' : 'leave'} the <strong className="text-white/80">{roomName}</strong> party?
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setShowEndConfirm(false)}
+                className="flex items-center justify-center p-4 bg-white/[0.03] hover:bg-white/[0.06] rounded-full text-white font-bold transition-colors h-[48px]"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  setShowEndConfirm(false);
+                  if (config.isHost) {
+                    await deleteRoom();
+                  }
+                  stopP2P();
+                  if (onLeave) onLeave();
+                }}
+                className="flex items-center justify-center p-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-full transition-colors h-[48px]"
+              >
+                {config.isHost ? 'End Party' : 'Leave'}
+              </button>
+            </div>
+          </div>
+          <style>{`
+            @keyframes slideUpModal {
+              0% { opacity: 0; transform: translateY(40px) scale(0.96); }
+              100% { opacity: 1; transform: translateY(0) scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 };

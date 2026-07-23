@@ -1,4 +1,5 @@
 import React from 'react';
+import AmbientLight from './AmbientLight';
 
 // ─── Base shimmer block ──────────────────────────────────────
 export const Shimmer = ({ className = '' }) => (
@@ -39,48 +40,95 @@ export const PlayerTrackSkeleton = () => (
   </div>
 );
 
+// ─── Lobby Room Tile Skeleton ────────────────────────────────
+export const LobbyTileSkeleton = () => (
+  <div className="w-full max-w-xl bg-white/[0.03] p-5 rounded-2xl flex flex-col gap-3">
+    <div className="flex justify-between items-start">
+      <Shimmer className="h-5 w-48 rounded-md" />
+    </div>
+    <div className="mt-2 w-full">
+      <Shimmer className="h-4 w-3/4 rounded-md" />
+    </div>
+  </div>
+);
+
 // ─── Full-screen app init skeleton ───────────────────────────
 export const AppInitSkeleton = ({ status }) => {
-  const loadingText = 
-    status === 'initializing' ? 'Connecting to peers...' : 
-    status === 'syncing' ? 'Syncing room data...' : 
-    status === 'failed' ? 'Connection failed' : 
-    'Making things ready for you...';
+  const loadingText = status === 'failed' ? 'connection failed' : status === 'connected' ? 'connected' : 'connecting';
   
+  const textColor = status === 'failed' ? 'text-red-500' : status === 'connected' ? 'text-emerald-500' : 'text-white/40';
+  const dotColor = status === 'failed' ? 'text-red-500/30' : status === 'connected' ? 'text-emerald-500/30' : 'text-white/10';
+  const lightVariant = status === 'failed' ? 'error' : status === 'connected' ? 'success' : 'default';
+
+  const isConnecting = status !== 'failed' && status !== 'connected';
+
   return (
     <div className="fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center overflow-hidden">
-      
-      {/* Ambient background glow */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[40vw] h-[40vw] max-w-[400px] max-h-[400px] bg-pink-500/10 rounded-full blur-[100px] animate-pulse"></div>
-        <div className="absolute w-[30vw] h-[30vw] max-w-[300px] max-h-[300px] bg-purple-500/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+      <div className="absolute inset-0 z-0">
+        <AmbientLight variant={lightVariant} />
       </div>
 
-      {/* Spinning logo in middle */}
-      <div className="z-10 flex flex-col items-center gap-8">
-        <div className="relative flex items-center justify-center">
-          <img 
-            src="./assets/Bloom.svg" 
-            className={`w-24 h-24 sm:w-32 sm:h-32 ${status !== 'failed' ? 'animate-[spin_4s_linear_infinite]' : 'opacity-50'}`} 
-            alt="Bloom Logo" 
-          />
-        </div>
-        
-        <div className="flex flex-col items-center gap-6">
-          <p className={`text-xs sm:text-sm tracking-[0.3em] uppercase font-medium ${status === 'failed' ? 'text-red-400' : 'text-white/40'}`}>
-            {loadingText}
-          </p>
-
-          {status === 'failed' && (
-            <button 
-              onClick={() => window.location.href = window.location.pathname} 
-              className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors text-xs font-bold tracking-widest"
+      {/* Centered Bloom SVG Text */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[5]">
+        <div className="w-3/4 max-w-md overflow-hidden leading-none opacity-100 -translate-y-4">
+          <svg viewBox="0 0 100 28" className="w-full h-auto">
+            <text 
+              x="50%" 
+              y="27" 
+              textAnchor="middle" 
+              className={`font-['Gloock'] tracking-tight transition-all duration-700 ${
+                isConnecting ? 'fill-transparent stroke-white/60' : 'fill-white stroke-transparent'
+              }`} 
+              fontSize="32"
+              strokeWidth={isConnecting ? "0.3" : "0"}
             >
-              RETURN HOME
-            </button>
-          )}
+              <tspan className={isConnecting ? 'stroke-b' : ''}>B</tspan>
+              <tspan className={isConnecting ? 'stroke-l' : ''}>l</tspan>
+              <tspan className={isConnecting ? 'stroke-o' : ''}>o</tspan>
+              <tspan className={isConnecting ? 'stroke-o' : ''}>o</tspan>
+              <tspan className={isConnecting ? 'stroke-m' : ''}>m</tspan>
+            </text>
+          </svg>
         </div>
       </div>
+
+      <div className="w-full relative z-10 flex mask-image-x overflow-hidden">
+        <div className="flex w-max animate-marquee whitespace-nowrap">
+          {/* Half 1 */}
+          <div className="flex items-center gap-4 shrink-0 pr-4">
+            {Array(20).fill(0).map((_, i) => (
+              <React.Fragment key={`h1-${i}`}>
+                <span className={`text-sm sm:text-base font-medium ${textColor}`}>
+                  {loadingText}
+                </span>
+                <span className={`text-[10px] ${dotColor}`}>•</span>
+              </React.Fragment>
+            ))}
+          </div>
+          {/* Half 2 */}
+          <div className="flex items-center gap-4 shrink-0 pr-4">
+            {Array(20).fill(0).map((_, i) => (
+              <React.Fragment key={`h2-${i}`}>
+                <span className={`text-sm sm:text-base font-medium ${textColor}`}>
+                  {loadingText}
+                </span>
+                <span className={`text-[10px] ${dotColor}`}>•</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {status === 'failed' && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20">
+          <button 
+            onClick={() => window.location.href = window.location.pathname} 
+            className="h-10 px-6 bg-white/10 hover:bg-white/20 text-white font-medium text-sm rounded-full transition-all flex items-center justify-center backdrop-blur-sm"
+          >
+            Return Home
+          </button>
+        </div>
+      )}
     </div>
   );
 };

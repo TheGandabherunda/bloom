@@ -11,6 +11,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('bloom_name'));
   const [hasInvite, setHasInvite] = useState(false);
   const [inviteRoomId, setInviteRoomId] = useState(null);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const fetchKeysAndSetConfig = async (baseConfig) => {
     console.log(`[App] fetchKeysAndSetConfig called for roomId=${baseConfig.roomId}`);
@@ -95,11 +96,28 @@ function App() {
         {!isLoggedIn ? (
           <Login onComplete={handleLogin} />
         ) : config ? (
-          <Layout config={config} onLeave={() => {
-            sessionStorage.removeItem(`bloom_host_${config.roomId}`);
-            setConfig(null);
-            window.location.hash = '';
-          }} />
+          <>
+            <div className="fixed inset-0 z-0 bg-[#050505]">
+              <Lobby 
+                onJoin={handleJoinLobby} 
+                onCreateRoom={handleCreateRoom} 
+                displayName={localStorage.getItem('bloom_name')} 
+                onRestore={() => setIsMinimized(false)}
+                minimizedConfig={config}
+              />
+            </div>
+            <div 
+              className={`fixed inset-0 z-[100] transition-transform duration-[400ms] ${isMinimized ? 'translate-y-full' : 'translate-y-0'}`}
+              style={{ transitionTimingFunction: 'cubic-bezier(0.2, 1, 0.4, 1)' }}
+            >
+              <Layout config={config} onLeave={() => {
+                sessionStorage.removeItem(`bloom_host_${config.roomId}`);
+                setConfig(null);
+                setIsMinimized(false);
+                window.location.hash = '';
+              }} onMinimize={() => setIsMinimized(true)} />
+            </div>
+          </>
         ) : (
           <Lobby 
             onJoin={handleJoinLobby} 

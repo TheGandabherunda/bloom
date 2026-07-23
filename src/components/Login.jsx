@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import AmbientLight from './AmbientLight';
 import { getOrCreateKeys, pool, DEFAULT_RELAYS, signEvent } from '../services/nostr';
-import { findBestMirror, getMirrorStatus } from '../services/musicApi';
+import { findBestMirror } from '../services/musicApi';
 
 const Login = ({ onComplete }) => {
   const [name, setName] = useState(localStorage.getItem('bloom_name') || '');
@@ -70,25 +71,23 @@ const Login = ({ onComplete }) => {
     publishProfile(displayName, pk, sk);
     onComplete({ displayName, nostrPk: pk, nostrSk: sk });
   };
-
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex flex-col justify-end items-center lg:justify-center overflow-hidden pb-8 px-4 lg:pb-0 lg:px-0">
+    <div className="fixed inset-0 bg-black z-[200] flex flex-col justify-end md:justify-center items-center overflow-hidden px-4 md:px-0 pb-24 md:pb-0 animate-fade-in">
       
-      <div className="lg:hidden absolute inset-0 flex items-center justify-center pointer-events-none z-0 bloom-enter-wrap">
-        <img src="./assets/Bloom.svg" className="w-[150vw] sm:w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
+      {/* LED Edge Light Effect */}
+      <AmbientLight />
+
+      {/* Top Logo Title */}
+      <div className="absolute top-12 left-0 right-0 text-center z-10 pointer-events-none px-4">
+        <h1 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">Bloom</h1>
       </div>
 
-      <div className="hidden lg:flex absolute inset-0 items-center justify-center pointer-events-none z-0 bloom-enter-wrap">
-        <img src="./assets/Bloom.svg" className="w-[90vw] max-w-[800px] opacity-[0.12] rotate-slow" alt="" />
-      </div>
-
-      <div className="lg:hidden w-full max-w-md text-center z-10 mb-6">
-        <h1 className="text-5xl font-bold text-white tracking-tight">Bloom</h1>
-      </div>
-
-      <div className="bg-black/90 lg:bg-black lg:backdrop-blur-none backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md transform transition-all pointer-events-auto relative z-10">
-        <div className="text-center mb-6">
-          <h1 className="hidden lg:block text-4xl font-bold text-white tracking-tight">Bloom</h1>
+      <div className="w-full max-w-sm transform transition-all pointer-events-auto relative z-10 p-4 lg:p-0 mx-auto">
+        <div className="mb-8 w-full text-center">
+          <h2 className="text-[2.8rem] text-white/90 font-['Gloock'] tracking-tight leading-none">
+            Enter the space.<br />
+            Feel the sound.
+          </h2>
         </div>
 
         <form onSubmit={handleGuestLogin} className="space-y-5">
@@ -99,7 +98,7 @@ const Login = ({ onComplete }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="off"
-              className="w-full h-[48px] bg-white/[0.06] border border-white/10 rounded-full px-6 text-lg text-white focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/20 transition-colors shadow-inner"
+              className="w-full h-[48px] bg-white/[0.06] rounded-full px-6 text-lg text-white focus:outline-none focus:ring-1 focus:ring-white/20 transition-colors shadow-inner"
               placeholder="e.g., Alice"
               required={!localStorage.getItem('bloom_nip07')}
             />
@@ -135,13 +134,15 @@ const Login = ({ onComplete }) => {
         </form>
       </div>
 
-      <div className="absolute bottom-4 left-0 right-0 text-center z-10 pointer-events-none px-4 hidden lg:block">
-        <p className="text-white/30 text-xs">
-          Bloom uses the decentralized Nostr network for secure, peer-to-peer connection handling.
-        </p>
-      </div>
-      <div className="lg:hidden w-full text-center mt-6 z-10 pointer-events-none px-4">
-        <p className="text-white/30 text-xs">
+      <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center pointer-events-none z-0 px-4">
+        <div className="w-full overflow-hidden leading-none opacity-10 flex justify-center items-end">
+          <svg viewBox="0 0 100 28" className="w-full h-auto">
+            <text x="50%" y="27" textAnchor="middle" className="font-['Gloock'] fill-white tracking-tight" fontSize="32">
+              Bloom
+            </text>
+          </svg>
+        </div>
+        <p className="text-white/30 text-xs text-center mt-1">
           Bloom uses the decentralized Nostr network for secure, peer-to-peer connection handling.
         </p>
       </div>
