@@ -124,7 +124,7 @@ export const getTrendingByLocation = async () => {
       id: song.id,
       title: song.name || song.title,
       author: song.primaryArtists || (song.artists && song.artists.primary && song.artists.primary[0]?.name) || 'Unknown Artist',
-      thumbnail: song.image?.[song.image?.length - 1]?.url?.replace('500x500', '150x150') || song.image?.[0]?.url || '/placeholder.png',
+      thumbnail: song.image?.[song.image?.length - 1]?.url || song.image?.[0]?.url || '/placeholder.png',
       duration: song.duration,
       downloadUrl: song.downloadUrl?.[song.downloadUrl.length - 1]?.url || '',
       language: forceLanguage || song.language || 'unknown'
