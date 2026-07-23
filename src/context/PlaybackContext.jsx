@@ -378,6 +378,7 @@ export const PlaybackProvider = ({ children }) => {
     
     if (forceLocal) {
       setError(null);
+      await playerRef.current?.play().catch(e => console.warn('Still blocked', e));
       if (stateDb) {
         try {
           const syncedTrack = await stateDb.get('currentTrack');
@@ -396,7 +397,6 @@ export const PlaybackProvider = ({ children }) => {
           console.error('[Playback] Force resync error:', e);
         }
       }
-      await playerRef.current?.play().catch(e => console.warn('Still blocked', e));
       return;
     }
 
