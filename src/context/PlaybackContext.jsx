@@ -289,7 +289,10 @@ export const PlaybackProvider = ({ children }) => {
         const originator = value?.originator || null;
 
         // Security check: Only Owner and Admin can change playback state
-        const role = originator ? peerRolesRef.current[originator] : null;
+        let role = originator ? peerRolesRef.current[originator] : null;
+        if (!role && originator && stateDb) {
+           role = await stateDb.get(`peer_role_${originator}`);
+        }
         const isAuthorized = role === 'owner' || role === 'admin';
 
         // Standard Deduplication is handled by OrbitContext deep-equality checks.
