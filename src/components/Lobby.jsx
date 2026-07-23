@@ -387,7 +387,11 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             <span className="text-[var(--color-primary)] text-[10px]">•</span>
             <span className="font-bold text-white text-xs tracking-wider">{roomName || minimizedConfig.roomId}</span>
             <span className="text-[var(--color-primary)] text-[10px]">•</span>
-            <span className="text-white/60 text-xs font-medium tracking-widest">{peerNames[minimizedConfig.hostId] || 'Host'}</span>
+            <span className="text-white/60 text-xs font-medium tracking-widest">
+              {minimizedConfig.isHost 
+                ? (peerNames[minimizedConfig.nostrPk] || minimizedConfig.displayName || 'Host') 
+                : (peerNames[minimizedConfig.hostId] || 'Host')}
+            </span>
           </div>
 
           <div className="flex flex-col gap-1.5 w-full">

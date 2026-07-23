@@ -115,9 +115,9 @@ export const getTopVideos = async () => {
 
 export const getTrendingByLocation = async () => {
   try {
-    const res = await fetch('https://ipapi.co/json/');
+    const res = await fetch('https://ipwho.is/');
     const locationData = res.ok ? await res.json() : {};
-    const country = locationData.country_name || 'Global';
+    const country = locationData.country || 'Global';
     const isIndia = country === 'India';
 
     const normalizeSong = (song, forceLanguage = null) => ({

@@ -263,9 +263,9 @@ export const OrbitProvider = ({ children }) => {
                     } else if (key.startsWith('peer_role_')) {
                       setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: data[key]}));
                     } else if (key === 'banned' && data[key] === nostrPk) {
-                       window.location.reload();
+                       window.location.href = window.location.pathname;
                     } else if (key === 'room_ended' && data[key] === true) {
-                       window.location.reload();
+                       window.location.href = window.location.pathname;
                     }
                   }
                 });
