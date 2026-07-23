@@ -167,7 +167,6 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                 <span className="material-symbols-rounded text-[26px]">keyboard_arrow_down</span>
               </button>
               <div className="flex items-center gap-3">
-                <img src="./assets/Bloom.svg" alt="Bloom" className="w-7 h-7 md:w-8 md:h-8" />
                 <h2 className="font-bold text-white tracking-wide text-lg lg:text-xl">Bloom</h2>
               </div>
               <span className="text-white/30 font-bold">•</span>
