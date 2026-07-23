@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 const IMPRINT_GROUPS = [
   {
@@ -44,6 +44,8 @@ const IMPRINT_GROUPS = [
 
 const Imprints = ({ onClose }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const isHoveredRef = useRef(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -52,6 +54,43 @@ const Imprints = ({ onClose }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // Smooth JS Auto-scroll + Native scroll support
+  useEffect(() => {
+    let animId;
+    let lastTime = performance.now();
+
+    const scrollStep = (now) => {
+      const delta = now - lastTime;
+      lastTime = now;
+
+      const container = containerRef.current;
+      if (container && !isHoveredRef.current) {
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        if (container.scrollTop < maxScroll) {
+          // Scroll ~40px per second smoothly
+          container.scrollTop += (40 * delta) / 1000;
+        }
+      }
+      animId = requestAnimationFrame(scrollStep);
+    };
+
+    animId = requestAnimationFrame(scrollStep);
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    isHoveredRef.current = true;
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    isHoveredRef.current = false;
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/85 backdrop-blur-2xl animate-fade-in overflow-hidden select-none">
@@ -71,22 +110,19 @@ const Imprints = ({ onClose }) => {
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-black via-black/80 to-transparent z-40 backdrop-blur-[2px]" />
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black via-black/80 to-transparent z-40 backdrop-blur-[2px]" />
 
-      {/* Rolling Credits Motion Container with Hover-to-Pause */}
+      {/* Natively Scrollable + Auto-scrolling Credits Container */}
       <div 
-        className="w-full max-w-2xl h-full overflow-hidden relative flex flex-col items-center mask-image-y px-4 cursor-pointer"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        ref={containerRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onTouchStart={handleMouseEnter}
+        onTouchEnd={handleMouseLeave}
+        className="w-full max-w-2xl h-full overflow-y-auto no-scrollbar relative flex flex-col items-center mask-image-y px-4 scroll-smooth"
       >
-        <div 
-          className="w-full flex flex-col items-center space-y-16 py-12 text-center hover:[animation-play-state:paused]"
-          style={{
-            animation: 'imprintsRoll 36s cubic-bezier(0.1, 0, 0.25, 1) forwards',
-            animationPlayState: isHovered ? 'paused' : 'running',
-            willChange: 'transform'
-          }}
-        >
+        <div className="w-full flex flex-col items-center space-y-16 pt-[60vh] pb-[42vh] text-center">
+          
           {/* Main Heading in the List Itself */}
-          <div className="text-center pt-28 pb-6 max-w-xl flex flex-col items-center">
+          <div className="text-center pb-6 max-w-xl flex flex-col items-center">
             <span className="text-xs font-semibold text-[var(--color-primary,#ec4899)] mb-2">
               Bloom Architecture & Imprints
             </span>
@@ -138,7 +174,7 @@ const Imprints = ({ onClose }) => {
             </div>
           ))}
 
-          {/* Final Thank You Section - Stops exactly in the vertical center */}
+          {/* Final Thank You Section - Stops exactly in the vertical center at bottom of scroll */}
           <div className="text-center pt-8 pb-4 max-w-md flex flex-col items-center shrink-0">
             {/* Heart Icon with Red Color */}
             <span 
@@ -169,18 +205,6 @@ const Imprints = ({ onClose }) => {
 
         </div>
       </div>
-
-      {/* Animation Keyframes: Stops with the Thank You section in vertical center */}
-      <style>{`
-        @keyframes imprintsRoll {
-          0% {
-            transform: translateY(75vh);
-          }
-          100% {
-            transform: translateY(calc(-100% + 62vh));
-          }
-        }
-      `}</style>
     </div>
   );
 };
