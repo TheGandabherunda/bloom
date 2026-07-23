@@ -68,7 +68,6 @@ const Imprints = ({ onClose }) => {
       if (container && !isHoveredRef.current) {
         const maxScroll = container.scrollHeight - container.clientHeight;
         if (container.scrollTop < maxScroll) {
-          // Scroll ~40px per second smoothly
           container.scrollTop += (40 * delta) / 1000;
         }
       }
@@ -106,9 +105,18 @@ const Imprints = ({ onClose }) => {
         </button>
       </div>
 
-      {/* Progressive Blur / Gradient Overlays (Top & Bottom) */}
-      <div className="pointer-events-none absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-black via-black/80 to-transparent z-40 backdrop-blur-[2px]" />
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black via-black/80 to-transparent z-40 backdrop-blur-[2px]" />
+      {/* Detailed Progressive Blur Overlays (Top & Bottom - Reduced Height h-24) */}
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-24 z-40 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-transparent backdrop-blur-xl" />
+        <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black via-black/80 to-transparent backdrop-blur-md" />
+        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black to-transparent backdrop-blur-sm" />
+      </div>
+
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 z-40 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/90 to-transparent backdrop-blur-xl" />
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black via-black/80 to-transparent backdrop-blur-md" />
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black to-transparent backdrop-blur-sm" />
+      </div>
 
       {/* Natively Scrollable + Auto-scrolling Credits Container */}
       <div 
@@ -174,7 +182,7 @@ const Imprints = ({ onClose }) => {
             </div>
           ))}
 
-          {/* Final Thank You Section - Stops exactly in the vertical center at bottom of scroll */}
+          {/* Final Thank You Section */}
           <div className="text-center pt-8 pb-4 max-w-md flex flex-col items-center shrink-0">
             {/* Heart Icon with Red Color */}
             <span 
