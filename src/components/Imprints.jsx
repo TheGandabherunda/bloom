@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const IMPRINT_GROUPS = [
   {
@@ -43,6 +43,8 @@ const IMPRINT_GROUPS = [
 ];
 
 const Imprints = ({ onClose }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -54,7 +56,7 @@ const Imprints = ({ onClose }) => {
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/85 backdrop-blur-2xl animate-fade-in overflow-hidden select-none">
       
-      {/* Top Bar - Close Button Only (No top-left heading, no stroke, no play/pause button) */}
+      {/* Top Bar - Close Button Only */}
       <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-end z-50 pointer-events-auto">
         <button
           onClick={onClose}
@@ -69,12 +71,18 @@ const Imprints = ({ onClose }) => {
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-black via-black/80 to-transparent z-40 backdrop-blur-[2px]" />
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black via-black/80 to-transparent z-40 backdrop-blur-[2px]" />
 
-      {/* Rolling Credits Motion Container */}
-      <div className="w-full max-w-2xl h-full overflow-hidden relative flex flex-col items-center mask-image-y px-4">
+      {/* Rolling Credits Motion Container with Hover-to-Pause */}
+      <div 
+        className="w-full max-w-2xl h-full overflow-hidden relative flex flex-col items-center mask-image-y px-4 cursor-pointer"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <div 
-          className="w-full flex flex-col items-center space-y-16 py-12 text-center"
+          className="w-full flex flex-col items-center space-y-16 py-12 text-center hover:[animation-play-state:paused]"
           style={{
-            animation: 'imprintsRoll 36s cubic-bezier(0.1, 0, 0.25, 1) forwards'
+            animation: 'imprintsRoll 36s cubic-bezier(0.1, 0, 0.25, 1) forwards',
+            animationPlayState: isHovered ? 'paused' : 'running',
+            willChange: 'transform'
           }}
         >
           {/* Main Heading in the List Itself */}
@@ -108,7 +116,7 @@ const Imprints = ({ onClose }) => {
                 {group.category}
               </h2>
 
-              {/* Items in Category - Seamless centered text without box containers or stroke */}
+              {/* Items in Category */}
               <div className="w-full flex flex-col gap-8 items-center">
                 {group.items.map((item, itemIdx) => (
                   <div key={itemIdx} className="flex flex-col items-center max-w-lg px-4 text-center">
@@ -132,7 +140,7 @@ const Imprints = ({ onClose }) => {
 
           {/* Final Thank You Section - Stops exactly in the vertical center */}
           <div className="text-center pt-8 pb-4 max-w-md flex flex-col items-center shrink-0">
-            {/* Heart Icon with Red Color (no container box, no stroke) */}
+            {/* Heart Icon with Red Color */}
             <span 
               className="material-symbols-rounded icon-fill text-4xl mb-3"
               style={{ color: '#ef4444' }}
