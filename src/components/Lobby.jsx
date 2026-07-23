@@ -485,7 +485,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             </button>
 
             <div className="mt-2 mb-8 text-center px-4">
-              <h3 className="text-4xl font-bold text-white tracking-tight font-serif">Host a Party</h3>
+              <h3 className="text-4xl text-white tracking-tight font-serif">Host a Party</h3>
               <p className="text-white/40 text-sm mt-2">Start a room and invite your friends.</p>
             </div>
 
