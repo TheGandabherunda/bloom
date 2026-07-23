@@ -37,7 +37,7 @@ export const getMirrorStatus = () => ({ "proxy": "healthy" });
 export const searchTracks = async (query) => {
   try {
     const q = query.replace(/\baudio\b/ig, '').trim();
-    const url = `https://jiosaavn-api-one-rho.vercel.app/api/search/songs?query=${encodeURIComponent(q)}`;
+    const url = `https://jiosaavn-api-one-rho.vercel.app/api/search/songs?query=${encodeURIComponent(q)}&limit=40`;
     
     const response = await fetch(url);
     const data = await response.json();
@@ -74,7 +74,7 @@ export const getRecommendations = async (track) => {
   if (!track || !track.id) return [];
   if (recsCache.has(track.id)) return recsCache.get(track.id);
   try {
-    const url = `https://jiosaavn-api-one-rho.vercel.app/api/songs/${track.id}/suggestions`;
+    const url = `https://jiosaavn-api-one-rho.vercel.app/api/songs/${track.id}/suggestions?limit=40`;
     const response = await fetch(url);
     const data = await response.json();
     if (!data.success || !data.data || data.data.length === 0) return [];
@@ -111,6 +111,89 @@ export const getMix = async () => {
 
 export const getTopVideos = async () => {
   return searchTracks("top music");
+};
+
+export const getTrendingByLocation = async () => {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    const locationData = res.ok ? await res.json() : {};
+    const country = locationData.country_name || 'Global';
+    const isIndia = country === 'India';
+
+    const normalizeSong = (song, forceLanguage = null) => ({
+      id: song.id,
+      title: song.name || song.title,
+      author: song.primaryArtists || (song.artists && song.artists.primary && song.artists.primary[0]?.name) || 'Unknown Artist',
+      thumbnail: song.image?.[song.image?.length - 1]?.url?.replace('500x500', '150x150') || song.image?.[0]?.url || '/placeholder.png',
+      duration: song.duration,
+      downloadUrl: song.downloadUrl?.[song.downloadUrl.length - 1]?.url || '',
+      language: forceLanguage || song.language || 'unknown'
+    });
+
+    let arraysToInterleave = [];
+
+    if (isIndia) {
+      // 1. India specific logic (hardcoded diverse regional hits)
+      const playlistIds = [
+        '1081991857', // Weekly Top Songs English
+        '1134543272', // India Superhits Top 50 (Hindi)
+        '1170578779', // Top Hits Tamil
+        '1266643840', // Trending Telugu Songs
+        '592722547',  // Malayalam Viral Hits
+        '85728084'    // Kannada Viral Hits
+      ];
+      const fetches = playlistIds.map(id => fetch(`https://jiosaavn-api-one-rho.vercel.app/api/playlists?id=${id}&limit=15`).then(r => r.json()).catch(() => null));
+      const results = await Promise.all(fetches);
+      
+      arraysToInterleave = results.filter(r => r?.success && r.data?.songs).map(r => r.data.songs.map(s => normalizeSong(s)));
+    } else {
+      // 2. Global/International logic
+      // Always include top English hits as base
+      const engRes = await fetch(`https://jiosaavn-api-one-rho.vercel.app/api/playlists?id=1081991857&limit=20`).then(r => r.json()).catch(() => null);
+      if (engRes?.success && engRes.data?.songs) {
+        arraysToInterleave.push(engRes.data.songs.map(s => normalizeSong(s)));
+      }
+
+      // Fallback: search tracks directly for `top hits {country}` to get local flavor
+      if (country !== 'Global' && country !== 'United States') {
+        try {
+          const localSearch = await searchTracks(`top hits ${country} trending`);
+          if (localSearch && localSearch.length > 0) {
+            // Assign the country name as the 'language' so it shows up beautifully in the chips! e.g., "Spain"
+            const localNormalized = localSearch.map(t => ({ 
+              ...t, 
+              language: country.toLowerCase() 
+            }));
+            arraysToInterleave.push(localNormalized);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Interleave them to create a diverse mix
+    const interleaved = [];
+    const maxLength = Math.max(...arraysToInterleave.map(arr => arr.length), 0);
+    const seenIds = new Set();
+    
+    for (let i = 0; i < maxLength; i++) {
+      for (const songArray of arraysToInterleave) {
+        const song = songArray[i];
+        if (song && !seenIds.has(song.id)) {
+          interleaved.push(song);
+          seenIds.add(song.id);
+        }
+      }
+    }
+
+    if (interleaved.length > 0) {
+      return interleaved;
+    }
+    
+    return await searchTracks("global top hits trending");
+  } catch (e) {
+    console.warn('Could not fetch curated trending playlists, falling back to basic search:', e);
+    return await searchTracks("global top hits trending");
+  }
 };
 
 const GIPHY_API_KEY = 'Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g';

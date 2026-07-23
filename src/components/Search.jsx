@@ -54,8 +54,7 @@ const Search = ({ query, onClose }) => {
           </div>
         ) : results.length > 0 ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full">
-            <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-6 flex items-center gap-2">
-              <span className="material-symbols-rounded text-[var(--color-primary)] text-[20px]">search</span>
+            <h3 className="text-xl font-bold text-white/90 mb-6">
               Search Results
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">

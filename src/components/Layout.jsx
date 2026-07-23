@@ -1,23 +1,39 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useOrbit } from '../context/OrbitContext';
 import { usePlayback } from '../context/PlaybackContext';
 import Search from './Search';
 import Player from './Player';
 import Sidebar from './Sidebar';
-import { getRecommendations, getTopVideos, getMix } from '../services/musicApi';
+import { getRecommendations, getTopVideos, getMix, getTrendingByLocation } from '../services/musicApi';
 import { extractDominantColors, extractPrimaryColor } from '../utils/colorExtractor';
 import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config, onLeave, onMinimize }) => {
-  const { initP2P, stopP2P, status, peerId, getConnectedRelays, deleteRoom } = useOrbit();
-  const { isPlaying, currentTrack, setIsExpanded } = usePlayback();
-  const [showSearch, setShowSearch] = useState(true);
+  const { initP2P, stopP2P, status, peerId, peerRoles, getConnectedRelays, deleteRoom } = useOrbit();
+  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue } = usePlayback();
+  const [showSearch, setShowSearch] = useState(false);
+  
+  const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
+  const canControl = role === 'owner' || role === 'admin';
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMobileView, setActiveMobileView] = useState('home');
   const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [trendingTracks, setTrendingTracks] = useState([]);
+  const [loadingTrending, setLoadingTrending] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    getTrendingByLocation().then(tracks => {
+      if (isMounted) {
+        setTrendingTracks(tracks);
+        setLoadingTrending(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, []);
 
   useEffect(() => {
     if (status === 'connected') {
@@ -252,15 +268,45 @@ const Layout = ({ config, onLeave, onMinimize }) => {
              {showSearch ? (
                <Search query={searchQuery} onClose={() => { setShowSearch(false); setSearchQuery(''); }} />
              ) : (
-               <div className="flex-1 overflow-y-auto p-6 pb-[90px] space-y-12">
+               <div className="flex-1 overflow-y-auto p-6 pb-[90px] flex flex-col gap-8">
                   {!currentTrack ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white/20 pointer-events-none">
-                      <span className="material-symbols-rounded text-6xl">search</span>
-                      <p className="text-sm font-bold uppercase tracking-widest">Type to start searching</p>
+                    <div className="w-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      {loadingTrending ? (
+                        <div className="w-full">
+                          <div className="h-4 w-40 shimmer rounded-lg mb-6" />
+                          <TrackGridSkeleton count={5} />
+                        </div>
+                      ) : (
+                        <div className={!canControl ? 'opacity-50 pointer-events-none' : ''}>
+                          <HomeSection 
+                            title="Discover Top Hits" 
+                            items={trendingTracks} 
+                            onItemClick={(track) => loadTrack(track, -1)} 
+                            addToQueue={addToQueue} 
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
                       <RecommendationsFeed track={currentTrack} />
+                      <div>
+                        {loadingTrending ? (
+                          <div className="w-full">
+                            <div className="h-4 w-40 shimmer rounded-lg mb-6" />
+                            <TrackGridSkeleton count={5} />
+                          </div>
+                        ) : (
+                          <div className={!canControl ? 'opacity-50 pointer-events-none' : ''}>
+                            <HomeSection 
+                              title="Discover Top Hits" 
+                              items={trendingTracks} 
+                              onItemClick={(track) => loadTrack(track, -1)} 
+                              addToQueue={addToQueue} 
+                            />
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
                </div>
@@ -402,7 +448,7 @@ const RecommendationsFeed = ({ track }) => {
     const fetch = async () => {
       try {
         const data = await getRecommendations(track);
-        setRecs(data.slice(0, 10));
+        setRecs(data);
       } catch (e) {
         // Fallback or silent fail
       } finally {
@@ -422,24 +468,124 @@ const RecommendationsFeed = ({ track }) => {
   if (recs.length === 0) return null;
 
   return (
-    <div className="space-y-12">
+    <div className="w-full">
       <HomeSection title={`More like ${track.title}`} items={recs} onItemClick={loadTrack} addToQueue={addToQueue} />
     </div>
   );
 };
 
-const HomeSection = ({ title, icon, items, onItemClick, addToQueue }) => (
-  <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-    <h3 className="text-xl font-bold text-white/90 mb-6 flex items-center gap-2">
-      {icon && <span className="material-symbols-rounded text-[var(--color-primary)] text-[24px]">{icon}</span>}
-      {title}
-    </h3>
-    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-      {items.map(track => (
-        <TrackCard key={track.id} track={track} addToQueue={addToQueue} onClick={onItemClick ? () => onItemClick(track) : undefined} />
-      ))}
-    </div>
-  </section>
-);
+const HomeSection = ({ title, icon, items, onItemClick, addToQueue }) => {
+  const scrollRef = useRef(null);
+  const [showLeft, setShowLeft] = useState(false);
+  const [showRight, setShowRight] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('All');
+
+  // Compute unique languages (capitalize first letter)
+  const languages = Array.from(new Set(items.map(item => item.language).filter(l => l && l !== 'unknown')))
+    .map(l => l.charAt(0).toUpperCase() + l.slice(1));
+  
+  const showFilters = languages.length > 1;
+
+  const filteredItems = selectedLanguage === 'All' 
+    ? items 
+    : items.filter(item => item.language?.toLowerCase() === selectedLanguage.toLowerCase());
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setShowLeft(scrollLeft > 0);
+    setShowRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
+  };
+
+  useEffect(() => {
+    handleScroll();
+  }, [filteredItems]);
+
+  const scrollLeft = () => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: -(scrollRef.current.clientWidth + 24), behavior: 'smooth' });
+  };
+
+  const scrollRight = () => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: (scrollRef.current.clientWidth + 24), behavior: 'smooth' });
+  };
+
+  return (
+    <section className="relative w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center justify-between mb-6 pr-2">
+        <h3 className="text-xl font-bold text-white/90 flex items-center gap-2">
+          {icon && <span className="material-symbols-rounded text-[var(--color-primary)] text-[24px]">{icon}</span>}
+          {title}
+        </h3>
+        
+        {/* Navigation Arrows in Heading Row */}
+        {filteredItems.length > 5 && (
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={scrollLeft}
+              disabled={!showLeft}
+              className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white disabled:opacity-30 disabled:hover:bg-white/5 transition-colors"
+            >
+              <span className="material-symbols-rounded text-[20px]">chevron_left</span>
+            </button>
+            <button 
+              onClick={scrollRight}
+              disabled={!showRight}
+              className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white disabled:opacity-30 disabled:hover:bg-white/5 transition-colors"
+            >
+              <span className="material-symbols-rounded text-[20px]">chevron_right</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {showFilters && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 -mt-2">
+          <button
+            onClick={() => setSelectedLanguage('All')}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              selectedLanguage === 'All' 
+                ? 'bg-white text-black' 
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            All
+          </button>
+          {languages.map(lang => (
+            <button
+              key={lang}
+              onClick={() => setSelectedLanguage(lang)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                selectedLanguage === lang 
+                  ? 'bg-white text-black' 
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              {lang}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="relative w-full">
+        <div 
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="grid grid-rows-2 grid-flow-col gap-6 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth pb-4
+                     auto-cols-[calc(50%-0.75rem)] 
+                     sm:auto-cols-[calc(33.333333%-1rem)] 
+                     xl:auto-cols-[calc(25%-1.125rem)] 
+                     2xl:auto-cols-[calc(20%-1.2rem)]"
+        >
+          {filteredItems.map(track => (
+            <div key={track.id} className="snap-start h-full">
+              <TrackCard track={track} addToQueue={addToQueue} onClick={onItemClick ? () => onItemClick(track) : undefined} />
+            </div>
+          ))}
+        </div>
+        
+      </div>
+    </section>
+  );
+};
 
 export default Layout;
