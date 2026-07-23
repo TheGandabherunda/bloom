@@ -166,7 +166,10 @@ const Layout = ({ config, onLeave, onMinimize }) => {
               >
                 <span className="material-symbols-rounded text-[26px]">keyboard_arrow_down</span>
               </button>
-              <h2 className="font-bold text-white tracking-wide text-lg lg:text-xl">Bloom</h2>
+              <div className="flex items-center gap-3">
+              <img src="./assets/Bloom.svg" alt="Bloom" className="w-7 h-7 md:w-8 md:h-8" />
+              <h2 className="text-white text-2xl lg:text-3xl font-serif" style={{ fontFamily: '"Gloock", serif', fontWeight: 400 }}>Bloom</h2>
+            </div>
               <span className="text-white/30 font-bold">•</span>
               
               <div className="flex items-center gap-2">
@@ -379,7 +382,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
             </button>
 
             <div className="mt-2 mb-8 text-center px-4">
-              <h3 className="text-2xl font-bold text-white tracking-tight">{config.isHost ? 'End Party?' : 'Leave Party?'}</h3>
+              <h3 className="text-3xl text-white font-serif" style={{ fontFamily: '"Gloock", serif', fontWeight: 400 }}>{config.isHost ? 'End Party?' : 'Leave Party?'}</h3>
               <p className="text-white/40 text-sm mt-3 leading-relaxed">
                 Are you sure you want to {config.isHost ? 'end' : 'leave'} the <strong className="text-white/80">{roomName}</strong> party?
               </p>
@@ -513,8 +516,8 @@ const HomeSection = ({ title, icon, items, onItemClick, addToQueue }) => {
   return (
     <section className="relative w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between mb-6 pr-2">
-        <h3 className="text-xl font-bold text-white/90 flex items-center gap-2">
-          {icon && <span className="material-symbols-rounded text-[var(--color-primary)] text-[24px]">{icon}</span>}
+        <h3 className="text-3xl text-white/90 flex items-center gap-3 font-serif" style={{ fontFamily: '"Gloock", serif', fontWeight: 400 }}>
+          {icon && <span className="material-symbols-rounded text-[var(--color-primary)] text-[28px]">{icon}</span>}
           {title}
         </h3>
         
