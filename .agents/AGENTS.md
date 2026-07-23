@@ -82,6 +82,10 @@ Every track object used in playback must have these fields:
 - IDB stores are keyed by `roomId`: `bloom/blocks/${roomId}` and `bloom/data/${roomId}` — do not change this naming scheme.
 - OrbitDB databases: `${roomId}-state` (keyvalue) and `${roomId}-chat` (events).
 
+### 11. Repository Cleanliness
+- Do not leave temporary test files (`test_*.js`, `.png` dumps, `playlist_info.json`) or standalone binaries (`yt-dlp.exe`) in the project root.
+- Clean up any scratch scripts or API testing scripts before committing.
+
 ---
 
 ## File Structure Reference
