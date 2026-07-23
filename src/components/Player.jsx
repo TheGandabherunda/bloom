@@ -402,7 +402,7 @@ const Player = ({ activeMobileView }) => {
       {currentTrack && (
         <div 
           ref={draggableRef}
-          className={`bg-black flex flex-col items-center justify-center select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : `absolute inset-0 ${activeMobileView === 'chat' ? 'bottom-[136px]' : 'bottom-[60px]'} lg:bottom-0 lg:right-[400px] z-[45] pb-[80px] lg:pb-24`}`}
+          className={`bg-black flex flex-col items-center justify-center select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : `fixed inset-0 bottom-[60px] lg:absolute lg:inset-0 lg:bottom-0 lg:right-[400px] z-[120] lg:z-[45] pb-[80px] lg:pb-24`}`}
           onClick={handleExpandedClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isFullscreen && setShowFsControls(false)}
