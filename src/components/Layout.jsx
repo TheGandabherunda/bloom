@@ -11,7 +11,7 @@ import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config, onLeave, onMinimize }) => {
   const { initP2P, stopP2P, status, peerId, peerRoles, getConnectedRelays, deleteRoom } = useOrbit();
-  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback, error, togglePlay } = usePlayback();
+  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback, error, togglePlay, networkIsPlaying, isLoading } = usePlayback();
   const [showSearch, setShowSearch] = useState(false);
   
   const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
@@ -420,7 +420,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
       )}
 
       {/* Autoplay Blocked Overlay */}
-      {error && error.toLowerCase().includes('interact') && (
+      {networkIsPlaying && !isPlaying && !isLoading && !canControl && currentTrack && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500"
           onClick={() => togglePlay(true)}

@@ -18,6 +18,7 @@ export const PlaybackProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [networkIsPlaying, setNetworkIsPlaying] = useState(false);
 
   const playerRef = useRef(null);
   const loadingTrackId = useRef(null);
@@ -247,6 +248,7 @@ export const PlaybackProvider = ({ children }) => {
           const isPlayingState = await stateDb.get('isPlaying');
           const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
           networkIsPlayingRef.current = isPlaying;
+          setNetworkIsPlaying(isPlaying);
           
           loadTrack(track, index, liveTime, isPlaying, 'initial-sync');
         }
@@ -309,6 +311,7 @@ export const PlaybackProvider = ({ children }) => {
         } else if (key === 'isPlaying') {
           const status = typeof value === 'object' ? value.status : value;
           networkIsPlayingRef.current = status;
+          setNetworkIsPlaying(status);
           console.log(`[Orbit Sync] Received isPlaying update: ${status}`);
           if (status) {
             playerRef.current?.play().catch(e => console.warn(e));
@@ -584,8 +587,8 @@ export const PlaybackProvider = ({ children }) => {
       duration, loadTrack, togglePlay, stopPlayback, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
-      playerRef
-  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded]);
+      playerRef, networkIsPlaying
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying]);
 
   return (
     <PlaybackContext.Provider value={value}>
