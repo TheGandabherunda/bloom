@@ -426,9 +426,6 @@ const Layout = ({ config, onLeave, onMinimize }) => {
           onClick={() => togglePlay(true)}
         >
           <div className="flex flex-col items-center text-center max-w-sm w-full">
-            <div className="w-20 h-20 bg-[var(--color-primary)] rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(var(--color-primary-rgb),0.7)] animate-pulse">
-              <span className="material-symbols-rounded text-white text-[44px] leading-none icon-fill" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
-            </div>
             <p className="text-white/90 text-lg font-medium mb-6 tracking-wide">The party is already playing</p>
             <button className="bg-white hover:bg-white/90 text-black px-8 py-3.5 rounded-full font-semibold text-base transition-all hover:scale-105 active:scale-95 shadow-xl">
               Start listening
