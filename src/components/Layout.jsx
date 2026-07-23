@@ -425,10 +425,10 @@ const Layout = ({ config, onLeave, onMinimize }) => {
           className="fixed inset-0 bg-black/70 backdrop-blur-2xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300 cursor-pointer"
           onClick={() => togglePlay(true)}
         >
-          <div className="flex flex-col items-center text-center max-w-md w-full">
-            <h2 className="text-3xl font-serif text-white mb-8 leading-snug" style={{ fontFamily: '"Gloock", serif', fontWeight: 400 }}>
+          <div className="flex flex-col items-center text-center max-w-sm w-full">
+            <p className="text-white/70 text-sm mb-8 leading-relaxed">
               The party is already playing. Tap anywhere to sync audio.
-            </h2>
+            </p>
             <button className="bg-white hover:bg-white/90 text-black px-8 py-3.5 rounded-full font-semibold text-base transition-all hover:scale-105 active:scale-95 shadow-xl">
               Start listening
             </button>
