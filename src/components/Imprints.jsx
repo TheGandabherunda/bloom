@@ -105,18 +105,23 @@ const Imprints = ({ onClose }) => {
         </button>
       </div>
 
-      {/* Detailed Progressive Blur Overlays (Top & Bottom - Reduced Height h-24) */}
-      <div className="pointer-events-none absolute top-0 left-0 right-0 h-24 z-40 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-transparent backdrop-blur-xl" />
-        <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black via-black/80 to-transparent backdrop-blur-md" />
-        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black to-transparent backdrop-blur-sm" />
-      </div>
+      {/* Top Progressive Blur: Pure Transparent Max Blur -> No Blur (Top to Bottom) */}
+      <div 
+        className="pointer-events-none absolute top-0 left-0 right-0 h-24 z-40 backdrop-blur-3xl"
+        style={{
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)'
+        }}
+      />
 
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 z-40 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/90 to-transparent backdrop-blur-xl" />
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black via-black/80 to-transparent backdrop-blur-md" />
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black to-transparent backdrop-blur-sm" />
-      </div>
+      {/* Bottom Progressive Blur: Pure Transparent No Blur -> Max Blur (Top to Bottom) */}
+      <div 
+        className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 z-40 backdrop-blur-3xl"
+        style={{
+          WebkitMaskImage: 'linear-gradient(to top, black 0%, transparent 100%)',
+          maskImage: 'linear-gradient(to top, black 0%, transparent 100%)'
+        }}
+      />
 
       {/* Natively Scrollable + Auto-scrolling Credits Container */}
       <div 
