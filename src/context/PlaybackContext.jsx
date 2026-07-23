@@ -490,7 +490,11 @@ export const PlaybackProvider = ({ children }) => {
     }
     
     const activeQueue = queueRef.current;
-    if (activeQueue.length === 0) { setIsPlaying(false); return; }
+    if (activeQueue.length === 0) {
+      setIsPlaying(false);
+      isPlayingRef.current = false;
+      return;
+    }
     
     let activeIdx = currentIndexRef.current;
     if (currentTrackRef.current) {
@@ -500,12 +504,21 @@ export const PlaybackProvider = ({ children }) => {
 
     let nextIndex = activeIdx + 1;
     if (nextIndex >= activeQueue.length) {
-      nextIndex = 0; // Loop back
+      // Reached the end of the queue: stop playback instead of looping back to the beginning
+      console.log('[Playback] End of queue reached. Stopping playback.');
+      setIsPlaying(false);
+      isPlayingRef.current = false;
+      playerRef.current?.pause();
+      if (canControl() && stateDb) {
+        stateDb.put('isPlaying', { status: false, originator: peerId }).catch(e => console.warn('Sync Failed', e));
+      }
+      return;
     }
+
     setCurrentIndex(nextIndex);
     currentIndexRef.current = nextIndex;
     loadTrack(activeQueue[nextIndex], nextIndex, 0, autoPlay, peerId);
-  }, [loadTrack, seek, peerId, canControl]);
+  }, [loadTrack, seek, peerId, canControl, stateDb]);
 
   useEffect(() => {
     playNextRef.current = playNext;
@@ -527,10 +540,7 @@ export const PlaybackProvider = ({ children }) => {
       if (actualIdx !== -1) activeIdx = actualIdx;
     }
 
-    let prevIndex = activeIdx - 1;
-    if (prevIndex < 0) {
-      prevIndex = activeQueue.length - 1;
-    }
+    let prevIndex = Math.max(0, activeIdx - 1);
     setCurrentIndex(prevIndex);
     currentIndexRef.current = prevIndex;
     loadTrack(activeQueue[prevIndex], prevIndex, 0, true, peerId);
