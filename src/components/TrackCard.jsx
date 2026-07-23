@@ -71,7 +71,7 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
                 const systemMsg = { text: `${userName} added "${track.title}" to the queue.`, type: 'system', sender: 'System', timestamp: Date.now() };
                 window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
                 if (chatDb) {
-                  try { await chatDb.add(systemMsg); } catch(err) {}
+                  try { await chatDb.add(systemMsg); } catch(err) { /* ignore */ }
                 }
               }}
               title="Add to Queue"
@@ -139,7 +139,7 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
                       const systemMsg = { text: `${userName} added "${track.title}" to the queue.`, type: 'system', sender: 'System', timestamp: Date.now() };
                       window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
                       if (chatDb) {
-                        try { await chatDb.add(systemMsg); } catch(err) {}
+                        try { await chatDb.add(systemMsg); } catch(err) { /* ignore */ }
                       }
                     }}
                   >
