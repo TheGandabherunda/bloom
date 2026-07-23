@@ -524,6 +524,36 @@ export const PlaybackProvider = ({ children }) => {
     }
   }, [queue, currentIndex, canControl, stateDb]);
 
+  const reorderQueue = useCallback((fromIndex, toIndex) => {
+    if (!canControl()) return;
+    setQueueState(prev => {
+      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length || fromIndex === toIndex) {
+        return prev;
+      }
+      const newQ = [...prev];
+      const [movedItem] = newQ.splice(fromIndex, 1);
+      newQ.splice(toIndex, 0, movedItem);
+
+      if (currentIndex === fromIndex) {
+        setCurrentIndex(toIndex);
+      } else if (fromIndex < currentIndex && toIndex >= currentIndex) {
+        setCurrentIndex(c => c - 1);
+      } else if (fromIndex > currentIndex && toIndex <= currentIndex) {
+        setCurrentIndex(c => c + 1);
+      }
+
+      if (stateDb) {
+        stateDb.put('queue', newQ).catch(e => console.warn('Failed to sync reordered queue:', e));
+      }
+      return newQ;
+    });
+  }, [canControl, currentIndex, stateDb]);
+
+  const moveQueueItem = useCallback((index, direction) => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    reorderQueue(index, targetIndex);
+  }, [reorderQueue]);
+
   const setIsShuffled = useCallback((shuffle) => {
     if (!canControl()) return;
     setIsShuffledState(shuffle);
@@ -648,12 +678,12 @@ export const PlaybackProvider = ({ children }) => {
   }, [isPlaying, duration, playerRef.current]);
 
   const value = React.useMemo(() => ({
-      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
+      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, setCurrentIndex,
       duration, loadTrack, togglePlay, stopPlayback, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
       playerRef, networkIsPlaying
-  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying]);
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying]);
 
   return (
     <PlaybackContext.Provider value={value}>

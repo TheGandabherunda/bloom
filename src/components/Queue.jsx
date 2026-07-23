@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import { extractPrimaryColor } from '../utils/colorExtractor';
@@ -12,12 +12,10 @@ const formatTime = (seconds) => {
 };
 
 const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
-  const barsRef = React.useRef([]);
+  const barsRef = useRef([]);
 
-  React.useEffect(() => {
-    // Don't run the RAF loop when paused — saves 60fps of CPU drain
+  useEffect(() => {
     if (!isPlaying) {
-      // Reset bars to flat when paused
       for (let i = 0; i < 6; i++) {
         if (barsRef.current[i]) barsRef.current[i].style.transform = 'scaleY(0.05)';
       }
@@ -60,11 +58,17 @@ const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
   );
 };
 
-const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canControl, loadTrack, removeFromQueue, hoveredIdx, setHoveredIdx, playerRef }) => {
+const QueueItem = React.memo(({ 
+  track, idx, queueLength, isActive, isPlaying, isLoading, canControl, 
+  loadTrack, removeFromQueue, moveQueueItem, hoveredIdx, setHoveredIdx, 
+  draggedIdx, dragOverIdx, handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleTouchStart, playerRef 
+}) => {
   const [cardColor, setCardColor] = useState('var(--color-primary)');
   const isAnyHovered = hoveredIdx !== -1;
   const isHovered = hoveredIdx === idx;
-  
+  const isDragging = draggedIdx === idx;
+  const isDragOver = dragOverIdx === idx && !isDragging;
+
   useEffect(() => {
     if (!track?.thumbnail) return;
     let cancelled = false;
@@ -76,16 +80,42 @@ const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canC
 
   return (
     <div
+      data-queue-idx={idx}
+      draggable={canControl}
+      onDragStart={(e) => handleDragStart(e, idx)}
+      onDragOver={(e) => handleDragOver(e, idx)}
+      onDrop={(e) => handleDrop(e, idx)}
+      onDragEnd={handleDragEnd}
       onClick={() => { 
-        console.log(`[QueueItem] Clicked on track: ${track.title} (id: ${track.id}), idx: ${idx}, canControl: ${canControl}`);
         if (canControl) { loadTrack(track, idx); } 
       }}
       onMouseEnter={() => setHoveredIdx(idx)}
       onMouseLeave={() => setHoveredIdx(-1)}
-      className={`relative flex items-center gap-3 p-2.5 rounded-xl transition-all ${canControl ? 'cursor-pointer' : ''} bg-white/[0.04] ${isHovered ? '!opacity-100 hover:bg-white/10' : (isAnyHovered && !isActive ? 'opacity-40' : 'opacity-100')} ${isActive ? '!opacity-100' : ''}`}
+      className={`relative flex items-center gap-2 p-2 rounded-xl transition-all ${
+        canControl ? 'cursor-pointer' : ''
+      } bg-white/[0.04] ${
+        isHovered ? '!opacity-100 hover:bg-white/10' : (isAnyHovered && !isActive ? 'opacity-40' : 'opacity-100')
+      } ${isActive ? '!opacity-100' : ''} ${
+        isDragging ? 'opacity-30 scale-[0.98]' : ''
+      } ${
+        isDragOver ? 'ring-2 ring-[var(--color-primary)] bg-white/10 scale-[1.01]' : ''
+      }`}
       style={isActive ? { background: `linear-gradient(90deg, color-mix(in srgb, ${cardColor} 20%, transparent) 0%, transparent 100%)` } : {}}
     >
-      <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-white/10 shrink-0 shadow-lg ml-1">
+      {/* Drag Handle Icon for Desktop & Mobile */}
+      {canControl && (
+        <div 
+          onTouchStart={(e) => handleTouchStart(e, idx)}
+          className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/80 shrink-0 flex items-center justify-center p-0.5 touch-none"
+          title="Drag to reorder"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="material-symbols-rounded text-[18px]">drag_indicator</span>
+        </div>
+      )}
+
+      {/* Album Art Thumbnail */}
+      <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-white/10 shrink-0 shadow-lg">
         <img src={track.thumbnail} className={`w-full h-full object-cover transition-opacity ${isActive && isLoading ? 'opacity-50' : 'opacity-100'}`} alt="" />
         {(isActive && isLoading) && (
           <div className="absolute inset-0 z-20 shimmer" />
@@ -94,6 +124,8 @@ const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canC
           <TileVisualizer playerRef={playerRef} isPlaying={isPlaying} cardColor={cardColor} />
         )}
       </div>
+
+      {/* Song Details */}
       <div className={`min-w-0 flex-1 relative ${isActive && isLoading ? 'rounded overflow-hidden' : ''}`}>
         {(isActive && isLoading) && (
           <div className="absolute inset-0 z-20 shimmer mix-blend-overlay opacity-50" />
@@ -101,10 +133,53 @@ const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canC
         <h4 className={`text-xs font-bold truncate ${isActive ? '' : 'text-white/90'}`} style={{ color: isActive ? cardColor : undefined }}>{track.title}</h4>
         <p className="text-[10px] text-white/40 font-medium truncate mt-0.5">{track.author}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="text-[10px] font-mono text-white/30 tabular-nums">
+
+      {/* Control Action Buttons */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="text-[10px] font-mono text-white/30 tabular-nums mr-0.5">
           {formatTime(track.duration / 1000)}
         </div>
+
+        {/* ALWAYS-VISIBLE UP & DOWN ARROWS for Queue Reordering */}
+        {canControl && (
+          <div className="flex items-center gap-0.5 shrink-0 bg-white/5 rounded-lg p-0.5 border border-white/10">
+            <button
+              type="button"
+              disabled={idx === 0}
+              onClick={(e) => {
+                e.stopPropagation();
+                moveQueueItem(idx, 'up');
+              }}
+              className={`w-6 h-6 flex items-center justify-center rounded-md transition-all ${
+                idx === 0
+                  ? 'text-white/15 cursor-not-allowed'
+                  : 'text-white/70 hover:text-white hover:bg-white/15 active:scale-90'
+              }`}
+              title="Move Up"
+            >
+              <span className="material-symbols-rounded text-[18px] leading-none">keyboard_arrow_up</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={idx === queueLength - 1}
+              onClick={(e) => {
+                e.stopPropagation();
+                moveQueueItem(idx, 'down');
+              }}
+              className={`w-6 h-6 flex items-center justify-center rounded-md transition-all ${
+                idx === queueLength - 1
+                  ? 'text-white/15 cursor-not-allowed'
+                  : 'text-white/70 hover:text-white hover:bg-white/15 active:scale-90'
+              }`}
+              title="Move Down"
+            >
+              <span className="material-symbols-rounded text-[18px] leading-none">keyboard_arrow_down</span>
+            </button>
+          </div>
+        )}
+
+        {/* Delete / Remove button */}
         {canControl && (
           <button
             onClick={(e) => {
@@ -126,17 +201,90 @@ const QueueItem = React.memo(({ track, idx, isActive, isPlaying, isLoading, canC
          (!prev.isActive || prev.isPlaying === next.isPlaying) &&
          prev.canControl === next.canControl &&
          prev.hoveredIdx === next.hoveredIdx &&
+         prev.draggedIdx === next.draggedIdx &&
+         prev.dragOverIdx === next.dragOverIdx &&
+         prev.idx === next.idx &&
+         prev.queueLength === next.queueLength &&
          prev.track.id === next.track.id;
 });
 
 const Queue = () => {
-  const { queue, currentIndex, loadTrack, isPlaying, isLoading, removeFromQueue, playerRef, addToQueue } = usePlayback();
+  const { 
+    queue, currentIndex, loadTrack, isPlaying, isLoading, 
+    removeFromQueue, reorderQueue, moveQueueItem, playerRef, addToQueue 
+  } = usePlayback();
   const { peerId, peerRoles, peerNames, chatDb } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
   const canControl = role === 'owner' || role === 'admin';
   const [hoveredIdx, setHoveredIdx] = useState(-1);
+  const [draggedIdx, setDraggedIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+
+  const touchActiveIdxRef = useRef(null);
+
+  // Desktop Drag Handlers
+  const handleDragStart = (e, index) => {
+    if (!canControl) return;
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIdx(index);
+  };
+
+  const handleDragOver = (e, index) => {
+    if (!canControl) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIdx !== index) setDragOverIdx(index);
+  };
+
+  const handleDrop = (e, index) => {
+    if (!canControl) return;
+    e.preventDefault();
+    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    if (!isNaN(fromIndex) && fromIndex !== index) {
+      reorderQueue(fromIndex, index);
+    }
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
+  // Touch Drag Handlers (Mobile)
+  const handleTouchStart = (e, index) => {
+    if (!canControl) return;
+    touchActiveIdxRef.current = index;
+    setDraggedIdx(index);
+  };
+
+  const handleTouchMove = (e) => {
+    if (touchActiveIdxRef.current === null || !canControl) return;
+    const touch = e.touches[0];
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (targetEl) {
+      const queueItemEl = targetEl.closest('[data-queue-idx]');
+      if (queueItemEl) {
+        const targetIdx = parseInt(queueItemEl.getAttribute('data-queue-idx'), 10);
+        if (!isNaN(targetIdx) && targetIdx !== dragOverIdx) {
+          setDragOverIdx(targetIdx);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchActiveIdxRef.current !== null && dragOverIdx !== null && touchActiveIdxRef.current !== dragOverIdx) {
+      reorderQueue(touchActiveIdxRef.current, dragOverIdx);
+    }
+    touchActiveIdxRef.current = null;
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
 
   const handleImport = async (e) => {
     e.preventDefault();
@@ -155,19 +303,16 @@ const Queue = () => {
       
       let importedCount = 0;
       for (const t of parsedTracks) {
-        // Clean up common YouTube noise to improve JioSaavn search match rate
         const cleanTitle = t.title.replace(/[\(\[].*?[\)\]]|official|video|audio|lyric|mv/ig, '').trim();
         const cleanAuthor = t.author.replace(/- Topic|VEVO|music/ig, '').trim();
         const query = (cleanTitle + ' ' + cleanAuthor).trim();
 
-        // Silently search JioSaavn for the high-res stream
         try {
           const results = await searchTracks(query);
           if (results && results.length > 0) {
             addToQueue(results[0]);
             importedCount++;
           } else {
-            // Fallback: search just the title if author + title failed
             const fallbackResults = await searchTracks(cleanTitle);
             if (fallbackResults && fallbackResults.length > 0) {
               addToQueue(fallbackResults[0]);
@@ -199,7 +344,12 @@ const Queue = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0" onMouseLeave={() => setHoveredIdx(-1)}>
+    <div 
+      className="flex-1 flex flex-col min-h-0" 
+      onMouseLeave={() => setHoveredIdx(-1)}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Import Playlist Bar */}
       {canControl && (
         <div className="px-4 pt-4 pb-2 shrink-0">
@@ -236,14 +386,24 @@ const Queue = () => {
               key={track.id + idx}
               track={track}
               idx={idx}
+              queueLength={queue.length}
               isActive={idx === currentIndex}
               isPlaying={isPlaying}
               isLoading={idx === currentIndex && isLoading}
               canControl={canControl}
               loadTrack={loadTrack}
               removeFromQueue={removeFromQueue}
+              moveQueueItem={moveQueueItem}
+              reorderQueue={reorderQueue}
               hoveredIdx={hoveredIdx}
               setHoveredIdx={setHoveredIdx}
+              draggedIdx={draggedIdx}
+              dragOverIdx={dragOverIdx}
+              handleDragStart={handleDragStart}
+              handleDragOver={handleDragOver}
+              handleDrop={handleDrop}
+              handleDragEnd={handleDragEnd}
+              handleTouchStart={handleTouchStart}
               playerRef={playerRef}
             />
           ))
