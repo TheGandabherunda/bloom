@@ -11,7 +11,7 @@ import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config, onLeave, onMinimize }) => {
   const { initP2P, stopP2P, status, peerId, peerRoles, getConnectedRelays, deleteRoom } = useOrbit();
-  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue } = usePlayback();
+  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback } = usePlayback();
   const [showSearch, setShowSearch] = useState(false);
   
   const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
@@ -395,6 +395,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
               <button 
                 onClick={async () => {
                   setShowEndConfirm(false);
+                  stopPlayback();
                   if (config.isHost) {
                     await deleteRoom();
                   }

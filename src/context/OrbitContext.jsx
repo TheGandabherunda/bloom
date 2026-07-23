@@ -94,6 +94,17 @@ export const OrbitProvider = ({ children }) => {
         const signedBeacon = finalizeEvent(beaconEvent, skRef.current);
         const pubResults = pool.publish(DEFAULT_RELAYS, signedBeacon);
         await Promise.allSettled(pubResults);
+        
+        // Broadcast room_ended to connected peers so they are kicked
+        const endStateEvent = {
+          kind: 30000,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [['d', roomRef.current]],
+          content: JSON.stringify({ room_ended: true })
+        };
+        const signedEndState = finalizeEvent(endStateEvent, skRef.current);
+        await Promise.allSettled(pool.publish(DEFAULT_RELAYS, signedEndState));
+        
         console.log(`[Nostr] Room marked as ended on relays.`);
       } catch (err) {
         console.error('[Nostr] Error deleting room:', err);
@@ -246,6 +257,8 @@ export const OrbitProvider = ({ children }) => {
                     } else if (key.startsWith('peer_role_')) {
                       setPeerRoles(prev => ({...prev, [key.replace('peer_role_', '')]: data[key]}));
                     } else if (key === 'banned' && data[key] === nostrPk) {
+                       window.location.reload();
+                    } else if (key === 'room_ended' && data[key] === true) {
                        window.location.reload();
                     }
                   }

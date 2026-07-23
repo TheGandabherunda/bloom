@@ -253,7 +253,22 @@ export const PlaybackProvider = ({ children }) => {
       }
     };
     sync();
-  }, [stateDb, loadTrack]);
+  }, [stateDb]);
+
+  const stopPlayback = useCallback(() => {
+    if (playerRef.current) {
+      if (playerRef.current.audio) {
+        playerRef.current.audio.pause();
+        playerRef.current.audio.currentTime = 0;
+      }
+      setIsPlaying(false);
+      isPlayingRef.current = false;
+      setCurrentTrack(null);
+      setQueueState([]);
+      setOriginalQueue([]);
+      setCurrentIndex(-1);
+    }
+  }, []);
 
   // Listen to OrbitDB updates
   useEffect(() => {
@@ -558,11 +573,11 @@ export const PlaybackProvider = ({ children }) => {
 
   const value = React.useMemo(() => ({
       isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, setCurrentIndex,
-      duration, loadTrack, togglePlay, seek,
+      duration, loadTrack, togglePlay, stopPlayback, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
       playerRef
-  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, duration, loadTrack, togglePlay, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded]);
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded]);
 
   return (
     <PlaybackContext.Provider value={value}>
