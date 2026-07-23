@@ -279,12 +279,12 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                           <TrackGridSkeleton count={5} />
                         </div>
                       ) : (
-                        <div className={!canControl ? 'opacity-50 pointer-events-none' : ''}>
+                        <div>
                           <HomeSection 
                             title="Discover Top Hits" 
                             items={trendingTracks} 
-                            onItemClick={(track) => loadTrack(track, -1)} 
-                            addToQueue={addToQueue} 
+                            onItemClick={canControl ? (track) => loadTrack(track, -1) : undefined} 
+                            addToQueue={canControl ? addToQueue : undefined} 
                           />
                         </div>
                       )}
@@ -299,12 +299,12 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                             <TrackGridSkeleton count={5} />
                           </div>
                         ) : (
-                          <div className={!canControl ? 'opacity-50 pointer-events-none' : ''}>
+                          <div>
                             <HomeSection 
                               title="Discover Top Hits" 
                               items={trendingTracks} 
-                              onItemClick={(track) => loadTrack(track, -1)} 
-                              addToQueue={addToQueue} 
+                              onItemClick={canControl ? (track) => loadTrack(track, -1) : undefined} 
+                              addToQueue={canControl ? addToQueue : undefined} 
                             />
                           </div>
                         )}
@@ -425,6 +425,10 @@ const Layout = ({ config, onLeave, onMinimize }) => {
 const TrendingSection = () => {
   const [items, setItems] = useState([]);
   const { loadTrack, addToQueue } = usePlayback();
+  const { peerId, peerRoles } = useOrbit();
+  const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
+  const canControl = role === 'owner' || role === 'admin';
+
   useEffect(() => {
     const fetch = async () => {
       try {
@@ -437,13 +441,26 @@ const TrendingSection = () => {
     fetch();
   }, []);
   if (items.length === 0) return null;
-  return <HomeSection title="Trending Now" icon="trending_up" items={items} onItemClick={(track) => loadTrack(track, -1)} addToQueue={addToQueue} />;
+  return (
+    <div>
+      <HomeSection 
+        title="Trending Now" 
+        icon="trending_up" 
+        items={items} 
+        onItemClick={canControl ? (track) => loadTrack(track, -1) : undefined} 
+        addToQueue={canControl ? addToQueue : undefined} 
+      />
+    </div>
+  );
 };
 
 const RecommendationsFeed = ({ track }) => {
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
   const { loadTrack, addToQueue } = usePlayback();
+  const { peerId, peerRoles } = useOrbit();
+  const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
+  const canControl = role === 'owner' || role === 'admin';
 
   useEffect(() => {
     setLoading(true);
@@ -472,7 +489,12 @@ const RecommendationsFeed = ({ track }) => {
 
   return (
     <div className="w-full">
-      <HomeSection title={`More like ${track.title}`} items={recs} onItemClick={loadTrack} addToQueue={addToQueue} />
+      <HomeSection 
+        title={`More like ${track.title}`} 
+        items={recs} 
+        onItemClick={canControl ? loadTrack : undefined} 
+        addToQueue={canControl ? addToQueue : undefined} 
+      />
     </div>
   );
 };
