@@ -219,7 +219,19 @@ export const OrbitProvider = ({ children }) => {
         events: new MiniEmitter(),
         arr: [],
         add: async (msg) => {
-          // Both host and peers can publish chat
+          if (!msg) return;
+          const isDuplicate = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image));
+          if (!isDuplicate) {
+            chatProxy.arr.push(msg);
+            chatProxy.events.emit('update', { payload: { value: msg } });
+          }
+          if (isHostRef.current) {
+            const currentHistory = stateProxy.store['chat_history'] || [];
+            if (!currentHistory.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender)) {
+              const updatedHistory = [...currentHistory, msg].slice(-100);
+              stateProxy.put('chat_history', updatedHistory);
+            }
+          }
           await publishSigned({
             kind: 9,
             created_at: Math.floor(Date.now() / 1000),
@@ -227,7 +239,7 @@ export const OrbitProvider = ({ children }) => {
             content: JSON.stringify(msg)
           });
         },
-        all: async () => chatProxy.arr.map(value => ({ payload: { value } }))
+        all: async () => (chatProxy.arr || []).map(value => ({ payload: { value } }))
       };
 
       setChatDbReady(chatProxy);
@@ -278,6 +290,15 @@ export const OrbitProvider = ({ children }) => {
                       const pk = key.replace('peer_role_', '');
                       newPeerRoles[pk] = data[key];
                       peerList.push(pk);
+                    } else if (key === 'chat_history' && Array.isArray(data[key])) {
+                      data[key].forEach(msg => {
+                        const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
+                        if (!isDup) {
+                          chatProxy.arr.push(msg);
+                          chatProxy.events.emit('update', { payload: { value: msg } });
+                          window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
+                        }
+                      });
                     } else if (key === 'banned' && data[key] === nostrPk) {
                        window.location.href = window.location.pathname;
                     } else if (key === 'room_ended' && data[key] === true) {
@@ -292,6 +313,15 @@ export const OrbitProvider = ({ children }) => {
                       const pk = key.replace('peer_role_', '');
                       newPeerRoles[pk] = data[key];
                       peerList.push(pk);
+                    } else if (key === 'chat_history' && Array.isArray(data[key])) {
+                      data[key].forEach(msg => {
+                        const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
+                        if (!isDup) {
+                          chatProxy.arr.push(msg);
+                          chatProxy.events.emit('update', { payload: { value: msg } });
+                          window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
+                        }
+                      });
                     }
                   }
                 });
@@ -372,10 +402,17 @@ export const OrbitProvider = ({ children }) => {
             try {
               const msg = JSON.parse(event.content);
               console.log('[OrbitContext] Received chat message from relay:', msg);
-              const isDuplicate = chatProxy.arr.some(m => m.id === msg.id && m.timestamp === msg.timestamp);
+              const isDuplicate = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image));
               if (!isDuplicate) {
                 chatProxy.arr.push(msg);
                 chatProxy.events.emit('update', { payload: { value: msg } });
+              }
+              if (isHostRef.current) {
+                const currentHistory = stateProxy.store['chat_history'] || [];
+                if (!currentHistory.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender)) {
+                  const updatedHistory = [...currentHistory, msg].slice(-100);
+                  stateProxy.put('chat_history', updatedHistory);
+                }
               }
               window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
             } catch (e) {

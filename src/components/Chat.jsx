@@ -42,28 +42,38 @@ const Chat = () => {
   }, []);
 
   useEffect(() => {
-    if (!chatDb) return;
+    if (!chatDb || typeof chatDb.all !== 'function') return;
 
     const loadMessages = async () => {
-      seenHashesRef.current = new Set();
-      const all = await chatDb.all();
-      const msgs = all.map(e => e.payload?.value || e.value).filter(Boolean);
-      msgs.forEach(m => {
-        const key = `${m.sender}|${m.timestamp}|${m.type}|${m.text || m.image || ''}`;
-        seenHashesRef.current.add(key);
-      });
-      setMessages(msgs);
+      try {
+        seenHashesRef.current = new Set();
+        const all = await chatDb.all();
+        const msgs = (all || []).map(e => e.payload?.value || e.value).filter(Boolean);
+        msgs.forEach(m => {
+          const key = `${m.sender}|${m.timestamp}|${m.type}|${m.text || m.image || ''}`;
+          seenHashesRef.current.add(key);
+        });
+        setMessages(msgs);
+      } catch (e) {
+        console.error('[Chat] Failed loading messages:', e);
+      }
     };
 
     loadMessages();
 
     const handleUpdate = (entry) => {
-      const msg = entry?.payload?.value;
+      const msg = entry?.payload?.value || entry?.value || entry;
       if (msg) addMessage(msg);
     };
 
-    chatDb.events.on('update', handleUpdate);
-    return () => chatDb.events.off('update', handleUpdate);
+    if (chatDb.events?.on) {
+      chatDb.events.on('update', handleUpdate);
+    }
+    return () => {
+      if (chatDb.events?.off) {
+        chatDb.events.off('update', handleUpdate);
+      }
+    };
   }, [chatDb, addMessage]);
 
   // Listen for local system messages dispatched by other contexts (e.g. PlaybackContext)
