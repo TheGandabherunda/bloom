@@ -222,7 +222,30 @@ const Queue = () => {
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
+  const containerRef = useRef(null);
   const touchActiveIdxRef = useRef(null);
+
+  // Auto-scroll current playing song to top of queue section
+  useEffect(() => {
+    if (currentIndex < 0 || queue.length === 0) return;
+
+    const scrollToActive = () => {
+      if (!containerRef.current) return;
+      const activeEl = containerRef.current.querySelector(`[data-queue-idx="${currentIndex}"]`);
+      if (activeEl) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+        const targetScrollTop = containerRef.current.scrollTop + (activeRect.top - containerRect.top) - 8;
+        containerRef.current.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: 'smooth'
+        });
+      }
+    };
+
+    const timer = setTimeout(scrollToActive, 100);
+    return () => clearTimeout(timer);
+  }, [currentIndex, queue.length === 0]);
 
   // Desktop Drag Handlers
   const handleDragStart = (e, index) => {
@@ -374,7 +397,7 @@ const Queue = () => {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 pt-2 space-y-2">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-4 pt-2 space-y-2">
         {queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20 group-hover/queue:opacity-100">
              <span className="material-symbols-rounded text-5xl">music_note</span>
