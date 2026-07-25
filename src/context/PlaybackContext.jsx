@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */  
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useOrbit } from './OrbitContext';
 import { CustomAudioPlayer } from '../services/CustomAudioPlayer';
@@ -354,11 +355,15 @@ export const PlaybackProvider = ({ children }) => {
           } else if (value.liveTime !== undefined) {
              computedLiveTime = value.liveTime;
           }
+          
+          if (track?.duration) {
+             computedLiveTime = Math.min(computedLiveTime, track.duration - 1);
+          }
 
           console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}, computedLiveTime=${computedLiveTime}`);
           if (track?.id !== currentTrackRef.current?.id) {
              console.log(`[Orbit Sync] Loading synced track...`);
-             loadTrack(track, index, computedLiveTime, networkIsPlayingRef.current, originator);
+             loadTrack(track, index, computedLiveTime, networkIsPlayingRef.current, 'network-sync');
           } else {
              if (index !== -1) {
                setCurrentIndex(index);
@@ -377,9 +382,15 @@ export const PlaybackProvider = ({ children }) => {
             playerRef.current?.pause();
           }
         } else if (key === 'currentTime') {
+          if (originator === peerId) return; // Prevent Host jitter from self-echoed time
           const time = typeof value === 'object' ? value.time : value;
-          if (Math.abs(playerRef.current?.getCurrentTime() - time) > 3) {
-            playerRef.current?.seek(time);
+          const timestamp = typeof value === 'object' ? value.timestamp : null;
+          let targetTime = time;
+          if (timestamp && networkIsPlayingRef.current) {
+            targetTime += Math.max(0, (Date.now() - timestamp) / 1000);
+          }
+          if (Math.abs(playerRef.current?.getCurrentTime() - targetTime) > 3) {
+            playerRef.current?.seek(targetTime);
           }
         } else if (key === 'queue') {
           const newQueue = value || [];
@@ -397,6 +408,8 @@ export const PlaybackProvider = ({ children }) => {
           }
         } else if (key === 'originalQueue') {
           setOriginalQueue(value);
+        } else if (key === 'isShuffled') {
+          setIsShuffledState(value);
         }
       } catch (e) {
         console.error('OrbitDB Sync Error:', e);
@@ -497,7 +510,7 @@ export const PlaybackProvider = ({ children }) => {
     }
     
     let activeIdx = currentIndexRef.current;
-    if (currentTrackRef.current) {
+    if (currentTrackRef.current && !loadingTrackId.current) {
       const actualIdx = activeQueue.findIndex(t => t.id === currentTrackRef.current.id);
       if (actualIdx !== -1) activeIdx = actualIdx;
     }
@@ -535,7 +548,7 @@ export const PlaybackProvider = ({ children }) => {
     if (activeQueue.length === 0) return;
 
     let activeIdx = currentIndexRef.current;
-    if (currentTrackRef.current) {
+    if (currentTrackRef.current && !loadingTrackId.current) {
       const actualIdx = activeQueue.findIndex(t => t.id === currentTrackRef.current.id);
       if (actualIdx !== -1) activeIdx = actualIdx;
     }

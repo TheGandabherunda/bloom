@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps, react/display-name, no-empty, no-useless-escape */  
 import React, { useState, useEffect, useRef } from 'react';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';

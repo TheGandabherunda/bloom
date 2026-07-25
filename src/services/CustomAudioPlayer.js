@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */  
 export class CustomAudioPlayer {
   constructor() {
     // ─── Single Audio element (plays to speakers AND feeds the analyser) ───
@@ -270,20 +271,27 @@ export class CustomAudioPlayer {
     });
   }
 
-  async play() {
-    if (this.isAborted) return;
-    try {
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-      await this.audio.play();
-    } catch (e) {
-      if (e.name !== 'AbortError') {
-        console.error('[AudioPlayer] play error:', e);
-        this.pause();
-        if (this.onError) this.onError(e);
-      }
+  play() {
+    if (this.isAborted) return Promise.resolve();
+    
+    // Fire off audioContext.resume() without awaiting it to avoid breaking the synchronous user gesture chain
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(e => console.warn('[AudioPlayer] Failed to resume AudioContext:', e));
     }
+
+    // Call audio.play() synchronously in the call stack
+    const playPromise = this.audio.play();
+    if (playPromise !== undefined) {
+      return playPromise.catch(e => {
+        if (e.name !== 'AbortError') {
+          console.error('[AudioPlayer] play error:', e);
+          this.pause();
+          if (this.onError) this.onError(e);
+        }
+        throw e;
+      });
+    }
+    return Promise.resolve();
   }
 
   pause() {

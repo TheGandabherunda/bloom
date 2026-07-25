@@ -1,3 +1,4 @@
+/* eslint-env node */  
 import CryptoJS from 'crypto-js';
 import { XMLParser } from 'fast-xml-parser';
 import spotifyUrlInfo from 'spotify-url-info';

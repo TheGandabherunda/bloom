@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */  
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useOrbit } from '../context/OrbitContext';

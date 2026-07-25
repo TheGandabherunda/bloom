@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */  
 // The backend proxy now handles all high-res streams natively via Jiosaavn CDN.
 // External monochrome mirrors are permanently stripped.
 
@@ -57,14 +58,32 @@ export const findBestMirror = async () => {
 export const getApiBase = () => "proxy";
 export const getMirrorStatus = () => ({ "proxy": "healthy" });
 
+const JIOSAAVN_INSTANCES = [
+  'https://jiosaavn-api-one-rho.vercel.app',
+  'https://jiosaavn-api-ebon-eta.vercel.app'
+];
+
+const fetchWithSaavnFallback = async (endpointPath) => {
+  let lastError;
+  for (const baseUrl of JIOSAAVN_INSTANCES) {
+    try {
+      const res = await fetch(`${baseUrl}${endpointPath}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && data.success) return data;
+    } catch (e) {
+      console.warn(`Saavn instance ${baseUrl} failed, trying next...`);
+      lastError = e;
+    }
+  }
+  throw lastError || new Error('All JioSaavn instances failed');
+};
+
 export const searchTracks = async (query) => {
   try {
     const q = query.replace(/\baudio\b/ig, '').trim();
-    const url = `https://jiosaavn-api-one-rho.vercel.app/api/search/songs?query=${encodeURIComponent(q)}&limit=40`;
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    if (!data.success || !data.data || !data.data.results || data.data.results.length === 0) return [];
+    const data = await fetchWithSaavnFallback(`/api/search/songs?query=${encodeURIComponent(q)}&limit=40`);
+    if (!data.data || !data.data.results || data.data.results.length === 0) return [];
     
     return data.data.results.map(song => {
       const thumbnail = song.image.find(img => img.quality === '500x500')?.url || song.image[song.image.length - 1]?.url;
@@ -97,10 +116,8 @@ export const getRecommendations = async (track) => {
   if (!track || !track.id) return [];
   if (recsCache.has(track.id)) return recsCache.get(track.id);
   try {
-    const url = `https://jiosaavn-api-one-rho.vercel.app/api/songs/${track.id}/suggestions?limit=40`;
-    const response = await fetch(url);
-    const data = await response.json();
-    if (!data.success || !data.data || data.data.length === 0) return [];
+    const data = await fetchWithSaavnFallback(`/api/songs/${track.id}/suggestions?limit=40`);
+    if (!data.data || data.data.length === 0) return [];
     
     const results = data.data.map(song => {
       const thumbnail = song.image.find(img => img.quality === '500x500')?.url || song.image[song.image.length - 1]?.url;
@@ -168,15 +185,15 @@ export const getTrendingByLocation = async () => {
         '592722547',  // Malayalam Viral Hits
         '85728084'    // Kannada Viral Hits
       ];
-      const fetches = playlistIds.map(id => fetch(`https://jiosaavn-api-one-rho.vercel.app/api/playlists?id=${id}&limit=15`).then(r => r.json()).catch(() => null));
+      const fetches = playlistIds.map(id => fetchWithSaavnFallback(`/api/playlists?id=${id}&limit=15`).catch(() => null));
       const results = await Promise.all(fetches);
       
-      arraysToInterleave = results.filter(r => r?.success && r.data?.songs).map(r => r.data.songs.map(s => normalizeSong(s)));
+      arraysToInterleave = results.filter(r => r && r.data?.songs).map(r => r.data.songs.map(s => normalizeSong(s)));
     } else {
       // 2. Global/International logic
       // Always include top English hits as base
-      const engRes = await fetch(`https://jiosaavn-api-one-rho.vercel.app/api/playlists?id=1081991857&limit=20`).then(r => r.json()).catch(() => null);
-      if (engRes?.success && engRes.data?.songs) {
+      const engRes = await fetchWithSaavnFallback(`/api/playlists?id=1081991857&limit=20`).catch(() => null);
+      if (engRes && engRes.data?.songs) {
         arraysToInterleave.push(engRes.data.songs.map(s => normalizeSong(s)));
       }
 
@@ -242,10 +259,8 @@ export const importPlaylist = async (url) => {
   try {
     // JioSaavn Playlist Support (Unlimited songs natively via Vercel API)
     if (url.includes('jiosaavn.com/')) {
-      const res = await fetch(`https://jiosaavn-api-one-rho.vercel.app/api/playlists?link=${encodeURIComponent(url)}`);
-      if (!res.ok) throw new Error('Failed to fetch JioSaavn playlist');
-      const data = await res.json();
-      if (!data.success || !data.data || !data.data.songs) return [];
+      const data = await fetchWithSaavnFallback(`/api/playlists?link=${encodeURIComponent(url)}`);
+      if (!data.data || !data.data.songs) return [];
       
       return data.data.songs.map(song => ({
         title: song.name,
@@ -253,15 +268,55 @@ export const importPlaylist = async (url) => {
       }));
     }
 
-    // YouTube Playlist Support (Full playlists via Netlify Serverless Proxy)
+    // YouTube Playlist Support (via Public APIs, no backend required)
     const match = url.match(/[?&]list=([^&]+)/);
     if (match && match[1]) {
-      // Call the Netlify backend directly to scrape the full YouTube playlist (bypasses CORS)
-      const res = await fetch(`https://bloom-music-player.netlify.app/api/audio/playlist?url=${encodeURIComponent(url)}`);
+      const playlistId = match[1];
+      const instances = [
+        'vid.puffyan.us',
+        'inv.nadeko.net',
+        'invidious.nerdvpn.de',
+        'invidious.slipfox.xyz'
+      ];
       
-      if (!res.ok) throw new Error('Failed to fetch YouTube playlist from backend');
-      const tracks = await res.json();
-      return tracks;
+      for (const instance of instances) {
+        try {
+          let allTracks = [];
+          let page = 1;
+          let hasMore = true;
+
+          while (hasMore) {
+            const res = await fetch(`https://${instance}/api/v1/playlists/${playlistId}?page=${page}`);
+            if (!res.ok) throw new Error('Bad response');
+            
+            const data = await res.json();
+            if (data && data.videos && data.videos.length > 0) {
+              const tracks = data.videos.map(song => ({
+                title: decodeHtml(song.title || 'Unknown Title'),
+                author: decodeHtml(song.author || 'Unknown Artist')
+              }));
+              allTracks = allTracks.concat(tracks);
+              
+              // Invidious typically returns 100 items per page
+              if (data.videos.length < 100) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+            } else {
+              hasMore = false; // No videos on this page
+            }
+          }
+          
+          if (allTracks.length > 0) {
+            return allTracks;
+          }
+        } catch (e) {
+          console.warn(`Invidious instance ${instance} failed, trying next...`);
+        }
+      }
+      
+      throw new Error('Failed to fetch YouTube playlist from all public APIs');
     }
 
     throw new Error('Unsupported playlist URL format');

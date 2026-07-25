@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */  
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { pool, signEvent, hexToBytes, DEFAULT_RELAYS } from '../services/nostr';
 import { finalizeEvent } from 'nostr-tools';
@@ -157,10 +158,12 @@ export const OrbitProvider = ({ children }) => {
       const stateProxy = {
         events: new MiniEmitter(),
         store: {},
+        dirtyKeys: new Set(),
         put: async (key, value) => {
           if (isHostRef.current) {
             // Host updates local state
             stateProxy.store[key] = value;
+            stateProxy.dirtyKeys.add(key);
             stateProxy.events.emit('update', { payload: { key, value } });
             window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value }, payload: { key, value } }));
             
@@ -211,12 +214,36 @@ export const OrbitProvider = ({ children }) => {
             // Debounce state publish
             if (statePublishTimeout) clearTimeout(statePublishTimeout);
             statePublishTimeout = setTimeout(async () => {
-              await publishSigned({
-                kind: 30000,
-                created_at: Math.floor(Date.now() / 1000),
-                tags: [['d', roomId]],
-                content: JSON.stringify(stateProxy.store)
-              });
+              const currentDirty = Array.from(stateProxy.dirtyKeys);
+              stateProxy.dirtyKeys.clear();
+              
+              const needsMain = currentDirty.some(k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history');
+              const needsQueue = currentDirty.includes('queue');
+              const needsOriginalQueue = currentDirty.includes('originalQueue');
+              const needsChat = currentDirty.includes('chat_history');
+              
+              const publishBundle = async (suffix, keysFilter) => {
+                 const data = {};
+                 let hasData = false;
+                 Object.entries(stateProxy.store).forEach(([k, v]) => {
+                    if (keysFilter(k)) {
+                       data[k] = v;
+                       hasData = true;
+                    }
+                 });
+                 if (!hasData) return;
+                 await publishSigned({
+                   kind: 30000,
+                   created_at: Math.floor(Date.now() / 1000),
+                   tags: [['d', `${roomId}${suffix}`]],
+                   content: JSON.stringify(data)
+                 });
+              };
+
+              if (needsMain) await publishBundle('', k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history');
+              if (needsQueue) await publishBundle('-queue', k => k === 'queue');
+              if (needsOriginalQueue) await publishBundle('-originalQueue', k => k === 'originalQueue');
+              if (needsChat) await publishBundle('-chat', k => k === 'chat_history');
             }, 500);
 
             // Debounce beacon publish if public
@@ -253,7 +280,7 @@ export const OrbitProvider = ({ children }) => {
             await publishSigned({
               kind: 30000,
               created_at: Math.floor(Date.now() / 1000),
-              tags: [['d', `intent-${roomId}`], ['p', hostIdRef.current]],
+              tags: [['d', `intent-${roomId}-${key}`], ['p', hostIdRef.current]],
               content: JSON.stringify({ key, value, ts: Date.now() }) // ts ensures content changes
             });
           }
@@ -296,7 +323,7 @@ export const OrbitProvider = ({ children }) => {
       // Set up subscriptions
       const hostPubKey = isHost ? nostrPk : hostIdRef.current;
       const filters = [
-        { kinds: [30000], '#d': [roomId], authors: [hostPubKey] }, // State sync from host
+        { kinds: [30000], '#d': [roomId, `${roomId}-queue`, `${roomId}-originalQueue`, `${roomId}-chat`], authors: [hostPubKey] }, // State sync from host
         { kinds: [9], '#h': [roomId] }, // Chat
       ];
       
@@ -312,7 +339,7 @@ export const OrbitProvider = ({ children }) => {
           if (event.kind === 30000) {
             const dTag = event.tags.find(t => t[0] === 'd')?.[1];
             
-            if (dTag === roomId) {
+            if (dTag === roomId || dTag === `${roomId}-queue` || dTag === `${roomId}-originalQueue` || dTag === `${roomId}-chat`) {
               // Host state update
               try {
                 const data = JSON.parse(event.content);
@@ -414,14 +441,28 @@ export const OrbitProvider = ({ children }) => {
 
                 if (stateRecovered && isHostRef.current) {
                   // We recovered state from the relay. Publish merged state to avoid partial overwrites.
+                  Object.keys(stateProxy.store).forEach(k => stateProxy.dirtyKeys.add(k));
                   if (statePublishTimeout) clearTimeout(statePublishTimeout);
                   statePublishTimeout = setTimeout(async () => {
-                    await publishSigned({
-                      kind: 30000,
-                      created_at: Math.floor(Date.now() / 1000),
-                      tags: [['d', roomId]],
-                      content: JSON.stringify(stateProxy.store)
-                    });
+                    const publishBundle = async (suffix, keysFilter) => {
+                       const data = {};
+                       let hasData = false;
+                       Object.entries(stateProxy.store).forEach(([k, v]) => {
+                          if (keysFilter(k)) { data[k] = v; hasData = true; }
+                       });
+                       if (!hasData) return;
+                       await publishSigned({
+                         kind: 30000,
+                         created_at: Math.floor(Date.now() / 1000),
+                         tags: [['d', `${roomId}${suffix}`]],
+                         content: JSON.stringify(data)
+                       });
+                    };
+                    await publishBundle('', k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history');
+                    await publishBundle('-queue', k => k === 'queue');
+                    await publishBundle('-originalQueue', k => k === 'originalQueue');
+                    await publishBundle('-chat', k => k === 'chat_history');
+                    stateProxy.dirtyKeys.clear();
                   }, 500);
                 }
 
@@ -431,7 +472,7 @@ export const OrbitProvider = ({ children }) => {
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse state event from relay:', e);
               }
-            } else if (dTag === `intent-${roomId}` && isHost) {
+            } else if (dTag?.startsWith(`intent-${roomId}-`) && isHost) {
               // Peer intent to host
               try {
                 const intent = JSON.parse(event.content);

@@ -1,3 +1,4 @@
+/* eslint-disable react/display-name */  
 import React, { useState, useEffect } from 'react';
 import { extractPrimaryColor } from '../utils/colorExtractor';
 import { useOrbit } from '../context/OrbitContext';

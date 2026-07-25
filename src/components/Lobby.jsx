@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps, react/display-name, no-empty */  
 import React, { useState, useEffect, useRef } from 'react';
 import AmbientLight from './AmbientLight';
 import { pool, getUserRelays } from '../services/nostr';

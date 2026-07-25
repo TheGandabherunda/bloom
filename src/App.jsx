@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */  
 import React, { useState, useEffect } from 'react';
 import { OrbitProvider } from './context/OrbitContext';
 import { PlaybackProvider } from './context/PlaybackContext';

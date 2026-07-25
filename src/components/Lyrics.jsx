@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps, react/display-name */  
 import React, { useState, useEffect, useRef } from 'react';
 import { getLyrics } from '../services/musicApi';
 

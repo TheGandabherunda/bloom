@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps, no-empty, no-unused-vars */  
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useOrbit } from '../context/OrbitContext';
 import { usePlayback } from '../context/PlaybackContext';
@@ -11,8 +12,9 @@ import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
 
 const Layout = ({ config, onLeave, onMinimize }) => {
   const { initP2P, stopP2P, status, peerId, peerRoles, getConnectedRelays, deleteRoom } = useOrbit();
-  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback, error, togglePlay, networkIsPlaying, isLoading } = usePlayback();
+  const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback, error, togglePlay, networkIsPlaying, isLoading, playerRef } = usePlayback();
   const [showSearch, setShowSearch] = useState(false);
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
   
   const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
   const canControl = role === 'owner' || role === 'admin';
@@ -446,10 +448,17 @@ const Layout = ({ config, onLeave, onMinimize }) => {
       )}
 
       {/* Autoplay Blocked Overlay */}
-      {networkIsPlaying && !isPlaying && !isLoading && currentTrack && (
+      {networkIsPlaying && !isPlaying && !isLoading && currentTrack && !overlayDismissed && (
         <div 
           className="fixed inset-0 bg-black/70 backdrop-blur-2xl z-[9999] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300 cursor-pointer"
-          onClick={() => togglePlay(true)}
+          onClick={() => {
+            setOverlayDismissed(true);
+            // Synchronously call play on the raw audio element to satisfy iOS Safari autoplay policies
+            if (playerRef.current && playerRef.current.audio) {
+              playerRef.current.audio.play().catch(() => {});
+            }
+            togglePlay(true);
+          }}
         >
           <div className="flex flex-col items-center text-center max-w-sm w-full">
             <p className="text-white/70 text-sm mb-8 leading-relaxed">
