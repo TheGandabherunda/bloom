@@ -29,6 +29,7 @@ export const PlaybackProvider = ({ children }) => {
   const originalQueueRef = useRef([]);
   const currentIndexRef = useRef(-1);
   const networkIsPlayingRef = useRef(false);
+  const peerIdRef = useRef(peerId);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -41,6 +42,10 @@ export const PlaybackProvider = ({ children }) => {
   useEffect(() => {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
+
+  useEffect(() => {
+    peerIdRef.current = peerId;
+  }, [peerId]);
 
   useEffect(() => {
     // Initialize WebAudio Player
@@ -65,7 +70,12 @@ export const PlaybackProvider = ({ children }) => {
       }
     };
     player.onEnded = () => {
-      if (playNextRef.current) playNextRef.current(true);
+      // ONLY the Host is allowed to automatically advance the queue
+      if (peerRolesRef.current[peerIdRef.current] === 'owner') {
+        if (playNextRef.current) playNextRef.current(true);
+      } else {
+        console.log('[Playback] Local audio ended. Waiting for Host to sync next track.');
+      }
     };
     player.onBuffering = (isBuffering) => {
       setIsLoading(isBuffering);
