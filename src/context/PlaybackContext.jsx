@@ -296,7 +296,7 @@ export const PlaybackProvider = ({ children }) => {
       if (playerRef.current && isPlaying) {
         const curTime = playerRef.current.getCurrentTime();
         if (curTime > 0) {
-          stateDb.put('currentTime', { time: curTime, originator: peerId, timestamp: Date.now() }).catch(() => {});
+          stateDb.put('currentTime', { time: curTime, trackId: currentTrackRef.current?.id, originator: peerId, timestamp: Date.now() }).catch(() => {});
         }
       }
     }, 4000);
@@ -322,11 +322,13 @@ export const PlaybackProvider = ({ children }) => {
           let computedLiveTime = 0;
           const ct = await stateDb.get('currentTime');
           if (ct && typeof ct === 'object' && isPlaying) {
-             const ctElapsed = ct.timestamp ? Math.max(0, (Date.now() - ct.timestamp) / 1000) : 0;
-             computedLiveTime = ct.time + ctElapsed;
-          } else if (syncedTrack.timestamp && isPlaying) {
-             const elapsed = Math.max(0, (Date.now() - syncedTrack.timestamp) / 1000);
-             computedLiveTime = (syncedTrack.startTime || 0) + elapsed;
+             if (ct.trackId === track?.id) {
+               computedLiveTime = ct.time;
+             } else {
+               computedLiveTime = syncedTrack.startTime || 0;
+             }
+          } else if (isPlaying) {
+             computedLiveTime = syncedTrack.startTime || 0;
           }
           
           loadTrack(track, index, computedLiveTime, isPlaying, 'initial-sync');
@@ -395,12 +397,8 @@ export const PlaybackProvider = ({ children }) => {
           const isPlayingState = stateDb ? await stateDb.get('isPlaying') : false;
           const isPlaying = isPlayingState ? (typeof isPlayingState === 'object' ? isPlayingState.status : isPlayingState) : false;
 
-          if (ct && typeof ct === 'object' && isPlaying) {
-             const ctElapsed = ct.timestamp ? Math.max(0, (Date.now() - ct.timestamp) / 1000) : 0;
-             computedLiveTime = ct.time + ctElapsed;
-          } else if (value.timestamp && isPlaying) {
-             const elapsed = Math.max(0, (Date.now() - value.timestamp) / 1000);
-             computedLiveTime = (value.startTime || 0) + elapsed;
+          if (ct && typeof ct === 'object' && isPlaying && ct.trackId === track?.id) {
+             computedLiveTime = ct.time;
           } else if (value.liveTime !== undefined) {
              computedLiveTime = value.liveTime;
           }
@@ -436,10 +434,11 @@ export const PlaybackProvider = ({ children }) => {
           if (originator === peerId) return; // Prevent Host jitter from self-echoed time
           const time = typeof value === 'object' ? value.time : value;
           const timestamp = typeof value === 'object' ? value.timestamp : null;
+          const trackId = typeof value === 'object' ? value.trackId : null;
+          
+          if (trackId && currentTrackRef.current?.id !== trackId) return; // Ignore stale time updates
+          
           let targetTime = time;
-          if (timestamp && networkIsPlayingRef.current) {
-            targetTime += Math.max(0, (Date.now() - timestamp) / 1000);
-          }
           if (Math.abs(playerRef.current?.getCurrentTime() - targetTime) > 3) {
             playerRef.current?.seek(targetTime);
           }
@@ -480,7 +479,7 @@ export const PlaybackProvider = ({ children }) => {
     }
     
     if (stateDb) {
-      stateDb.put('currentTime', { time, originator: peerId }).catch(e => console.warn('Sync Failed:', e.message));
+      stateDb.put('currentTime', { time, trackId: currentTrackRef.current?.id, originator: peerId, timestamp: Date.now() }).catch(e => console.warn('Sync Failed:', e.message));
     }
   }, [stateDb, peerId, canControl]);
 
@@ -501,14 +500,10 @@ export const PlaybackProvider = ({ children }) => {
             let currentPos = 0;
             const ct = await stateDb.get('currentTime');
             if (ct && typeof ct === 'object') {
-              const ctElapsed = ct.timestamp ? Math.max(0, (Date.now() - ct.timestamp) / 1000) : 0;
-              currentPos = ct.time + ctElapsed;
+              currentPos = ct.time;
             } else {
               const syncedTrack = await stateDb.get('currentTrack');
-              if (syncedTrack && syncedTrack.timestamp) {
-                const elapsed = Math.max(0, (Date.now() - syncedTrack.timestamp) / 1000);
-                currentPos = (syncedTrack.startTime || 0) + elapsed;
-              }
+              currentPos = syncedTrack?.startTime || 0;
             }
             if (playerRef.current && currentPos > 0) {
                console.log(`[Playback] Force resyncing audio seek position to ${currentPos.toFixed(1)}s on user unblock.`);
