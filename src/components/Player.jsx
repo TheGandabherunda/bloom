@@ -140,14 +140,20 @@ const MobileProgressBar = React.memo(({ playerRef, duration, canControl, seek })
             max="100"
             step="0.1"
             value={displayProgress}
-            onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setLocalProgress(val);
+              window.dispatchEvent(new CustomEvent('bloom:scrub', { detail: val / 100 }));
+            }}
             onMouseUp={(e) => {
               seek((parseFloat(e.target.value) / 100) * duration);
               setLocalProgress(null);
+              window.dispatchEvent(new CustomEvent('bloom:scrubEnd'));
             }}
             onTouchEnd={(e) => {
               seek((parseFloat(e.target.value) / 100) * duration);
               setLocalProgress(null);
+              window.dispatchEvent(new CustomEvent('bloom:scrubEnd'));
             }}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
@@ -211,14 +217,20 @@ const DesktopTopProgressBar = React.memo(({ playerRef, duration, canControl, see
           max="100"
           step="0.1"
           value={displayProgress}
-          onChange={(e) => setLocalProgress(parseFloat(e.target.value))}
+          onChange={(e) => {
+            const val = parseFloat(e.target.value);
+            setLocalProgress(val);
+            window.dispatchEvent(new CustomEvent('bloom:scrub', { detail: val / 100 }));
+          }}
           onMouseUp={(e) => {
             seek((parseFloat(e.target.value) / 100) * duration);
             setLocalProgress(null);
+            window.dispatchEvent(new CustomEvent('bloom:scrubEnd'));
           }}
           onTouchEnd={(e) => {
             seek((parseFloat(e.target.value) / 100) * duration);
             setLocalProgress(null);
+            window.dispatchEvent(new CustomEvent('bloom:scrubEnd'));
           }}
           onTouchStart={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}
@@ -496,6 +508,7 @@ const Player = ({ activeMobileView }) => {
                   thumbnail={currentTrack.thumbnail} 
                   isPlaying={isPlaying} 
                   isExpanded={isExpanded} 
+                  playerRef={playerRef}
                 />
 
                 {showPlayAnim && (

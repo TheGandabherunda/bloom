@@ -5,8 +5,8 @@ import React from 'react';
 // Oversized base rectangles (-100, -100, 1200x833) prevent any 1px mask gaps on the outer edges.
 const maskUrl = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 633'%3E%3Cmask id='m'%3E%3Crect x='-100' y='-100' width='1200' height='833' fill='white'/%3E%3Crect x='310' y='223' width='380' height='59' fill='black'/%3E%3Ccircle cx='310' cy='263' r='86' fill='white'/%3E%3Ccircle cx='690' cy='263' r='73' fill='white'/%3E%3Ccircle cx='170' cy='565' r='22' fill='black'/%3E%3Ccircle cx='830' cy='565' r='22' fill='black'/%3E%3Crect x='320' y='535' width='80' height='60' rx='6' fill='black'/%3E%3Crect x='600' y='535' width='80' height='60' rx='6' fill='black'/%3E%3C/mask%3E%3Crect x='-100' y='-100' width='1200' height='833' fill='black' mask='url(%23m)'/%3E%3C/svg%3E")`;
 
-const SpoolSVG = ({ isPlaying }) => (
-  <svg viewBox="0 0 100 100" className={`w-full h-full drop-shadow-md z-10 ${isPlaying ? 'animate-[spin_4s_linear_infinite]' : ''}`}>
+const SpoolSVG = ({ forwardRef }) => (
+  <svg ref={forwardRef} viewBox="0 0 100 100" className="w-full h-full drop-shadow-md z-10 will-change-transform">
     {/* Outer white ring with thickness */}
     <path fill="#e5e5e5" fillRule="evenodd" d="M 50 2 A 48 48 0 1 1 49.9 2 M 50 22 A 28 28 0 1 0 50.1 22" />
     
@@ -19,7 +19,65 @@ const SpoolSVG = ({ isPlaying }) => (
   </svg>
 );
 
-const CassetteTape = ({ thumbnail, isPlaying, isExpanded }) => {
+const CassetteTape = ({ thumbnail, isPlaying, isExpanded, playerRef }) => {
+  const leftSpoolRef = React.useRef(null);
+  const rightSpoolRef = React.useRef(null);
+  const scrubRatioRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleScrub = (e) => {
+      scrubRatioRef.current = e.detail;
+      updateRotation();
+    };
+    window.addEventListener('bloom:scrub', handleScrub);
+    return () => window.removeEventListener('bloom:scrub', handleScrub);
+  }, []);
+
+  React.useEffect(() => {
+    const handleScrubEnd = () => {
+      scrubRatioRef.current = null;
+    };
+    window.addEventListener('bloom:scrubEnd', handleScrubEnd);
+    return () => window.removeEventListener('bloom:scrubEnd', handleScrubEnd);
+  }, []);
+
+  const updateRotation = React.useCallback(() => {
+    let time = 0;
+    if (scrubRatioRef.current !== null && playerRef?.current) {
+      time = scrubRatioRef.current * (playerRef.current.audio?.duration || 0);
+    } else if (playerRef?.current?.audio) {
+      time = playerRef.current.audio.currentTime;
+    }
+    
+    // 90 degrees per second means 4 seconds per full rotation
+    const deg = time * 90;
+    if (leftSpoolRef.current) leftSpoolRef.current.style.transform = `rotate(${deg}deg)`;
+    if (rightSpoolRef.current) rightSpoolRef.current.style.transform = `rotate(${deg}deg)`;
+  }, [playerRef]);
+
+  React.useEffect(() => {
+    if (!playerRef?.current) return;
+    
+    let animationFrameId;
+    const loop = () => {
+       if (isPlaying && scrubRatioRef.current === null) {
+          updateRotation();
+       }
+       animationFrameId = requestAnimationFrame(loop);
+    };
+    loop();
+    
+    const handleTime = () => {
+      if (!isPlaying && scrubRatioRef.current === null) updateRotation();
+    };
+    playerRef.current.addTimeListener(handleTime);
+    
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (playerRef.current) playerRef.current.removeTimeListener(handleTime);
+    };
+  }, [playerRef, isPlaying, updateRotation]);
+
   return (
     <div 
       className={`relative w-[90vw] max-w-[500px] aspect-[1.58/1] rounded-[4%] flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
@@ -136,7 +194,7 @@ const CassetteTape = ({ thumbnail, isPlaying, isExpanded }) => {
             {/* Black background for the inner wheel spindle to hide the tape color */}
             <div className="absolute w-[70%] h-[70%] rounded-full bg-[#050505] shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)]"></div>
 
-            <SpoolSVG isPlaying={isPlaying} />
+            <SpoolSVG forwardRef={leftSpoolRef} />
           </div>
 
           {/* Right Spool - Perfectly centered in the pill shape end */}
@@ -153,7 +211,7 @@ const CassetteTape = ({ thumbnail, isPlaying, isExpanded }) => {
             {/* Black background for the inner wheel spindle to hide the tape color */}
             <div className="absolute w-[70%] h-[70%] rounded-full bg-[#050505] shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)]"></div>
 
-            <SpoolSVG isPlaying={isPlaying} />
+            <SpoolSVG forwardRef={rightSpoolRef} />
           </div>
         </div>
 
