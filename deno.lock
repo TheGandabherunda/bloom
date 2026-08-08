@@ -32,9 +32,7 @@
         "npm:tailwind-merge@^1.14.0",
         "npm:tailwindcss@^3.3.3",
         "npm:vite-plugin-node-polyfills@0.28",
-        "npm:vite@6",
-        "npm:youtube-sr@^4.3.12",
-        "npm:youtubei.js@^17.2.0"
+        "npm:vite@6"
       ],
       "overrides": {
         "elliptic": "^6.5.4"

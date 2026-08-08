@@ -4,6 +4,7 @@ import { useOrbit } from '../context/OrbitContext';
 import { usePlayback } from '../context/PlaybackContext';
 import Lyrics from './Lyrics';
 import { PlayerTrackSkeleton } from './Skeleton';
+import CassetteTape from './CassetteTape';
 
 const Visualizer = React.memo(({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
   const barsRef = useRef([]);
@@ -455,12 +456,46 @@ const Player = ({ activeMobileView }) => {
           </div>
           
           {!showLyrics ? (
-            <div className="relative flex flex-col items-center w-full mt-4 lg:mt-0">
-              <div className="relative">
-                <img 
-                  src={currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault')}
-                  className={`w-[80vw] max-w-[600px] aspect-square object-cover rounded-3xl border border-white/10 z-10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isExpanded ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`} 
-                  alt=""
+            <div className="relative flex flex-col items-center justify-center w-full h-full mt-4 lg:mt-0 z-10">
+              
+              {/* Title and Artist (Above Cassette) */}
+              <div className="w-full flex flex-col items-center mb-14 lg:mb-20 px-6 text-center animate-in fade-in slide-in-from-top-4 duration-700 relative z-40">
+                {currentTrack.title.length > 20 ? (
+                  <div className="w-full max-w-3xl overflow-hidden mask-image-x relative flex justify-start pb-4 -mb-4 pt-2 -mt-2">
+                    <div className="flex w-max animate-marquee whitespace-nowrap items-center">
+                      <div className="flex items-center shrink-0 pr-16">
+                        <h2 className="text-3xl lg:text-5xl font-serif text-white leading-normal">{currentTrack.title}</h2>
+                      </div>
+                      <div className="flex items-center shrink-0 pr-16">
+                        <h2 className="text-3xl lg:text-5xl font-serif text-white leading-normal">{currentTrack.title}</h2>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <h2 className="text-3xl lg:text-5xl font-serif text-white w-full max-w-3xl truncate pb-4 -mb-4 pt-2 -mt-2 leading-normal">{currentTrack.title}</h2>
+                )}
+                
+                {currentTrack.author.length > 35 ? (
+                  <div className="w-full max-w-2xl overflow-hidden mask-image-x relative flex justify-start pb-2 -mb-2 mt-2">
+                    <div className="flex w-max animate-marquee whitespace-nowrap items-center">
+                      <div className="flex items-center shrink-0 pr-16">
+                        <p className="text-lg lg:text-2xl font-semibold text-white/70 leading-normal">{currentTrack.author}</p>
+                      </div>
+                      <div className="flex items-center shrink-0 pr-16">
+                        <p className="text-lg lg:text-2xl font-semibold text-white/70 leading-normal">{currentTrack.author}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-lg lg:text-2xl font-semibold text-white/70 w-full max-w-2xl truncate mt-2 pb-2 -mb-2 leading-normal">{currentTrack.author}</p>
+                )}
+              </div>
+
+              <div className="relative flex items-center justify-center w-full min-h-[40vh] lg:min-h-0">
+                <CassetteTape 
+                  thumbnail={currentTrack.thumbnail} 
+                  isPlaying={isPlaying} 
+                  isExpanded={isExpanded} 
                 />
 
                 {showPlayAnim && (
@@ -472,12 +507,6 @@ const Player = ({ activeMobileView }) => {
                     </div>
                   </div>
                 )}
-              </div>
-              
-              {/* Mobile Title and Artist (Below Cover Art) */}
-              <div className="lg:hidden w-full flex flex-col items-center mt-6 px-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-40">
-                <h2 className="text-2xl font-extrabold text-white w-full truncate drop-shadow-lg">{currentTrack.title}</h2>
-                <p className="text-base font-semibold text-white/70 w-full truncate mt-1 drop-shadow-md">{currentTrack.author}</p>
               </div>
             </div>
           ) : (
