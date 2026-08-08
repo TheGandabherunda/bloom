@@ -75,7 +75,7 @@ const Lyrics = React.memo(({ currentTrack, playerRef }) => {
       activeIndexRef.current = -1;
       
       try {
-        const data = await getLyrics(currentTrack.title, currentTrack.author);
+        const data = await getLyrics(currentTrack.title, currentTrack.author, currentTrack.duration);
         
         if (isMounted && data && data.lyrics) {
           if (data.isSynced) {

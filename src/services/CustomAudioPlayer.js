@@ -217,8 +217,8 @@ export class CustomAudioPlayer {
     return this.audio ? this.audio.currentTime : 0;
   }
 
-  load(manifestUrl, unused = null, startTime = 0) {
-    console.log(`[AudioPlayer] load called with URL: ${manifestUrl}, startTime: ${startTime}`);
+  load(manifestUrl, autoPlay = false, startTime = 0) {
+    console.log(`[AudioPlayer] load called with URL: ${manifestUrl}, startTime: ${startTime}, autoPlay: ${autoPlay}`);
     this.isAborted = false;
 
     if (this.currentObjectUrl) {
@@ -237,6 +237,11 @@ export class CustomAudioPlayer {
     return new Promise((resolve, reject) => {
       this.rejectActiveLoad = reject;
       this.audio.src = manifestUrl;
+      
+      if (autoPlay) {
+        // Unlock audio element synchronously during user gesture!
+        this.audio.play().catch(e => console.warn('[AudioPlayer] Unlock play failed (expected if blocked):', e));
+      }
       
       let timeoutId;
 

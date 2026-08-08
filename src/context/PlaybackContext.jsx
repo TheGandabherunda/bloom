@@ -178,7 +178,7 @@ export const PlaybackProvider = ({ children }) => {
       // Ensure player is ready before loading
       if (!playerRef.current) throw new Error('Player not initialized');
 
-      await playerRef.current.load(streamUrl, null, startTime);
+      await playerRef.current.load(streamUrl, autoPlay, startTime);
       console.log(`[Playback] player load finished for trackId: ${track.id}`);
       
       if (loadingTrackId.current !== currentLoadId) {

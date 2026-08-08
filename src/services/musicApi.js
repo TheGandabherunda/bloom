@@ -344,7 +344,7 @@ export const importPlaylist = async (url) => {
   }
 };
 
-export const getLyrics = async (track, artist) => {
+export const getLyrics = async (track, artist, duration) => {
   try {
     const query = new URLSearchParams({ track_name: track });
     if (artist) {
@@ -353,7 +353,27 @@ export const getLyrics = async (track, artist) => {
       query.append('artist_name', primaryArtist);
     }
     
-    // Use search instead of get for fuzzy matching (essential for titles with (From "Movie"))
+    // 1. Try exact match using duration if available
+    if (duration) {
+      const getQuery = new URLSearchParams(query);
+      getQuery.append('duration', duration.toString());
+      try {
+        const getRes = await fetch(`https://lrclib.net/api/get?${getQuery.toString()}`);
+        if (getRes.ok) {
+          const getData = await getRes.json();
+          if (getData && (getData.syncedLyrics || getData.plainLyrics)) {
+            return {
+              lyrics: getData.syncedLyrics || getData.plainLyrics,
+              isSynced: !!getData.syncedLyrics
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Exact lyric match failed, falling back to search');
+      }
+    }
+
+    // 2. Fallback to fuzzy search
     const response = await fetch(`https://lrclib.net/api/search?${query.toString()}`);
     
     if (!response.ok) return null;
@@ -361,7 +381,16 @@ export const getLyrics = async (track, artist) => {
     const data = await response.json();
     
     if (data && data.length > 0) {
-      const bestMatch = data[0];
+      let bestMatch = data[0];
+      
+      // Find best match by duration (within 5 seconds) if available
+      if (duration) {
+        const matchingDuration = data.find(item => item.duration && Math.abs(item.duration - duration) <= 5);
+        if (matchingDuration) {
+          bestMatch = matchingDuration;
+        }
+      }
+      
       if (bestMatch.syncedLyrics) {
         return { lyrics: bestMatch.syncedLyrics, isSynced: true };
       } else if (bestMatch.plainLyrics) {

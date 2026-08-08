@@ -33,12 +33,28 @@ const Chat = () => {
   const scrollRef = useRef(null);
   const seenHashesRef = useRef(new Set());
 
-  const addMessage = useCallback((msg) => {
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    return localStorage.getItem('bloom_chat_sound') !== 'false';
+  });
+  const soundEnabledRef = useRef(soundEnabled);
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+    localStorage.setItem('bloom_chat_sound', soundEnabled);
+  }, [soundEnabled]);
+
+  const addMessage = useCallback((msg, isNewRemote = false) => {
     if (!msg) return;
     const key = `${msg.sender}|${msg.timestamp}|${msg.type}|${msg.text || msg.image || ''}`;
     if (seenHashesRef.current.has(key)) return;
     seenHashesRef.current.add(key);
     setMessages(prev => [...prev, msg]);
+
+    if (isNewRemote && msg.type !== 'system' && soundEnabledRef.current) {
+      const audio = new Audio('/assets/noti.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -63,7 +79,7 @@ const Chat = () => {
 
     const handleUpdate = (entry) => {
       const msg = entry?.payload?.value || entry?.value || entry;
-      if (msg) addMessage(msg);
+      if (msg) addMessage(msg, msg.peerId !== peerId);
     };
 
     if (chatDb.events?.on) {
@@ -78,7 +94,7 @@ const Chat = () => {
 
   // Listen for local system messages dispatched by other contexts (e.g. PlaybackContext)
   useEffect(() => {
-    const handleLocal = (e) => { if (e.detail) addMessage(e.detail); };
+    const handleLocal = (e) => { if (e.detail) addMessage(e.detail, false); };
     window.addEventListener('bloom:chat-message', handleLocal);
     return () => window.removeEventListener('bloom:chat-message', handleLocal);
   }, [addMessage]);
@@ -117,7 +133,7 @@ const Chat = () => {
       peerId
     };
 
-    addMessage(msg);
+    addMessage(msg, false);
     setInput('');
 
     try {
@@ -138,7 +154,7 @@ const Chat = () => {
       peerId
     };
 
-    addMessage(msg);
+    addMessage(msg, false);
 
     try {
       await chatDb.add(msg);
@@ -149,7 +165,17 @@ const Chat = () => {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+      <button 
+        onClick={() => setSoundEnabled(!soundEnabled)}
+        className="absolute top-2 right-4 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 text-white/50 hover:bg-black/60 hover:text-white transition-all backdrop-blur-sm"
+        title={soundEnabled ? "Mute Notifications" : "Unmute Notifications"}
+      >
+        <span className="material-symbols-rounded text-[18px]">
+          {soundEnabled ? 'notifications_active' : 'notifications_off'}
+        </span>
+      </button>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 pt-12">
         {!chatDb || status === 'initializing' ? (
           <div className="flex flex-col gap-3">
             {[...Array(6)].map((_, i) => (
