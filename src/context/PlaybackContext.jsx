@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useOrbit } from './OrbitContext';
 import { CustomAudioPlayer } from '../services/CustomAudioPlayer';
-import { decodeHtml } from '../services/musicApi';
+import { decodeHtml, resolveTrackStream } from '../services/musicApi';
 
 const PlaybackContext = createContext(null);
 
@@ -26,12 +26,17 @@ export const PlaybackProvider = ({ children }) => {
   const loadingTrackId = useRef(null);
   const playNextRef = useRef(null);
   const queueRef = useRef([]);
+  const originalQueueRef = useRef([]);
   const currentIndexRef = useRef(-1);
   const networkIsPlayingRef = useRef(false);
 
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  useEffect(() => {
+    originalQueueRef.current = originalQueue;
+  }, [originalQueue]);
 
   useEffect(() => {
     currentIndexRef.current = currentIndex;
@@ -92,6 +97,39 @@ export const PlaybackProvider = ({ children }) => {
     if (isLocal && !canControl()) {
       console.warn("Only owners and admins can play tracks in this room.");
       return;
+    }
+    
+    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    if (isLocal && !isOwner) {
+       console.log(`[Playback] Admin intent dispatched to Host for track: ${track.id}`);
+       if (stateDb) {
+           const updatedTrack = { 
+            ...track, 
+            title: decodeHtml(track.title || ''),
+            author: decodeHtml(track.author || ''),
+            audioQuality: track.audioQuality || 'AUDIO' 
+          };
+          const resolvedIndex = targetIndex !== -1 ? targetIndex : (queueRef.current ? queueRef.current.findIndex(t => t.id === track.id) : -1);
+          
+          try {
+            await stateDb.put('currentTrack', { 
+              track: updatedTrack, 
+              index: resolvedIndex, 
+              originator: peerId,
+              startTime: startTime || 0,
+              timestamp: Date.now(),
+              autoPlay: autoPlay
+            });
+            if (autoPlay) {
+              await stateDb.put('isPlaying', { status: true, originator: peerId });
+            }
+          } catch (err) {
+            console.error("Failed to sync playback intent:", err);
+          }
+       }
+       // Optimistic UI for loading state
+       setIsLoading(true);
+       return;
     }
 
       setError(null);
@@ -168,6 +206,17 @@ export const PlaybackProvider = ({ children }) => {
       setError(isInteractError ? 'autoplay-interact-blocked' : (err.message || 'Failed to load track'));
       setIsLoading(false);
       
+      // If we failed to load due to a 403 (e.g. JioSaavn stream URL expired), re-resolve it once
+      if (err.message && err.message.includes('403') && !track._resolved) {
+         console.log(`[Playback] Track stream likely expired. Attempting to resolve fresh URL for ${track.id}...`);
+         const freshUrl = await resolveTrackStream(track.id);
+         if (freshUrl) {
+           const freshTrack = { ...track, downloadUrl: freshUrl, _resolved: true };
+           // Don't change index or time, just reload silently
+           return loadTrack(freshTrack, targetIndex, startTime, autoPlay, originator);
+         }
+      }
+
       if (!isInteractError) {
         setIsPlaying(false);
         isPlayingRef.current = false;
@@ -356,6 +405,8 @@ export const PlaybackProvider = ({ children }) => {
              computedLiveTime = value.liveTime;
           }
           
+          const shouldPlay = value.autoPlay !== undefined ? value.autoPlay : networkIsPlayingRef.current;
+          
           if (track?.duration) {
              computedLiveTime = Math.min(computedLiveTime, track.duration - 1);
           }
@@ -363,7 +414,7 @@ export const PlaybackProvider = ({ children }) => {
           console.log(`[Orbit Sync] Received currentTrack update: id=${track?.id}, index=${index}, computedLiveTime=${computedLiveTime}`);
           if (track?.id !== currentTrackRef.current?.id) {
              console.log(`[Orbit Sync] Loading synced track...`);
-             loadTrack(track, index, computedLiveTime, networkIsPlayingRef.current, 'network-sync');
+             loadTrack(track, index, computedLiveTime, shouldPlay, 'network-sync');
           } else {
              if (index !== -1) {
                setCurrentIndex(index);
@@ -422,13 +473,16 @@ export const PlaybackProvider = ({ children }) => {
 
   const seek = useCallback((time) => {
     if (!canControl()) return;
-    if (playerRef.current) {
-      playerRef.current.seek(time);
+    
+    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    if (isOwner) {
+      if (playerRef.current) playerRef.current.seek(time);
     }
+    
     if (stateDb) {
       stateDb.put('currentTime', { time, originator: peerId }).catch(e => console.warn('Sync Failed:', e.message));
     }
-  }, [stateDb, peerId]);
+  }, [stateDb, peerId, canControl]);
 
   const togglePlay = useCallback(async (forceLocal = false) => {
     if (!forceLocal && !canControl()) return;
@@ -480,14 +534,22 @@ export const PlaybackProvider = ({ children }) => {
     // Read from ref to always get latest value and avoid stale closure issues
     const newState = !isPlayingRef.current;
     console.log(`[Playback] togglePlay: toggling to ${newState}`);
-    if (newState) {
-      setError(null);
-      await playerRef.current?.play();
+    
+    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    if (isOwner) {
+      if (newState) {
+        setError(null);
+        await playerRef.current?.play();
+      } else {
+        playerRef.current?.pause();
+      }
+      setIsPlaying(newState);
+      isPlayingRef.current = newState;
     } else {
-      playerRef.current?.pause();
+      // Optimistic UI update for Play/Pause button
+      setIsPlaying(newState);
     }
-    setIsPlaying(newState);
-    isPlayingRef.current = newState;
+    
     if (canControl() && stateDb) stateDb.put('isPlaying', { status: newState, originator: peerId }).catch(e => console.warn('Sync Failed', e));
   }, [stateDb, peerId, queue, loadTrack, canControl]);
 
@@ -521,10 +583,24 @@ export const PlaybackProvider = ({ children }) => {
       console.log('[Playback] End of queue reached. Stopping playback.');
       setIsPlaying(false);
       isPlayingRef.current = false;
-      playerRef.current?.pause();
+      const isOwner = peerRolesRef.current[peerId] === 'owner';
+      if (isOwner) {
+        playerRef.current?.pause();
+      }
       if (canControl() && stateDb) {
         stateDb.put('isPlaying', { status: false, originator: peerId }).catch(e => console.warn('Sync Failed', e));
       }
+      return;
+    }
+
+    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    if (!isOwner) {
+      // Optimistic UI updates
+      setCurrentIndex(nextIndex);
+      currentIndexRef.current = nextIndex;
+      setIsLoading(true);
+      // Just dispatch intent by calling loadTrack, which we modified to handle intent dispatch when isOwner=false
+      loadTrack(activeQueue[nextIndex], nextIndex, 0, autoPlay, peerId);
       return;
     }
 
@@ -554,6 +630,17 @@ export const PlaybackProvider = ({ children }) => {
     }
 
     let prevIndex = Math.max(0, activeIdx - 1);
+    
+    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    if (!isOwner) {
+      // Optimistic UI updates
+      setCurrentIndex(prevIndex);
+      currentIndexRef.current = prevIndex;
+      setIsLoading(true);
+      loadTrack(activeQueue[prevIndex], prevIndex, 0, true, peerId);
+      return;
+    }
+
     setCurrentIndex(prevIndex);
     currentIndexRef.current = prevIndex;
     loadTrack(activeQueue[prevIndex], prevIndex, 0, true, peerId);
@@ -561,86 +648,112 @@ export const PlaybackProvider = ({ children }) => {
 
   const addToQueue = useCallback((track) => {
     if (!canControl()) return;
-    setOriginalQueue(prev => {
-      const newQ = [...prev, track];
-      if (stateDb) stateDb.put('originalQueue', newQ).catch(e => console.warn(e));
-      return newQ;
-    });
-    setQueueState(prev => {
-      const newQ = [...prev, track];
-      if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
-      return newQ;
-    });
+    const newOrig = [...originalQueueRef.current, track];
+    const newQ = [...queueRef.current, track];
+
+    originalQueueRef.current = newOrig;
+    setOriginalQueue(newOrig);
+
+    queueRef.current = newQ;
+    setQueueState(newQ);
+
+    if (stateDb) {
+      stateDb.put('originalQueue', newOrig).catch(e => console.warn(e));
+      stateDb.put('queue', newQ).catch(e => console.warn(e));
+    }
+  }, [canControl, stateDb]);
+
+  const addMultipleToQueue = useCallback((tracks) => {
+    if (!canControl() || !tracks || tracks.length === 0) return;
+    const newOrig = [...originalQueueRef.current, ...tracks];
+    const newQ = [...queueRef.current, ...tracks];
+
+    originalQueueRef.current = newOrig;
+    setOriginalQueue(newOrig);
+
+    queueRef.current = newQ;
+    setQueueState(newQ);
+
+    if (stateDb) {
+      stateDb.put('originalQueue', newOrig).catch(e => console.warn(e));
+      stateDb.put('queue', newQ).catch(e => console.warn(e));
+    }
   }, [canControl, stateDb]);
 
   const removeFromQueue = useCallback((indexToRemove) => {
     if (!canControl()) return;
-    setQueueState(prev => {
-      const newQ = prev.filter((_, idx) => idx !== indexToRemove);
-      if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
-      return newQ;
-    });
+    
+    const newQ = queueRef.current.filter((_, idx) => idx !== indexToRemove);
+    queueRef.current = newQ;
+    setQueueState(newQ);
+    
+    if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
+
     // Approximate removal from original queue if needed, though active queue matters more
-    const trackToRemove = queue[indexToRemove];
-    setOriginalQueue(prev => {
-      const idx = prev.findIndex(t => t.id === trackToRemove.id);
+    const trackToRemove = queueRef.current[indexToRemove];
+    if (trackToRemove) {
+      const idx = originalQueueRef.current.findIndex(t => t.id === trackToRemove.id);
       if (idx !== -1) {
-        const newOrigQ = prev.filter((_, i) => i !== idx);
+        const newOrigQ = originalQueueRef.current.filter((_, i) => i !== idx);
+        originalQueueRef.current = newOrigQ;
+        setOriginalQueue(newOrigQ);
         if (stateDb) stateDb.put('originalQueue', newOrigQ).catch(e => console.warn(e));
-        return newOrigQ;
       }
-      return prev;
-    });
-    // Adjust index if we removed something before the current track
-    if (indexToRemove < currentIndex) {
-      setCurrentIndex(prev => prev - 1);
     }
-  }, [queue, currentIndex, canControl, stateDb]);
+
+    // Adjust index if we removed something before the current track
+    if (indexToRemove < currentIndexRef.current) {
+      const newIndex = currentIndexRef.current - 1;
+      currentIndexRef.current = newIndex;
+      setCurrentIndex(newIndex);
+    }
+  }, [canControl, stateDb]);
 
   const reorderQueue = useCallback((fromIndex, toIndex) => {
     if (!canControl()) return;
-    setQueueState(prev => {
-      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length || fromIndex === toIndex) {
-        return prev;
+    const prev = queueRef.current;
+    
+    if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length || fromIndex === toIndex) {
+      return;
+    }
+
+    const newQ = [...prev];
+    const [movedItem] = newQ.splice(fromIndex, 1);
+    newQ.splice(toIndex, 0, movedItem);
+
+    queueRef.current = newQ;
+    setQueueState(newQ);
+
+    let newCurrentIndex = currentIndexRef.current;
+    if (currentTrackRef.current) {
+      const foundIdx = newQ.findIndex(t => t.id === currentTrackRef.current.id);
+      if (foundIdx !== -1) {
+        newCurrentIndex = foundIdx;
       }
-      const newQ = [...prev];
-      const [movedItem] = newQ.splice(fromIndex, 1);
-      newQ.splice(toIndex, 0, movedItem);
-
-      queueRef.current = newQ;
-
-      let newCurrentIndex = currentIndexRef.current;
-      if (currentTrackRef.current) {
-        const foundIdx = newQ.findIndex(t => t.id === currentTrackRef.current.id);
-        if (foundIdx !== -1) {
-          newCurrentIndex = foundIdx;
-        }
-      } else {
-        if (currentIndexRef.current === fromIndex) {
-          newCurrentIndex = toIndex;
-        } else if (fromIndex < currentIndexRef.current && toIndex >= currentIndexRef.current) {
-          newCurrentIndex = currentIndexRef.current - 1;
-        } else if (fromIndex > currentIndexRef.current && toIndex <= currentIndexRef.current) {
-          newCurrentIndex = currentIndexRef.current + 1;
-        }
+    } else {
+      if (currentIndexRef.current === fromIndex) {
+        newCurrentIndex = toIndex;
+      } else if (fromIndex < currentIndexRef.current && toIndex >= currentIndexRef.current) {
+        newCurrentIndex = currentIndexRef.current - 1;
+      } else if (fromIndex > currentIndexRef.current && toIndex <= currentIndexRef.current) {
+        newCurrentIndex = currentIndexRef.current + 1;
       }
+    }
 
-      setCurrentIndex(newCurrentIndex);
-      currentIndexRef.current = newCurrentIndex;
+    setCurrentIndex(newCurrentIndex);
+    currentIndexRef.current = newCurrentIndex;
 
-      if (stateDb) {
-        stateDb.put('queue', newQ).catch(e => console.warn('Failed to sync reordered queue:', e));
-        if (currentTrackRef.current && newCurrentIndex !== -1) {
-          stateDb.put('currentTrack', {
-            track: currentTrackRef.current,
-            index: newCurrentIndex,
-            originator: peerId,
-            timestamp: Date.now()
-          }).catch(e => console.warn(e));
-        }
+    if (stateDb) {
+      stateDb.put('queue', newQ).catch(e => console.warn('Failed to sync reordered queue:', e));
+      if (currentTrackRef.current && newCurrentIndex !== -1) {
+        stateDb.put('currentTrack', {
+          track: currentTrackRef.current,
+          index: newCurrentIndex,
+          originator: peerId,
+          timestamp: Date.now()
+        }).catch(e => console.warn(e));
       }
-      return newQ;
-    });
+    }
   }, [canControl, stateDb, peerId]);
 
   const moveQueueItem = useCallback((index, direction) => {
@@ -654,38 +767,48 @@ export const PlaybackProvider = ({ children }) => {
     if (stateDb) stateDb.put('isShuffled', shuffle).catch(e => console.warn(e));
 
     if (shuffle) {
-      setQueueState(prevQueue => {
-        if (prevQueue.length <= 1) return prevQueue;
-        
-        let currentIdx = currentIndex;
-        if (currentTrackRef.current) {
-           const actualIdx = prevQueue.findIndex(t => t.id === currentTrackRef.current.id);
-           if (actualIdx !== -1) currentIdx = actualIdx;
-        }
+      const prevQueue = queueRef.current;
+      if (prevQueue.length <= 1) return;
+      
+      let currentIdx = currentIndexRef.current;
+      if (currentTrackRef.current) {
+         const actualIdx = prevQueue.findIndex(t => t.id === currentTrackRef.current.id);
+         if (actualIdx !== -1) currentIdx = actualIdx;
+      }
 
-        const current = currentIdx !== -1 ? prevQueue[currentIdx] : null;
-        const rest = prevQueue.filter((_, idx) => idx !== currentIdx);
-        for (let i = rest.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [rest[i], rest[j]] = [rest[j], rest[i]];
-        }
-        setCurrentIndex(current ? 0 : -1);
-        const newQ = current ? [current, ...rest] : rest;
-        if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
-        return newQ;
-      });
+      const current = currentIdx !== -1 ? prevQueue[currentIdx] : null;
+      const rest = prevQueue.filter((_, idx) => idx !== currentIdx);
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      
+      const newQ = current ? [current, ...rest] : rest;
+      const newIdx = current ? 0 : -1;
+      
+      setCurrentIndex(newIdx);
+      currentIndexRef.current = newIdx;
+      setQueueState(newQ);
+      queueRef.current = newQ;
+      
+      if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
     } else {
       // Restore from originalQueue
-      setQueueState(originalQueue);
-      if (stateDb) stateDb.put('queue', originalQueue).catch(e => console.warn(e));
+      const orig = originalQueueRef.current;
+      setQueueState(orig);
+      queueRef.current = orig;
+      
+      if (stateDb) stateDb.put('queue', orig).catch(e => console.warn(e));
       if (currentTrackRef.current) {
-        const idx = originalQueue.findIndex(t => t.id === currentTrackRef.current.id);
+        const idx = orig.findIndex(t => t.id === currentTrackRef.current.id);
         setCurrentIndex(idx !== -1 ? idx : -1);
+        currentIndexRef.current = idx !== -1 ? idx : -1;
       } else {
         setCurrentIndex(-1);
+        currentIndexRef.current = -1;
       }
     }
-  }, [currentIndex, originalQueue, canControl, stateDb]);
+  }, [canControl, stateDb]);
 
   // Media Session API for mobile notifications and OS lock screen
   useEffect(() => {
@@ -772,12 +895,12 @@ export const PlaybackProvider = ({ children }) => {
   }, [isPlaying, duration, playerRef.current]);
 
   const value = React.useMemo(() => ({
-      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, setCurrentIndex,
+      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, setCurrentIndex,
       duration, loadTrack, togglePlay, stopPlayback, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
       playerRef, networkIsPlaying
-  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying]);
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying]);
 
   return (
     <PlaybackContext.Provider value={value}>

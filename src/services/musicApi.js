@@ -137,12 +137,30 @@ export const getRecommendations = async (track) => {
         downloadUrl: downloadUrl
       };
     });
+    if (recsCache.size >= 50) {
+      const firstKey = recsCache.keys().next().value;
+      recsCache.delete(firstKey);
+    }
     recsCache.set(track.id, results);
     return results;
   } catch (e) {
     console.error('Recommendations failed:', e);
     return [];
   }
+};
+
+export const resolveTrackStream = async (trackId) => {
+  if (!trackId) return null;
+  try {
+    const data = await fetchWithSaavnFallback(`/api/songs/${trackId}`);
+    if (data && data.data && data.data[0]) {
+      const song = data.data[0];
+      return song.downloadUrl?.find(d => d.quality === '320kbps')?.url || song.downloadUrl?.[song.downloadUrl.length - 1]?.url;
+    }
+  } catch (e) {
+    console.error(`Failed to resolve fresh stream URL for track ${trackId}:`, e);
+  }
+  return null;
 };
 
 export const getMix = async () => {

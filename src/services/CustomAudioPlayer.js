@@ -45,6 +45,9 @@ export class CustomAudioPlayer {
     // Centralized Time Engine
     this.timeListeners = [];
 
+    // Track active load rejection
+    this.rejectActiveLoad = null;
+
     // Callbacks
     this.onDurationChange = null;
     this.onError = null;
@@ -93,6 +96,7 @@ export class CustomAudioPlayer {
       const error = this.audio.error;
       const msg = error ? `Error ${error.code}: ${error.message}` : 'Unknown audio error';
       console.error('[AudioPlayer] Native error:', msg);
+      // We don't trigger onEnded here to avoid infinite skip loops on broken URLs
       if (this.onError) this.onError(new Error(msg));
     });
 
@@ -222,10 +226,16 @@ export class CustomAudioPlayer {
       this.currentObjectUrl = null;
     }
 
+    if (this.rejectActiveLoad) {
+      this.rejectActiveLoad(new Error('Load aborted by a new load call'));
+      this.rejectActiveLoad = null;
+    }
+
     const currentLoadId = Symbol();
     this.activeLoadId = currentLoadId;
 
     return new Promise((resolve, reject) => {
+      this.rejectActiveLoad = reject;
       this.audio.src = manifestUrl;
       
       let timeoutId;
@@ -239,6 +249,7 @@ export class CustomAudioPlayer {
       const onCanPlay = () => {
         cleanup();
         if (this.activeLoadId !== currentLoadId) return;
+        this.rejectActiveLoad = null;
         if (startTime > 0 && !isNaN(this.audio.duration) && startTime < this.audio.duration) {
           try {
             this.audio.currentTime = startTime;
@@ -252,6 +263,7 @@ export class CustomAudioPlayer {
       const onError = () => {
         cleanup();
         if (this.activeLoadId !== currentLoadId) return;
+        this.rejectActiveLoad = null;
         const err = this.audio.error;
         reject(new Error(err ? `Error ${err.code}: ${err.message}` : 'Failed to load audio stream'));
       };
@@ -265,6 +277,7 @@ export class CustomAudioPlayer {
       timeoutId = setTimeout(() => {
         if (this.activeLoadId === currentLoadId) {
           cleanup();
+          this.rejectActiveLoad = null;
           reject(new Error('Audio stream buffering timed out after 30 seconds'));
         }
       }, 30000);

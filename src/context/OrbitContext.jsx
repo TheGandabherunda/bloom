@@ -38,6 +38,11 @@ export const OrbitProvider = ({ children }) => {
   const hostIdRef = useRef(null);
   const isHostRef = useRef(false);
   const isPublicRef = useRef(false);
+  const subRef = useRef(null);
+  const beaconIntervalRef = useRef(null);
+  const joinIntervalRef = useRef(null);
+  const statePublishTimeoutRef = useRef(null);
+  const beaconPublishTimeoutRef = useRef(null);
 
   useEffect(() => { peerRolesRef.current = peerRoles; }, [peerRoles]);
   useEffect(() => { peerNamesRef.current = peerNames; }, [peerNames]);
@@ -126,6 +131,15 @@ export const OrbitProvider = ({ children }) => {
         });
       } catch (e) {}
     }
+    if (subRef.current) {
+      try { subRef.current.close(); } catch (e) {}
+      subRef.current = null;
+    }
+    if (beaconIntervalRef.current) clearInterval(beaconIntervalRef.current);
+    if (joinIntervalRef.current) clearInterval(joinIntervalRef.current);
+    if (statePublishTimeoutRef.current) clearTimeout(statePublishTimeoutRef.current);
+    if (beaconPublishTimeoutRef.current) clearTimeout(beaconPublishTimeoutRef.current);
+
     roomRef.current = null;
     setStateDbReady(null);
     setChatDbReady(null);
@@ -151,9 +165,8 @@ export const OrbitProvider = ({ children }) => {
       isPublicRef.current = isPublic;
       relaysRef.current = relays;
 
-      // Debouncers for state and beacon
-      let statePublishTimeout = null;
-      let beaconPublishTimeout = null;
+      isPublicRef.current = isPublic;
+      relaysRef.current = relays;
 
       const stateProxy = {
         events: new MiniEmitter(),
@@ -212,8 +225,8 @@ export const OrbitProvider = ({ children }) => {
             }
             
             // Debounce state publish
-            if (statePublishTimeout) clearTimeout(statePublishTimeout);
-            statePublishTimeout = setTimeout(async () => {
+            if (statePublishTimeoutRef.current) clearTimeout(statePublishTimeoutRef.current);
+            statePublishTimeoutRef.current = setTimeout(async () => {
               const currentDirty = Array.from(stateProxy.dirtyKeys);
               stateProxy.dirtyKeys.clear();
               
@@ -248,8 +261,8 @@ export const OrbitProvider = ({ children }) => {
 
             // Debounce beacon publish if public
             if (isPublicRef.current && (key === 'currentTrack' || key === 'roomName' || key.startsWith('peer_name_'))) {
-               if (beaconPublishTimeout) clearTimeout(beaconPublishTimeout);
-               beaconPublishTimeout = setTimeout(() => {
+               if (beaconPublishTimeoutRef.current) clearTimeout(beaconPublishTimeoutRef.current);
+               beaconPublishTimeoutRef.current = setTimeout(() => {
                   const activeRoomName = stateProxy.store['roomName'] || roomName || 'Bloom Party';
                   const beaconEvent = {
                     kind: 30311,
@@ -299,6 +312,7 @@ export const OrbitProvider = ({ children }) => {
           const isDuplicate = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image));
           if (!isDuplicate) {
             chatProxy.arr.push(msg);
+            if (chatProxy.arr.length > 200) chatProxy.arr.shift();
             chatProxy.events.emit('update', { payload: { value: msg } });
           }
           if (isHostRef.current) {
@@ -333,7 +347,7 @@ export const OrbitProvider = ({ children }) => {
 
       console.log(`[Nostr] Subscribing with filters:`, filters);
 
-      pool.subscribeMany(relays, filters, {
+      subRef.current = pool.subscribeMany(relays, filters, {
         onevent(event) {
           console.log(`[Nostr] Received event id=${event.id} kind=${event.kind} from pubkey=${event.pubkey}`);
           if (event.kind === 30000) {
@@ -376,6 +390,7 @@ export const OrbitProvider = ({ children }) => {
                         const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
                         if (!isDup) {
                           chatProxy.arr.push(msg);
+                          if (chatProxy.arr.length > 200) chatProxy.arr.shift();
                           chatProxy.events.emit('update', { payload: { value: msg } });
                           window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
                         }
@@ -403,6 +418,7 @@ export const OrbitProvider = ({ children }) => {
                         const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
                         if (!isDup) {
                           chatProxy.arr.push(msg);
+                          if (chatProxy.arr.length > 200) chatProxy.arr.shift();
                           chatProxy.events.emit('update', { payload: { value: msg } });
                           window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
                         }
@@ -442,8 +458,8 @@ export const OrbitProvider = ({ children }) => {
                 if (stateRecovered && isHostRef.current) {
                   // We recovered state from the relay. Publish merged state to avoid partial overwrites.
                   Object.keys(stateProxy.store).forEach(k => stateProxy.dirtyKeys.add(k));
-                  if (statePublishTimeout) clearTimeout(statePublishTimeout);
-                  statePublishTimeout = setTimeout(async () => {
+                  if (statePublishTimeoutRef.current) clearTimeout(statePublishTimeoutRef.current);
+                  statePublishTimeoutRef.current = setTimeout(async () => {
                     const publishBundle = async (suffix, keysFilter) => {
                        const data = {};
                        let hasData = false;
@@ -567,6 +583,7 @@ export const OrbitProvider = ({ children }) => {
               const isDuplicate = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image));
               if (!isDuplicate) {
                 chatProxy.arr.push(msg);
+                if (chatProxy.arr.length > 200) chatProxy.arr.shift();
                 chatProxy.events.emit('update', { payload: { value: msg } });
               }
               if (isHostRef.current) {
@@ -602,9 +619,9 @@ export const OrbitProvider = ({ children }) => {
         }, 1500);
 
         // Heartbeat beacon every 30s to ensure Lobby visibility without spamming
-        const beaconInterval = setInterval(() => {
+        beaconIntervalRef.current = setInterval(() => {
           if (roomRef.current !== roomId) {
-            clearInterval(beaconInterval);
+            clearInterval(beaconIntervalRef.current);
             return;
           }
           if (isPublicRef.current) {
@@ -650,9 +667,9 @@ export const OrbitProvider = ({ children }) => {
 
         sendJoin(); // Try immediately
         
-        const joinInterval = setInterval(() => {
+        joinIntervalRef.current = setInterval(() => {
           if (roomRef.current !== roomId) {
-            clearInterval(joinInterval);
+            clearInterval(joinIntervalRef.current);
             return;
           }
           if (statusRef.current === 'initializing') {
@@ -660,13 +677,13 @@ export const OrbitProvider = ({ children }) => {
             sendJoin();
           } else {
             console.log(`[Nostr] Peer connected or failed! Stopping join intent loop.`);
-            clearInterval(joinInterval);
+            clearInterval(joinIntervalRef.current);
           }
         }, 8000);
         
         // Fallback timeout
         setTimeout(() => {
-          clearInterval(joinInterval);
+          if (joinIntervalRef.current) clearInterval(joinIntervalRef.current);
           if (statusRef.current === 'initializing') {
             setStatusWrapped('failed');
           }

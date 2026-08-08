@@ -38,6 +38,10 @@ export const extractDominantColors = (imageUrl) => {
         dominantColorsCache.set(imageUrl, hexPalettes);
         // Also attach the raw rgb strings for CSS variables
         hexPalettes.rawRgbStrings = res;
+        if (dominantColorsCache.size >= 100) {
+          const firstKey = dominantColorsCache.keys().next().value;
+          dominantColorsCache.delete(firstKey);
+        }
         resolve(hexPalettes);
       },
       reject: () => {
@@ -60,6 +64,10 @@ export const extractPrimaryColor = (imageUrl) => {
     const id = msgId++;
     pending.set(id, {
       resolve: (res) => {
+        if (primaryColorCache.size >= 100) {
+          const firstKey = primaryColorCache.keys().next().value;
+          primaryColorCache.delete(firstKey);
+        }
         primaryColorCache.set(imageUrl, res);
         resolve(res);
       },

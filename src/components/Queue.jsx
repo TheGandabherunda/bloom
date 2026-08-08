@@ -212,7 +212,7 @@ const QueueItem = React.memo(({
 const Queue = () => {
   const { 
     queue, currentIndex, loadTrack, isPlaying, isLoading, 
-    removeFromQueue, reorderQueue, moveQueueItem, playerRef, addToQueue 
+    removeFromQueue, reorderQueue, moveQueueItem, playerRef, addToQueue, addMultipleToQueue 
   } = usePlayback();
   const { peerId, peerRoles, peerNames, chatDb } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
@@ -325,7 +325,7 @@ const Queue = () => {
         return;
       }
       
-      let importedCount = 0;
+      let importedTracks = [];
       for (const t of parsedTracks) {
         const cleanTitle = t.title.replace(/[\(\[].*?[\)\]]|official|video|audio|lyric|mv/ig, '').trim();
         const cleanAuthor = t.author.replace(/- Topic|VEVO|music/ig, '').trim();
@@ -334,13 +334,11 @@ const Queue = () => {
         try {
           const results = await searchTracks(query);
           if (results && results.length > 0) {
-            addToQueue(results[0]);
-            importedCount++;
+            importedTracks.push(results[0]);
           } else {
             const fallbackResults = await searchTracks(cleanTitle);
             if (fallbackResults && fallbackResults.length > 0) {
-              addToQueue(fallbackResults[0]);
-              importedCount++;
+              importedTracks.push(fallbackResults[0]);
             }
           }
         } catch (err) {
@@ -348,10 +346,11 @@ const Queue = () => {
         }
       }
 
-      if (importedCount > 0) {
+      if (importedTracks.length > 0) {
+        addMultipleToQueue(importedTracks);
         const userName = peerNames[peerId] || localStorage.getItem('bloom_name') || 'Someone';
         const systemMsg = { 
-          text: `${userName} imported ${importedCount} songs from a playlist.`, 
+          text: `${userName} imported ${importedTracks.length} songs from a playlist.`, 
           type: 'system', 
           sender: 'System', 
           timestamp: Date.now() 
