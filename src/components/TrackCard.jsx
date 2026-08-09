@@ -130,7 +130,6 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
               title="Add to Queue"
             >
               <span className="material-symbols-rounded text-[20px]">playlist_add</span>
-              <span className="text-xs font-semibold">Queue</span>
             </button>
           </div>
         )}
