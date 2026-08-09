@@ -653,6 +653,8 @@ export const PlaybackProvider = ({ children }) => {
 
   const addToQueue = useCallback((track) => {
     if (!canControl()) return;
+    if (originalQueueRef.current.some(t => t.id === track.id)) return;
+
     const newOrig = [...originalQueueRef.current, track];
     const newQ = [...queueRef.current, track];
 
@@ -670,8 +672,12 @@ export const PlaybackProvider = ({ children }) => {
 
   const addMultipleToQueue = useCallback((tracks) => {
     if (!canControl() || !tracks || tracks.length === 0) return;
-    const newOrig = [...originalQueueRef.current, ...tracks];
-    const newQ = [...queueRef.current, ...tracks];
+
+    const uniqueTracks = tracks.filter(track => !originalQueueRef.current.some(t => t.id === track.id));
+    if (uniqueTracks.length === 0) return;
+
+    const newOrig = [...originalQueueRef.current, ...uniqueTracks];
+    const newQ = [...queueRef.current, ...uniqueTracks];
 
     originalQueueRef.current = newOrig;
     setOriginalQueue(newOrig);
