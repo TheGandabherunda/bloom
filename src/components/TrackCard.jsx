@@ -115,41 +115,44 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
         
         {/* Mobile Options Button */}
         {addToQueue && (
-          <div className="lg:hidden relative">
+          <div className="lg:hidden flex items-center">
             <button 
-              className="text-white/40 hover:text-white transition-colors p-1 rounded-full active:bg-white/10"
-              onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(!showMobileDropdown); }}
+              className="text-white/40 hover:text-white transition-colors p-1.5 rounded-full active:bg-white/10 flex items-center justify-center"
+              onClick={async (e) => {
+                e.stopPropagation();
+                addToQueue(track);
+                const userName = peerNames[peerId] || localStorage.getItem('bloom_name') || 'Someone';
+                const systemMsg = { text: `${userName} added "${track.title}" to the queue.`, type: 'system', sender: 'System', timestamp: Date.now() };
+                window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
+                if (chatDb) {
+                  try { await chatDb.add(systemMsg); } catch(err) { /* ignore */ }
+                }
+              }}
+              title="Add to Queue"
             >
-              <span className="material-symbols-rounded text-[20px]">more_vert</span>
+              <span className="material-symbols-rounded text-[22px]">playlist_add</span>
             </button>
             
-            {showMobileDropdown && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(false); }} 
-                />
-                <div className="absolute right-0 top-full mt-2 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-full shadow-2xl z-50 py-1.5 px-2 min-w-[100px] animate-in fade-in zoom-in-95 duration-200">
-                  <button 
-                    className="w-full text-left px-3 py-2 text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 active:bg-white/10 rounded-full transition-colors flex items-center justify-center gap-2"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      setShowMobileDropdown(false);
-                      addToQueue(track);
-                      const userName = peerNames[peerId] || localStorage.getItem('bloom_name') || 'Someone';
-                      const systemMsg = { text: `${userName} added "${track.title}" to the queue.`, type: 'system', sender: 'System', timestamp: Date.now() };
-                      window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));
-                      if (chatDb) {
-                        try { await chatDb.add(systemMsg); } catch(err) { /* ignore */ }
-                      }
-                    }}
-                  >
-                    <span className="material-symbols-rounded text-[18px]">playlist_add</span>
-                    Queue
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="relative">
+              <button 
+                className="text-white/40 hover:text-white transition-colors p-1.5 rounded-full active:bg-white/10 flex items-center justify-center"
+                onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(!showMobileDropdown); }}
+              >
+                <span className="material-symbols-rounded text-[20px]">more_vert</span>
+              </button>
+              
+              {showMobileDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(false); }} 
+                  />
+                  <div className="absolute right-0 top-full mt-2 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl z-50 py-1.5 px-2 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-3 py-2 text-xs text-white/50 text-center">No other options</div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

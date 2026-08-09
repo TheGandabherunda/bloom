@@ -471,7 +471,7 @@ const Player = ({ activeMobileView }) => {
             <div className="relative flex flex-col items-center justify-center w-full h-full mt-4 lg:mt-0 z-10">
               
               {/* Title and Artist (Above Cassette) */}
-              <div className="w-full flex flex-col items-center mb-14 lg:mb-20 px-6 text-center animate-in fade-in slide-in-from-top-4 duration-700 relative z-40">
+              <div className="w-full flex flex-col items-center mb-6 lg:mb-20 px-6 text-center animate-in fade-in slide-in-from-top-4 duration-700 relative z-40">
                 {currentTrack.title.length > 20 ? (
                   <div className="w-full max-w-3xl overflow-hidden mask-image-x relative flex justify-start pb-4 -mb-4 pt-2 -mt-2">
                     <div className="flex w-max animate-marquee whitespace-nowrap items-center">
