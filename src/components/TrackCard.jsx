@@ -6,7 +6,6 @@ import { useOrbit } from '../context/OrbitContext';
 const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
   const [cardColor, setCardColor] = useState('rgb(255, 255, 255)');
   const [hovered, setHovered] = useState(false);
-  const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const { chatDb, peerNames, peerId } = useOrbit();
 
   useEffect(() => {
@@ -117,7 +116,7 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
         {addToQueue && (
           <div className="lg:hidden flex items-center">
             <button 
-              className="text-white/40 hover:text-white transition-colors p-1.5 rounded-full active:bg-white/10 flex items-center justify-center"
+              className="text-white/50 hover:text-white transition-colors px-2 py-1.5 rounded-full active:bg-white/10 flex items-center justify-center gap-1"
               onClick={async (e) => {
                 e.stopPropagation();
                 addToQueue(track);
@@ -130,29 +129,9 @@ const TrackCard = React.memo(({ track, onClick, addToQueue }) => {
               }}
               title="Add to Queue"
             >
-              <span className="material-symbols-rounded text-[22px]">playlist_add</span>
+              <span className="material-symbols-rounded text-[20px]">playlist_add</span>
+              <span className="text-xs font-semibold">Queue</span>
             </button>
-            
-            <div className="relative">
-              <button 
-                className="text-white/40 hover:text-white transition-colors p-1.5 rounded-full active:bg-white/10 flex items-center justify-center"
-                onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(!showMobileDropdown); }}
-              >
-                <span className="material-symbols-rounded text-[20px]">more_vert</span>
-              </button>
-              
-              {showMobileDropdown && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={(e) => { e.stopPropagation(); setShowMobileDropdown(false); }} 
-                  />
-                  <div className="absolute right-0 top-full mt-2 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl z-50 py-1.5 px-2 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
-                    <div className="px-3 py-2 text-xs text-white/50 text-center">No other options</div>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         )}
       </div>
