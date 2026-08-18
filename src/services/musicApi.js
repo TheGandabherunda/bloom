@@ -81,7 +81,30 @@ const fetchWithSaavnFallback = async (endpointPath) => {
 
 export const searchTracks = async (query) => {
   try {
-    const q = query.replace(/\baudio\b/ig, '').trim();
+    let q = query.replace(/\baudio\b/ig, '').trim();
+
+    // Check if the query contains a YouTube link
+    const ytMatch = q.match(/(?:https?:\/\/)?(?:www\.|music\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+    
+    if (ytMatch && ytMatch[1]) {
+      try {
+        const videoId = ytMatch[1];
+        const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.title) {
+            // Clean up title (remove bracketed text like "Official Video", "Lyrics", etc.)
+            let title = data.title.replace(/\[.*?\]|\(.*?\)|\{.*?\}/g, '').trim();
+            // Append author for better JioSaavn matching, removing common suffixes
+            let author = data.author_name ? data.author_name.replace(/VEVO| - Topic/ig, '').trim() : '';
+            q = `${title} ${author}`.trim();
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to resolve YouTube link via noembed:', e);
+      }
+    }
+
     const data = await fetchWithSaavnFallback(`/api/search/songs?query=${encodeURIComponent(q)}&limit=40`);
     if (!data.data || !data.data.results || data.data.results.length === 0) return [];
     
