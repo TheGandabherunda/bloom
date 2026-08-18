@@ -216,9 +216,9 @@ export const PlaybackProvider = ({ children }) => {
       setError(isInteractError ? 'autoplay-interact-blocked' : (err.message || 'Failed to load track'));
       setIsLoading(false);
       
-      // If we failed to load due to a 403 (e.g. JioSaavn stream URL expired), re-resolve it once
-      if (err.message && err.message.includes('403') && !track._resolved) {
-         console.log(`[Playback] Track stream likely expired. Attempting to resolve fresh URL for ${track.id}...`);
+      // If we failed to load due to a stream URL error (e.g. JioSaavn stream URL expired or IP locked), re-resolve it once
+      if (!isInteractError && !track._resolved) {
+         console.log(`[Playback] Track stream likely expired or IP locked. Attempting to resolve fresh URL for ${track.id}...`);
          const freshUrl = await resolveTrackStream(track.id);
          if (freshUrl) {
            const freshTrack = { ...track, downloadUrl: freshUrl, _resolved: true };
