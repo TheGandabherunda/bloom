@@ -83,6 +83,34 @@ export const searchTracks = async (query) => {
   try {
     let q = query.replace(/\baudio\b/ig, '').trim();
 
+    // Check if the query is a direct JioSaavn link
+    if (q.includes('jiosaavn.com/song/')) {
+      try {
+        const res = await fetchWithSaavnFallback(`/api/songs?link=${encodeURIComponent(q)}`);
+        if (res && res.data) {
+          const songs = Array.isArray(res.data) ? res.data : [res.data];
+          return songs.map(song => {
+            const thumbnail = song.image?.find(img => img.quality === '500x500')?.url || song.image?.[song.image?.length - 1]?.url;
+            const downloadUrl = song.downloadUrl?.find(d => d.quality === '320kbps')?.url || song.downloadUrl?.[song.downloadUrl?.length - 1]?.url;
+            const author = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
+            return {
+              id: song.id,
+              title: decodeHtml(song.name || song.title),
+              author: decodeHtml(author),
+              thumbnail: thumbnail,
+              duration: parseInt(song.duration || 0),
+              isMusic: true,
+              audioQuality: 'HD',
+              downloadUrl: downloadUrl
+            };
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to fetch direct JioSaavn link:', e);
+      }
+      return [];
+    }
+
     // Check if the query contains a YouTube link
     const ytMatch = q.match(/(?:https?:\/\/)?(?:www\.|music\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
     
