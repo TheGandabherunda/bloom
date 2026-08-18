@@ -694,14 +694,16 @@ export const PlaybackProvider = ({ children }) => {
   const removeFromQueue = useCallback((indexToRemove) => {
     if (!canControl()) return;
     
+    // Capture track reference BEFORE mutating the queue
+    const trackToRemove = queueRef.current[indexToRemove];
+    
     const newQ = queueRef.current.filter((_, idx) => idx !== indexToRemove);
     queueRef.current = newQ;
     setQueueState(newQ);
     
     if (stateDb) stateDb.put('queue', newQ).catch(e => console.warn(e));
 
-    // Approximate removal from original queue if needed, though active queue matters more
-    const trackToRemove = queueRef.current[indexToRemove];
+    // Remove from original queue too
     if (trackToRemove) {
       const idx = originalQueueRef.current.findIndex(t => t.id === trackToRemove.id);
       if (idx !== -1) {

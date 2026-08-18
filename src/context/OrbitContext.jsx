@@ -230,10 +230,11 @@ export const OrbitProvider = ({ children }) => {
               const currentDirty = Array.from(stateProxy.dirtyKeys);
               stateProxy.dirtyKeys.clear();
               
-              const needsMain = currentDirty.some(k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history');
+              const needsMain = currentDirty.some(k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history' && k !== 'currentTime');
               const needsQueue = currentDirty.includes('queue');
               const needsOriginalQueue = currentDirty.includes('originalQueue');
               const needsChat = currentDirty.includes('chat_history');
+              const needsTime = currentDirty.includes('currentTime');
               
               const publishBundle = async (suffix, keysFilter) => {
                  const data = {};
@@ -253,10 +254,11 @@ export const OrbitProvider = ({ children }) => {
                  });
               };
 
-              if (needsMain) await publishBundle('', k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history');
+              if (needsMain) await publishBundle('', k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history' && k !== 'currentTime');
               if (needsQueue) await publishBundle('-queue', k => k === 'queue');
               if (needsOriginalQueue) await publishBundle('-originalQueue', k => k === 'originalQueue');
               if (needsChat) await publishBundle('-chat', k => k === 'chat_history');
+              if (needsTime) await publishBundle('-time', k => k === 'currentTime');
             }, 500);
 
             // Debounce beacon publish if public
@@ -337,7 +339,7 @@ export const OrbitProvider = ({ children }) => {
       // Set up subscriptions
       const hostPubKey = isHost ? nostrPk : hostIdRef.current;
       const filters = [
-        { kinds: [30000], '#d': [roomId, `${roomId}-queue`, `${roomId}-originalQueue`, `${roomId}-chat`], authors: [hostPubKey] }, // State sync from host
+        { kinds: [30000], '#d': [roomId, `${roomId}-queue`, `${roomId}-originalQueue`, `${roomId}-chat`, `${roomId}-time`], authors: [hostPubKey] }, // State sync from host
         { kinds: [9], '#h': [roomId] }, // Chat
       ];
       
@@ -353,12 +355,16 @@ export const OrbitProvider = ({ children }) => {
           if (event.kind === 30000) {
             const dTag = event.tags.find(t => t[0] === 'd')?.[1];
             
-            if (dTag === roomId || dTag === `${roomId}-queue` || dTag === `${roomId}-originalQueue` || dTag === `${roomId}-chat`) {
-              // Host state update
+            if (dTag === roomId || dTag === `${roomId}-queue` || dTag === `${roomId}-originalQueue` || dTag === `${roomId}-chat` || dTag === `${roomId}-time`) {
+              // Host skips its own echoed events AFTER initial recovery is done.
+              // During 'initializing', the host needs to process stored events from the relay to recover state.
+              if (isHostRef.current && event.pubkey === nostrPk && statusRef.current === 'connected') {
+                return;
+              }
+              // Host state update (received by peers)
               try {
                 const data = JSON.parse(event.content);
                 console.log(`[OrbitContext] Parsed state update from relay:`, data);
-                let stateRecovered = false;
 
                 const newPeerNames = {};
                 const newPeerRoles = {};
@@ -369,7 +375,6 @@ export const OrbitProvider = ({ children }) => {
                   if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
                     console.log(`[OrbitContext] Emitting update for key: ${key}`, data[key]);
                     stateProxy.store[key] = data[key];
-                    stateRecovered = true;
                     stateProxy.events.emit('update', { payload: { key, value: data[key] } });
                     window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value: data[key] }, payload: { key, value: data[key] } }));
                     
@@ -455,33 +460,6 @@ export const OrbitProvider = ({ children }) => {
                   }
                 }
 
-                if (stateRecovered && isHostRef.current) {
-                  // We recovered state from the relay. Publish merged state to avoid partial overwrites.
-                  Object.keys(stateProxy.store).forEach(k => stateProxy.dirtyKeys.add(k));
-                  if (statePublishTimeoutRef.current) clearTimeout(statePublishTimeoutRef.current);
-                  statePublishTimeoutRef.current = setTimeout(async () => {
-                    const publishBundle = async (suffix, keysFilter) => {
-                       const data = {};
-                       let hasData = false;
-                       Object.entries(stateProxy.store).forEach(([k, v]) => {
-                          if (keysFilter(k)) { data[k] = v; hasData = true; }
-                       });
-                       if (!hasData) return;
-                       await publishSigned({
-                         kind: 30000,
-                         created_at: Math.floor(Date.now() / 1000),
-                         tags: [['d', `${roomId}${suffix}`]],
-                         content: JSON.stringify(data)
-                       });
-                    };
-                    await publishBundle('', k => k !== 'queue' && k !== 'originalQueue' && k !== 'chat_history');
-                    await publishBundle('-queue', k => k === 'queue');
-                    await publishBundle('-originalQueue', k => k === 'originalQueue');
-                    await publishBundle('-chat', k => k === 'chat_history');
-                    stateProxy.dirtyKeys.clear();
-                  }, 500);
-                }
-
                 if (!isHostRef.current && statusRef.current !== 'connected') {
                   setStatusWrapped('connected');
                 }
@@ -494,15 +472,16 @@ export const OrbitProvider = ({ children }) => {
                 const intent = JSON.parse(event.content);
                 console.log(`[OrbitContext] Host received state intent from peer ${event.pubkey}:`, intent);
                 
-                // Validate peer has permission (or setting own name)
-                const role = peerRolesRef.current[event.pubkey] || 'peer';
-                const isSelfName = intent.key === `peer_name_${event.pubkey}`;
-                const canModifyTrack = intent.key === 'currentTrack' || intent.key === 'playbackState';
+                // Validate peer has permission (check both ref and store to avoid stale lookups)
+                const role = peerRolesRef.current[event.pubkey]
+                  || stateProxy.store[`peer_role_${event.pubkey}`]
+                  || 'peer';
+                const isSelfUpdate = intent.key === `peer_name_${event.pubkey}`;
                 
-                if (role === 'owner' || role === 'admin' || isSelfName || (canModifyTrack && role === 'peer')) {
+                if (role === 'owner' || role === 'admin' || isSelfUpdate) {
                   stateProxy.put(intent.key, intent.value);
                 } else {
-                  console.warn(`[OrbitContext] Peer ${event.pubkey} denied intent for key ${intent.key}`);
+                  console.warn(`[OrbitContext] Peer ${event.pubkey} (role=${role}) denied intent for key ${intent.key}`);
                 }
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse intent from peer:', e);
