@@ -212,6 +212,11 @@ export const PlaybackProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('[Playback] Load Track Error:', err);
+
+      if (err.name === 'AbortError') {
+        return; // Ignore, another loadTrack interrupted this one
+      }
+
       const isInteractError = err.message?.toLowerCase().includes('interact') || err.name === 'NotAllowedError';
       setError(isInteractError ? 'autoplay-interact-blocked' : (err.message || 'Failed to load track'));
       setIsLoading(false);

@@ -59,8 +59,8 @@ export const getApiBase = () => "proxy";
 export const getMirrorStatus = () => ({ "proxy": "healthy" });
 
 const JIOSAAVN_INSTANCES = [
-  'https://bloom-music-api-eta.vercel.app',
-  'https://jiosaavn-api-one-rho.vercel.app'
+  'https://jiosaavn-api-one-rho.vercel.app',
+  'https://bloom-music-api-eta.vercel.app'
 ];
 
 const fetchWithSaavnFallback = async (endpointPath) => {
