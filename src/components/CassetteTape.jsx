@@ -5,6 +5,18 @@ import React from 'react';
 // Oversized base rectangles (-100, -100, 1200x833) prevent any 1px mask gaps on the outer edges.
 const maskUrl = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 633'%3E%3Cmask id='m'%3E%3Crect x='-100' y='-100' width='1200' height='833' fill='white'/%3E%3Crect x='310' y='223' width='380' height='59' fill='black'/%3E%3Ccircle cx='310' cy='263' r='86' fill='white'/%3E%3Ccircle cx='690' cy='263' r='73' fill='white'/%3E%3Ccircle cx='170' cy='565' r='22' fill='black'/%3E%3Ccircle cx='830' cy='565' r='22' fill='black'/%3E%3Crect x='320' y='535' width='80' height='60' rx='6' fill='black'/%3E%3Crect x='600' y='535' width='80' height='60' rx='6' fill='black'/%3E%3C/mask%3E%3Crect x='-100' y='-100' width='1200' height='833' fill='black' mask='url(%23m)'/%3E%3C/svg%3E")`;
 
+const NoiseOverlay = ({ opacity, blendMode }) => (
+  <div className={`absolute inset-0 pointer-events-none ${blendMode}`} style={{ opacity }}>
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" preserveAspectRatio="none">
+      <filter id="noiseFilter">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" />
+        <feColorMatrix type="matrix" values="1 0 0 0 0, 1 0 0 0 0, 1 0 0 0 0, 0 0 0 1 0" />
+      </filter>
+      <rect width="100%" height="100%" filter="url(#noiseFilter)" />
+    </svg>
+  </div>
+);
+
 const SpoolSVG = ({ forwardRef }) => (
   <svg ref={forwardRef} viewBox="0 0 100 100" className="w-full h-full drop-shadow-md z-10 will-change-transform">
     {/* Outer white ring with thickness */}
@@ -112,7 +124,7 @@ const CassetteTape = ({ thumbnail, isPlaying, isExpanded, playerRef }) => {
             filter: 'drop-shadow(0px 3px 0px rgba(0,0,0,0.85)) drop-shadow(0px 5px 6px rgba(0,0,0,0.6))'
           }}
         >
-          <div className="absolute inset-0 bg-noise opacity-30 pointer-events-none mix-blend-overlay"></div>
+          <NoiseOverlay opacity={0.3} blendMode="mix-blend-overlay" />
 
         {/* 4 Corner Screws */}
         <div className="absolute top-[3%] left-[2%] w-[3.5%] aspect-square rounded-full bg-[#111] shadow-[inset_0_2px_4px_rgba(0,0,0,0.8),_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center">
@@ -143,7 +155,7 @@ const CassetteTape = ({ thumbnail, isPlaying, isExpanded, playerRef }) => {
             alt="Cassette Label"
             className="absolute inset-0 w-full h-full object-cover object-top"
           />
-          <div className="absolute inset-0 bg-noise opacity-[0.15] mix-blend-multiply pointer-events-none"></div>
+          <NoiseOverlay opacity={0.15} blendMode="mix-blend-multiply" />
           {/* Inner shadow overlay for sticker depth since clipPath removes outer shadow */}
           <div className="absolute inset-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)] pointer-events-none"></div>
         </div>

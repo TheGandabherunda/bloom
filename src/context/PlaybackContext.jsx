@@ -230,6 +230,9 @@ export const PlaybackProvider = ({ children }) => {
       if (!isInteractError) {
         setIsPlaying(false);
         isPlayingRef.current = false;
+        if (isLocal && stateDb && canControl()) {
+          stateDb.put('isPlaying', { status: false, originator: peerId }).catch(e => console.warn(e));
+        }
       } else {
         // It's an autoplay block. Keep isPlayingRef.current true if we intended to play,
         // so the Global Interact Listener can resume it on next click.

@@ -371,64 +371,61 @@ export const OrbitProvider = ({ children }) => {
                 const peerList = [];
                 const bannedPk = data['banned'];
 
+                // Handle deletions from main bundle: if a peer_name_ is in our store but missing in the main bundle, delete it
+                const isMainBundle = dTag === roomId;
+                if (isMainBundle) {
+                  Object.keys(stateProxy.store).forEach(key => {
+                    if ((key.startsWith('peer_name_') || key.startsWith('peer_role_')) && !(key in data)) {
+                      delete stateProxy.store[key];
+                      stateProxy.events.emit('update', { payload: { key, value: null } });
+                    }
+                  });
+                }
+
+                // Phase 1: Update the store so all gets are consistent
+                const changes = [];
                 Object.keys(data).forEach(key => {
                   if (JSON.stringify(stateProxy.store[key]) !== JSON.stringify(data[key])) {
-                    console.log(`[OrbitContext] Emitting update for key: ${key}`, data[key]);
+                    changes.push({ key, value: data[key] });
                     stateProxy.store[key] = data[key];
-                    stateProxy.events.emit('update', { payload: { key, value: data[key] } });
-                    window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value: data[key] }, payload: { key, value: data[key] } }));
-                    
-                    if (key.startsWith('peer_name_') && data[key]) {
-                      const pk = key.replace('peer_name_', '');
-                      if (pk !== bannedPk) {
-                        newPeerNames[pk] = data[key];
-                        peerList.push(pk);
-                      }
-                    } else if (key.startsWith('peer_role_') && data[key]) {
-                      const pk = key.replace('peer_role_', '');
-                      if (pk !== bannedPk) {
-                        newPeerRoles[pk] = data[key];
-                        peerList.push(pk);
-                      }
-                    } else if (key === 'chat_history' && Array.isArray(data[key])) {
-                      data[key].forEach(msg => {
-                        const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
-                        if (!isDup) {
-                          chatProxy.arr.push(msg);
-                          if (chatProxy.arr.length > 200) chatProxy.arr.shift();
-                          chatProxy.events.emit('update', { payload: { value: msg } });
-                          window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
-                        }
-                      });
-                    } else if (key === 'banned' && data[key] === nostrPk) {
-                       window.location.href = window.location.pathname;
-                    } else if (key === 'room_ended' && data[key] === true) {
-                       window.location.href = window.location.pathname;
+                  }
+                  
+                  // Always accumulate peer information
+                  if (key.startsWith('peer_name_') && data[key]) {
+                    const pk = key.replace('peer_name_', '');
+                    if (pk !== bannedPk) {
+                      newPeerNames[pk] = data[key];
+                      peerList.push(pk);
                     }
-                  } else {
-                    if (key.startsWith('peer_name_') && data[key]) {
-                      const pk = key.replace('peer_name_', '');
-                      if (pk !== bannedPk) {
-                        newPeerNames[pk] = data[key];
-                        peerList.push(pk);
-                      }
-                    } else if (key.startsWith('peer_role_') && data[key]) {
-                      const pk = key.replace('peer_role_', '');
-                      if (pk !== bannedPk) {
-                        newPeerRoles[pk] = data[key];
-                        peerList.push(pk);
-                      }
-                    } else if (key === 'chat_history' && Array.isArray(data[key])) {
-                      data[key].forEach(msg => {
-                        const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
-                        if (!isDup) {
-                          chatProxy.arr.push(msg);
-                          if (chatProxy.arr.length > 200) chatProxy.arr.shift();
-                          chatProxy.events.emit('update', { payload: { value: msg } });
-                          window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
-                        }
-                      });
+                  } else if (key.startsWith('peer_role_') && data[key]) {
+                    const pk = key.replace('peer_role_', '');
+                    if (pk !== bannedPk) {
+                      newPeerRoles[pk] = data[key];
+                      peerList.push(pk);
                     }
+                  } else if (key === 'chat_history' && Array.isArray(data[key])) {
+                    data[key].forEach(msg => {
+                      const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
+                      if (!isDup) {
+                        chatProxy.arr.push(msg);
+                        if (chatProxy.arr.length > 200) chatProxy.arr.shift();
+                        chatProxy.events.emit('update', { payload: { value: msg } });
+                        window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
+                      }
+                    });
+                  }
+                });
+
+                // Phase 2: Emit updates
+                changes.forEach(({ key, value }) => {
+                  console.log(`[OrbitContext] Emitting update for key: ${key}`, value);
+                  stateProxy.events.emit('update', { payload: { key, value } });
+                  window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value }, payload: { key, value } }));
+
+                  if (key === 'banned' && value === nostrPk) {
+                    window.location.href = window.location.pathname;
+                  } else if (key === 'room_ended' && value === true) {
+                    window.location.href = window.location.pathname;
                   }
                 });
 
@@ -449,14 +446,21 @@ export const OrbitProvider = ({ children }) => {
                     return copy;
                   });
                 } else {
-                  if (Object.keys(newPeerNames).length > 0) {
-                    setPeerNames(prev => ({ ...prev, ...newPeerNames }));
-                  }
-                  if (Object.keys(newPeerRoles).length > 0) {
-                    setPeerRoles(prev => ({ ...prev, ...newPeerRoles }));
-                  }
-                  if (peerList.length > 0) {
-                    setPeers(prev => [...new Set([...prev, ...peerList])]);
+                  if (isMainBundle) {
+                    // Full reset of peers if it's the main bundle
+                    setPeerNames(newPeerNames);
+                    setPeerRoles(newPeerRoles);
+                    setPeers([...new Set([...peerList, hostIdRef.current])]); // Always include host
+                  } else {
+                    if (Object.keys(newPeerNames).length > 0) {
+                      setPeerNames(prev => ({ ...prev, ...newPeerNames }));
+                    }
+                    if (Object.keys(newPeerRoles).length > 0) {
+                      setPeerRoles(prev => ({ ...prev, ...newPeerRoles }));
+                    }
+                    if (peerList.length > 0) {
+                      setPeers(prev => [...new Set([...prev, ...peerList])]);
+                    }
                   }
                 }
 
@@ -508,6 +512,16 @@ export const OrbitProvider = ({ children }) => {
                 if (peerName) {
                   stateProxy.put(`peer_name_${event.pubkey}`, peerName);
                 }
+
+                // Force full state sync so the new peer gets the queue, current track, and time
+                stateProxy.dirtyKeys.add('queue');
+                stateProxy.dirtyKeys.add('originalQueue');
+                stateProxy.dirtyKeys.add('chat_history');
+                stateProxy.dirtyKeys.add('currentTime');
+                stateProxy.dirtyKeys.add('currentTrack');
+                
+                // Trigger the debounce explicitly in case put() wasn't called (if role/name was same)
+                stateProxy.put('force_sync_trigger', Date.now());
 
                 if (isNewPeer && peerName) {
                   const joinMsg = {
