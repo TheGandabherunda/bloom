@@ -271,15 +271,15 @@ const SoundEngineSwitch = React.memo(({ currentMode, setMode }) => {
     { id: 'off', label: 'Off' },
     { id: 'natural', label: 'Natural' },
     { id: 'enhanced', label: 'Enhanced' },
-    { id: 'bassboosted', label: 'Bass Boosted' }
+    { id: 'bassboosted', label: 'Bass' }
   ];
   return (
-    <div className="flex items-center bg-black/40 backdrop-blur-md rounded-full p-1 shadow-xl z-40 relative max-w-full overflow-x-auto no-scrollbar" onClick={(e) => e.stopPropagation()}>
+    <div className="flex items-center bg-black/40 backdrop-blur-md rounded-full p-1 shadow-xl z-40 relative w-[320px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
       {modes.map(mode => (
         <button
           key={mode.id}
           onClick={() => setMode(mode.id)}
-          className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold tracking-wider transition-all whitespace-nowrap ${currentMode === mode.id ? 'bg-white text-black shadow-md' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+          className={`flex-1 h-8 flex items-center justify-center rounded-full text-[9px] sm:text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ease-out ${currentMode === mode.id ? 'bg-white text-black' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
         >
           {mode.label}
         </button>
@@ -546,9 +546,9 @@ const Player = ({ activeMobileView }) => {
                 )}
                 
                 {/* DSP Engine Control */}
-                <div className="absolute -bottom-16 lg:-bottom-24 z-30 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
+                <div className="absolute -bottom-8 lg:-bottom-24 z-30 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
                    <SoundEngineSwitch currentMode={soundMode} setMode={setSoundMode} />
-                   <span className="text-[10px] text-white/40 tracking-widest font-semibold mt-2">Audio Profile</span>
+                   <span className="text-[10px] text-white/40 tracking-widest font-semibold mt-2 uppercase">Sound Signature</span>
                 </div>
               </div>
             </div>
