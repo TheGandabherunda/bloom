@@ -266,6 +266,28 @@ const DesktopTimeDisplay = React.memo(({ playerRef, duration }) => {
   );
 });
 
+const SoundEngineSwitch = React.memo(({ currentMode, setMode }) => {
+  const modes = [
+    { id: 'off', label: 'Off' },
+    { id: 'natural', label: 'Natural' },
+    { id: 'enhanced', label: 'Enhanced' },
+    { id: 'bassboosted', label: 'Bass Boosted' }
+  ];
+  return (
+    <div className="flex items-center bg-black/40 backdrop-blur-md rounded-full p-1 shadow-xl z-40 relative max-w-full overflow-x-auto no-scrollbar" onClick={(e) => e.stopPropagation()}>
+      {modes.map(mode => (
+        <button
+          key={mode.id}
+          onClick={() => setMode(mode.id)}
+          className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold tracking-wider transition-all whitespace-nowrap ${currentMode === mode.id ? 'bg-white text-black shadow-md' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+        >
+          {mode.label}
+        </button>
+      ))}
+    </div>
+  );
+});
+
 const Player = ({ activeMobileView }) => {
   const {
     isPlaying,
@@ -285,7 +307,9 @@ const Player = ({ activeMobileView }) => {
     error,
     isExpanded,
     setIsExpanded,
-    playerRef
+    playerRef,
+    soundMode,
+    setSoundMode
   } = usePlayback();
   const { peerId, peerRoles } = useOrbit();
   
@@ -520,6 +544,12 @@ const Player = ({ activeMobileView }) => {
                     </div>
                   </div>
                 )}
+                
+                {/* DSP Engine Control */}
+                <div className="absolute -bottom-16 lg:-bottom-24 z-30 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
+                   <SoundEngineSwitch currentMode={soundMode} setMode={setSoundMode} />
+                   <span className="text-[10px] text-white/40 tracking-widest font-semibold mt-2">Audio Profile</span>
+                </div>
               </div>
             </div>
           ) : (

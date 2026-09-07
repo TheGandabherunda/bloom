@@ -21,10 +21,50 @@ export class CustomAudioPlayer {
     this.muteGain = this.audioContext.createGain();
     this.muteGain.gain.value = 0;
 
-    this.sourceNode.connect(this.audioContext.destination);
-    this.sourceNode.connect(this.analyser);
+    // ─── Sound Engine / DSP Chain ───
+    this.headroomGain = this.audioContext.createGain();
+    this.headroomGain.gain.value = 1;
+
+    // 10-Band Parametric EQ Pool (Dynamically Reconfigured per Profile)
+    this.eqBands = Array.from({ length: 10 }).map(() => {
+      const filter = this.audioContext.createBiquadFilter();
+      filter.type = 'peaking';
+      filter.frequency.value = 1000;
+      filter.gain.value = 0;
+      filter.Q.value = 1.0; 
+      return filter;
+    });
+
+    this.compressor = this.audioContext.createDynamicsCompressor();
+    this.compressor.threshold.value = -24;
+    this.compressor.knee.value = 30;
+    this.compressor.ratio.value = 1;
+    // Professional Master Bus Settings: Slow attack preserves the kick drum punch, fast release keeps energy high
+    this.compressor.attack.value = 0.03;  // 30ms 
+    this.compressor.release.value = 0.1;  // 100ms
+
+    this.finalGain = this.audioContext.createGain();
+    this.finalGain.gain.value = 1;
+
+    // Connect DSP Chain
+    this.sourceNode.connect(this.headroomGain);
+    
+    let currentLastNode = this.headroomGain;
+    for (const filter of this.eqBands) {
+      currentLastNode.connect(filter);
+      currentLastNode = filter;
+    }
+    
+    currentLastNode.connect(this.compressor);
+    this.compressor.connect(this.finalGain);
+
+    this.finalGain.connect(this.audioContext.destination);
+    
+    // Connect to Visualizer
+    this.finalGain.connect(this.analyser);
     this.analyser.connect(this.muteGain);
     this.muteGain.connect(this.audioContext.destination);
+
 
     this.audioContext.addEventListener('statechange', () => {
       console.log(`[DEBUG] AudioContext state changed to: ${this.audioContext.state}`);
@@ -34,10 +74,28 @@ export class CustomAudioPlayer {
     this.isPlaying = false;
     this.isAborted = false;
 
-    // Watchdog variables for stall recovery
     this.watchdogInterval = null;
     this.lastTime = -1;
     this.stallCount = 0;
+    
+    // 🚨 CORS BYPASS DETECTOR 🚨
+    // Runs globally every 2 seconds to check if WebAudio is actually receiving data
+    setInterval(() => {
+      if (this.isPlaying && this.audioContext.state === 'running') {
+        const testArray = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteFrequencyData(testArray);
+        let isDead = true;
+        for (let i = 0; i < 20; i++) {
+          if (testArray[i] > 0) {
+            isDead = false;
+            break;
+          }
+        }
+        if (isDead) {
+          console.error("🚨 CORS BYPASS DETECTED 🚨: The music server (saavncdn) is not sending CORS headers. Your browser has completely disabled the Equalizer to prevent data theft. You are hearing the RAW, un-EQ'd audio straight from the browser.");
+        }
+      }
+    }, 2000);
 
     // Centralized Visualizer Engine
     this.visualizers = [];
@@ -201,7 +259,146 @@ export class CustomAudioPlayer {
   getFrequencyData() {
     if (!this.analyser) return new Uint8Array(0);
     this.analyser.getByteFrequencyData(this.frequencyDataArray);
+    
+    // Debugging: Check if graph is bypassed (CORS issue)
+    if (this.isPlaying && this.audioContext.state === 'running') {
+      let isDead = true;
+      // Only check the first few bins which should definitely have energy if music is playing
+      for (let i = 0; i < 20; i++) {
+        if (this.frequencyDataArray[i] > 0) {
+          isDead = false;
+          break;
+        }
+      }
+      if (isDead && !this._corsWarned) {
+        console.error("[DEBUG-AUDIO] 🚨 CRITICAL ERROR 🚨: The Web Audio Engine is receiving NO DATA (all zeros). Your browser is playing the music directly to the speakers but BYPASSING the Equalizer entirely because of a CORS security restriction on the audio stream URL. The EQ cannot work until the stream URL provides an 'Access-Control-Allow-Origin: *' header.");
+        this._corsWarned = true;
+      } else if (!isDead && this._corsWarned) {
+        console.log("[DEBUG-AUDIO] Audio data is flowing through the DSP chain successfully.");
+        this._corsWarned = false; // reset if it recovers
+      }
+    }
+    
     return this.frequencyDataArray;
+  }
+
+  setSoundEngineMode(mode) {
+    this.soundMode = mode;
+    const now = this.audioContext.currentTime;
+    console.log(`[SoundEngine] Switching mode to: ${mode} at context time: ${now}`);
+    
+    
+    // Smooth transition time
+    const t = 0.5; 
+
+    // Helper to instantly set value to avoid any browser AudioContext scheduling bugs
+    const setVal = (param, val) => {
+      // Set instantly instead of using setTargetAtTime
+      param.value = val;
+    };
+
+    switch (mode) {
+      case 'off':
+        // TRUE BYPASS
+        setVal(this.headroomGain.gain, 1.0);
+        this.eqBands.forEach(band => {
+          band.type = 'peaking';
+          setVal(band.frequency, 1000);
+          setVal(band.gain, 0);
+          setVal(band.Q, 1.0);
+        });
+        setVal(this.compressor.threshold, -24);
+        setVal(this.compressor.ratio, 1.0);
+        setVal(this.compressor.attack, 0.03);
+        setVal(this.compressor.release, 0.1);
+        setVal(this.finalGain.gain, 1.0);
+        break;
+
+      case 'natural':
+        // Profile 1: Natural (Studio Reference) - Oratory1990 Optimum HiFi
+        setVal(this.headroomGain.gain, 0.708); // -3.0 dB
+        const natConfig = [
+          { type: 'lowshelf', f: 105, gain: 1.5, Q: 0.71 },
+          { type: 'peaking', f: 2000, gain: 1.0, Q: 1.41 },
+          { type: 'highshelf', f: 10000, gain: 1.5, Q: 0.71 }
+        ];
+        this.eqBands.forEach((band, i) => {
+          if (i < natConfig.length) {
+            band.type = natConfig[i].type;
+            setVal(band.frequency, natConfig[i].f);
+            setVal(band.gain, natConfig[i].gain);
+            setVal(band.Q, natConfig[i].Q);
+          } else {
+            setVal(band.gain, 0); // Bypass unused bands
+          }
+        });
+        setVal(this.compressor.threshold, -24);
+        setVal(this.compressor.ratio, 1.0);
+        setVal(this.compressor.attack, 0.03);
+        setVal(this.compressor.release, 0.1);
+        setVal(this.finalGain.gain, 1.0);
+        break;
+
+      case 'enhanced': 
+        // Profile 2: Enhanced (Pristine Studio Separation) - Oratory1990 DT990 Mix Target
+        setVal(this.headroomGain.gain, 0.543); // -5.3 dB
+        const enhConfig = [
+          { type: 'peaking', f: 63, gain: -3.8, Q: 0.70 },
+          { type: 'lowshelf', f: 105, gain: 5.5, Q: 0.67 },
+          { type: 'peaking', f: 160, gain: -2.6, Q: 0.80 },
+          { type: 'peaking', f: 680, gain: 3.5, Q: 0.70 },
+          { type: 'peaking', f: 1170, gain: -2.1, Q: 1.20 },
+          { type: 'peaking', f: 2000, gain: 1.0, Q: 1.00 },
+          { type: 'peaking', f: 2900, gain: -1.5, Q: 3.00 },
+          { type: 'peaking', f: 5950, gain: -6.4, Q: 3.50 },
+          { type: 'peaking', f: 8300, gain: -6.5, Q: 7.00 },
+          { type: 'highshelf', f: 11000, gain: -6.0, Q: 0.67 }
+        ];
+        this.eqBands.forEach((band, i) => {
+          if (i < enhConfig.length) {
+            band.type = enhConfig[i].type;
+            setVal(band.frequency, enhConfig[i].f);
+            setVal(band.gain, enhConfig[i].gain);
+            setVal(band.Q, enhConfig[i].Q);
+          } else {
+            setVal(band.gain, 0);
+          }
+        });
+        setVal(this.compressor.threshold, -24);
+        setVal(this.compressor.ratio, 1.0); 
+        setVal(this.compressor.attack, 0.03);
+        setVal(this.compressor.release, 0.1);
+        setVal(this.finalGain.gain, 1.0); 
+        break;
+
+      case 'bassboosted': 
+        // Profile 3: Bass Boosted (Professional Basshead) - AutoEQ Sub-Bass Target
+        setVal(this.headroomGain.gain, 0.251); // -12.0 dB
+        const bassConfig = [
+          { type: 'lowshelf', f: 40, gain: 12.0, Q: 1.00 },
+          { type: 'lowshelf', f: 75, gain: 8.0, Q: 1.00 }
+        ];
+        this.eqBands.forEach((band, i) => {
+          if (i < bassConfig.length) {
+            band.type = bassConfig[i].type;
+            setVal(band.frequency, bassConfig[i].f);
+            setVal(band.gain, bassConfig[i].gain);
+            setVal(band.Q, bassConfig[i].Q);
+          } else {
+            setVal(band.gain, 0);
+          }
+        });
+        // Limit extreme low frequency peaks to protect output
+        setVal(this.compressor.threshold, -2);
+        setVal(this.compressor.ratio, 20.0);
+        setVal(this.compressor.attack, 0.005);
+        setVal(this.compressor.release, 0.05);
+        setVal(this.finalGain.gain, 1.0); 
+        break;
+        
+      default:
+        break;
+    }
   }
 
   setVolume(v) {

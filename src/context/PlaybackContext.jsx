@@ -21,6 +21,9 @@ export const PlaybackProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [networkIsPlaying, setNetworkIsPlaying] = useState(false);
+  const [soundMode, setSoundModeState] = useState(() => {
+    return localStorage.getItem('bloom_sound_mode') || 'enhanced';
+  });
 
   const playerRef = useRef(null);
   const loadingTrackId = useRef(null);
@@ -52,6 +55,7 @@ export const PlaybackProvider = ({ children }) => {
     const player = new CustomAudioPlayer();
     playerRef.current = player;
     player.setVolume(volume);
+    player.setSoundEngineMode(soundMode);
     
     player.onDurationChange = (dur) => setDuration(dur);
     player.onError = (e) => {
@@ -94,6 +98,14 @@ export const PlaybackProvider = ({ children }) => {
   const setVolume = useCallback((val) => {
     setVolumeState(val);
     if (playerRef.current) playerRef.current.setVolume(val);
+  }, []);
+
+  const setSoundMode = useCallback((mode) => {
+    setSoundModeState(mode);
+    localStorage.setItem('bloom_sound_mode', mode);
+    if (playerRef.current) {
+      playerRef.current.setSoundEngineMode(mode);
+    }
   }, []);
 
   const loadTrack = useCallback(async (track, targetIndex = -1, startTime = 0, autoPlay = true, originator = null) => {
@@ -920,8 +932,8 @@ export const PlaybackProvider = ({ children }) => {
       duration, loadTrack, togglePlay, stopPlayback, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
-      playerRef, networkIsPlaying
-  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying]);
+      playerRef, networkIsPlaying, soundMode, setSoundMode
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying, soundMode, setSoundMode]);
 
   return (
     <PlaybackContext.Provider value={value}>
