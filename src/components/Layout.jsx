@@ -647,7 +647,7 @@ const HomeSection = ({ title, icon, items, onItemClick, addToQueue }) => {
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
-          className="grid grid-rows-2 grid-flow-col gap-6 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth pb-4
+          className="grid grid-rows-2 grid-flow-col gap-6 overflow-x-auto no-scrollbar snap-x snap-proximity pb-4
                      auto-cols-[calc(50%-0.75rem)] 
                      sm:auto-cols-[calc(33.333333%-1rem)] 
                      xl:auto-cols-[calc(25%-1.125rem)] 
