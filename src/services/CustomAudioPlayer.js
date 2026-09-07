@@ -311,7 +311,6 @@ export class CustomAudioPlayer {
         setVal(this.compressor.ratio, 1.0);
         setVal(this.compressor.attack, 0.03);
         setVal(this.compressor.release, 0.1);
-        setVal(this.finalGain.gain, 1.0);
         break;
 
       case 'natural':
@@ -329,14 +328,16 @@ export class CustomAudioPlayer {
             setVal(band.gain, natConfig[i].gain);
             setVal(band.Q, natConfig[i].Q);
           } else {
-            setVal(band.gain, 0); // Bypass unused bands
+            band.type = 'peaking';
+            setVal(band.frequency, 1000);
+            setVal(band.gain, 0);
+            setVal(band.Q, 1.0);
           }
         });
         setVal(this.compressor.threshold, -24);
         setVal(this.compressor.ratio, 1.0);
         setVal(this.compressor.attack, 0.03);
         setVal(this.compressor.release, 0.1);
-        setVal(this.finalGain.gain, 1.0);
         break;
 
       case 'enhanced': 
@@ -361,14 +362,16 @@ export class CustomAudioPlayer {
             setVal(band.gain, enhConfig[i].gain);
             setVal(band.Q, enhConfig[i].Q);
           } else {
+            band.type = 'peaking';
+            setVal(band.frequency, 1000);
             setVal(band.gain, 0);
+            setVal(band.Q, 1.0);
           }
         });
         setVal(this.compressor.threshold, -24);
         setVal(this.compressor.ratio, 1.0); 
         setVal(this.compressor.attack, 0.03);
         setVal(this.compressor.release, 0.1);
-        setVal(this.finalGain.gain, 1.0); 
         break;
 
       case 'bassboosted': 
@@ -385,7 +388,10 @@ export class CustomAudioPlayer {
             setVal(band.gain, bassConfig[i].gain);
             setVal(band.Q, bassConfig[i].Q);
           } else {
+            band.type = 'peaking';
+            setVal(band.frequency, 1000);
             setVal(band.gain, 0);
+            setVal(band.Q, 1.0);
           }
         });
         // Limit extreme low frequency peaks to protect output
@@ -393,7 +399,6 @@ export class CustomAudioPlayer {
         setVal(this.compressor.ratio, 20.0);
         setVal(this.compressor.attack, 0.005);
         setVal(this.compressor.release, 0.05);
-        setVal(this.finalGain.gain, 1.0); 
         break;
         
       default:
