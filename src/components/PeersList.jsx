@@ -39,7 +39,8 @@ const PeersList = () => {
       text: `${targetName} was kicked from the party`,
       type: 'system',
       sender: 'System',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      peerId: targetId
     };
     
     window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: systemMsg }));

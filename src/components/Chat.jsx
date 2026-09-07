@@ -51,11 +51,14 @@ const Chat = () => {
     setMessages(prev => [...prev, msg]);
 
     if (isNewRemote && msg.type !== 'system' && soundEnabledRef.current) {
+      // Host shouldn't hear the notification sound
+      if (peerRoles && peerId && peerRoles[peerId] === 'owner') return;
+
       const audio = new Audio('/assets/noti.mp3');
       audio.volume = 0.5;
       audio.play().catch(() => {});
     }
-  }, []);
+  }, [peerId, peerRoles]);
 
   useEffect(() => {
     if (!chatDb || typeof chatDb.all !== 'function') return;

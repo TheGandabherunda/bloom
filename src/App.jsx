@@ -5,6 +5,7 @@ import { PlaybackProvider } from './context/PlaybackContext';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Lobby from './components/Lobby';
+import NotificationStrip from './components/NotificationStrip';
 import { getOrCreateKeys, getUserRelays } from './services/nostr';
 
 function App() {
@@ -15,31 +16,24 @@ function App() {
   const [isMinimized, setIsMinimized] = useState(false);
 
   const fetchKeysAndSetConfig = async (baseConfig) => {
-    console.log(`[App] fetchKeysAndSetConfig called for roomId=${baseConfig.roomId}`);
     let pk = null;
     let sk = null;
     const isExtension = !!localStorage.getItem('bloom_nip07');
     
     if (isExtension && window.nostr) {
       try {
-        console.log(`[App] Extension detected, fetching pubkey...`);
         pk = await window.nostr.getPublicKey();
         sk = 'extension';
-        console.log(`[App] Successfully fetched pubkey from extension: ${pk}`);
-      } catch(e) { console.error('[App] Failed to fetch pubkey from extension:', e); }
+      } catch(e) {}
     } 
     
     if (!pk) {
-      console.log(`[App] No extension pubkey found, falling back to local keys...`);
       const keys = getOrCreateKeys();
       pk = keys.pk;
       sk = keys.sk;
-      console.log(`[App] Successfully loaded local keys. pubkey=${pk}`);
     }
     
     const userRelays = await getUserRelays();
-    
-    console.log(`[App] Setting config with nostrPk=${pk}, relays=${userRelays.length}`);
     setConfig({ ...baseConfig, nostrPk: pk, nostrSk: sk, relays: userRelays });
   };
 
@@ -97,38 +91,45 @@ function App() {
   return (
     <OrbitProvider>
       <PlaybackProvider>
-        {!isLoggedIn ? (
-          <Login onComplete={handleLogin} />
-        ) : config ? (
-          <>
-            <div className="fixed inset-0 z-0 bg-[#050505]">
-              <Lobby 
-                onJoin={handleJoinLobby} 
-                onCreateRoom={handleCreateRoom} 
-                displayName={localStorage.getItem('bloom_name')} 
-                onRestore={() => setIsMinimized(false)}
-                minimizedConfig={config}
-              />
-            </div>
-            <div 
-              className={`fixed inset-0 z-[100] transition-transform duration-[400ms] ${isMinimized ? 'translate-y-full' : 'translate-y-0'}`}
-              style={{ transitionTimingFunction: 'cubic-bezier(0.2, 1, 0.4, 1)' }}
-            >
-              <Layout config={config} onLeave={() => {
-                sessionStorage.removeItem(`bloom_host_${config.roomId}`);
-                setConfig(null);
-                setIsMinimized(false);
-                window.location.hash = '';
-              }} onMinimize={() => setIsMinimized(true)} />
-            </div>
-          </>
-        ) : (
-          <Lobby 
-            onJoin={handleJoinLobby} 
-            onCreateRoom={handleCreateRoom} 
-            displayName={localStorage.getItem('bloom_name')} 
-          />
-        )}
+        <div className="flex flex-col h-[100dvh] w-full overflow-hidden bg-[#050505] text-white">
+          <NotificationStrip />
+          <div className="flex-1 relative overflow-hidden">
+            {!isLoggedIn ? (
+              <Login onComplete={handleLogin} />
+            ) : config ? (
+              <>
+                <div className="absolute inset-0 z-0 bg-[#050505]">
+                  <Lobby 
+                    onJoin={handleJoinLobby} 
+                    onCreateRoom={handleCreateRoom} 
+                    displayName={localStorage.getItem('bloom_name')} 
+                    onRestore={() => setIsMinimized(false)}
+                    minimizedConfig={config}
+                  />
+                </div>
+                <div 
+                  className={`absolute inset-0 z-[100] transition-transform duration-[400ms] ${isMinimized ? 'translate-y-full' : 'translate-y-0'}`}
+                  style={{ transitionTimingFunction: 'cubic-bezier(0.2, 1, 0.4, 1)' }}
+                >
+                  <Layout config={config} onLeave={() => {
+                    sessionStorage.removeItem(`bloom_host_${config.roomId}`);
+                    setConfig(null);
+                    setIsMinimized(false);
+                    window.location.hash = '';
+                  }} onMinimize={() => setIsMinimized(true)} />
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-[#050505]">
+                <Lobby 
+                  onJoin={handleJoinLobby} 
+                  onCreateRoom={handleCreateRoom} 
+                  displayName={localStorage.getItem('bloom_name')} 
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </PlaybackProvider>
     </OrbitProvider>
   );

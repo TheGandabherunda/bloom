@@ -528,7 +528,8 @@ export const OrbitProvider = ({ children }) => {
                     text: `${peerName} joined the party`,
                     type: 'system',
                     sender: 'System',
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    peerId: event.pubkey
                   };
                   if (chatProxy?.add) {
                     chatProxy.add(joinMsg);
@@ -558,7 +559,8 @@ export const OrbitProvider = ({ children }) => {
                   text: `${leavingName} left the party`,
                   type: 'system',
                   sender: 'System',
-                  timestamp: Date.now()
+                  timestamp: Date.now(),
+                  peerId: event.pubkey
                 };
 
                 if (chatProxy?.add) {

@@ -157,7 +157,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
   }, [stateDb, config.isHost, config.roomName]);
 
   return (
-    <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''}`}>
+    <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col antialiased ${isPlaying ? 'ambient-playing' : ''} relative`}>
       {showSkeleton && (
         <AppInitSkeleton status={status} />
       )}
@@ -218,7 +218,11 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                       inviteLink = `${url.origin}${url.pathname}#${hashPath || config.roomId}?${params.toString()}`;
                     }
                   } catch (e) {}
-                  navigator.clipboard.writeText(inviteLink).catch(() => {});
+                  navigator.clipboard.writeText(inviteLink).then(() => {
+                    window.dispatchEvent(new CustomEvent('bloom:notify', {
+                      detail: { text: 'Invite link copied to clipboard', type: 'system', sender: 'System' }
+                    }));
+                  }).catch(() => {});
                 }}
                 className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center ml-2"
               >
