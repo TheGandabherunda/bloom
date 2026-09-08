@@ -1,46 +1,99 @@
-# Bloom 🌸
+<div align="center">
 
-A beautiful, GPU-accelerated, decentralized P2P music player built with React and WebRTC.
+# 🌸 Bloom
 
-## ✨ Features
-- **P2P Listening Rooms**: Listen to music perfectly in sync with friends using OrbitDB, WebRTC, and IPFS (no central server required!).
-- **Flawless HD Audio**: Features a custom-built dual-audio pipeline that bypasses notorious browser WebAudio engine bugs to deliver distortion-free, gapless 320kbps playback.
-- **Professional Visualizations**: A real-time, DAW-grade spectrum analyzer. Maps frequencies into precise logarithmic octaves with peak-extraction for razor-sharp transient response.
-- **GPU-Accelerated UI**: Buttery smooth shimmer skeleton loaders, glassmorphism, and hardware-accelerated animations that won't block the main thread.
-- **Git-Hosted & Zero-Config Deployment**: The project is primarily hosted on a Git repository. It features a zero-config serverless proxy backend built for Netlify, allowing the frontend to be easily deployed from the repository.
+### Listen together. No account. No server. Just music.
 
-## 🛠️ Tech Stack
-- **Frontend**: React 18, Vite 6, TailwindCSS v3
-- **Decentralization**: libp2p, Helia, OrbitDB
-- **Backend/Proxy**: Netlify Functions (Serverless, ESM, Node 20)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite)](https://vitejs.dev)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v3-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
+[![Netlify](https://img.shields.io/badge/Deployed%20on-Netlify-00C7B7?style=flat-square&logo=netlify)](https://netlify.com)
 
-## 🏗️ Latest Implementation
+</div>
 
-- **Frontend Styling**: Uses Tailwind utility classes primarily, paired with `src/index.css` for complex CSS animations, variables, and global resets.
-- **Audio Pipeline**: Centralized within `CustomAudioPlayer` (`src/services/CustomAudioPlayer.js`). It leverages the WebAudio API with a `MediaElementSource` routing through an analyzer and mute gain before reaching the destination.
-- **Context Architecture**: 
-  - `PlaybackContext`: Manages all audio playback state (`currentTrack`, `queue`, `isPlaying`, `currentTime`, `duration`, `volume`, etc.).
-  - `OrbitContext`: Owns P2P state (`stateDb`, `chatDb`, `peerId`, `peers`, `status`). It uses a silent background audio loop to bypass browser background throttling of WebAudio and JS execution.
-- **P2P Sync**: Real-time state synchronization across peers is driven by OrbitDB via `stateDb`. Host proactively full-syncs state with joining peers to resolve reconnections.
+---
 
-## ⚠️ Cautions
+## What is Bloom?
 
-- **Never bypass `CustomAudioPlayer`**: Creating a standalone `new Audio()` element breaks the WebAudio analyser graph and causes distortion. Always route audio through `CustomAudioPlayer`.
-- **State Deduplication**: When writing to `stateDb`, always include `originator: peerId` in the payload. When handling OrbitDB `update` events, ensure you skip updates where `originator === peerId`.
-- **Serverless API Timeout**: Netlify functions, specifically `audio-playlist`, have a hard timeout limit of 26 seconds.
-- **P2P Initialization Guards**: `initP2P` is tightly guarded by `initializingRef` and `statusRef` to prevent duplicate initialization. Never bypass these guards.
-- **Animations**: Continuously running CSS animations must use `will-change: transform` and remain `paused` by default unless audio is playing, respecting the user's `prefers-reduced-motion` settings.
+Bloom is a **shared music player** — think of it like a virtual listening room you can invite your friends into.
 
+Create a room, share the code, and everyone hears the same song at the same time. No sign-up. No account. No server in the middle. When everyone leaves, the room disappears. Clean and simple.
 
+---
 
-## ⚖️ Disclaimer & Copyright Notice
+## 🎵 What can you do with it?
 
-**Important Legal Information:**
-Bloom is strictly an educational open-source project. It functions solely as a specialized web interface and client-side search tool.
+- **Create or join a listening room** with just a short room code
+- **Play music in perfect sync** with everyone in the room
+- **Chat with your friends** while the music plays — GIFs included
+- **Build a queue together** — anyone can suggest a song, the host decides what plays
+- **See real-time lyrics** synced to the track
+- **Watch the music visualizer** pulse to the beat
+- **Rename your party** and make it feel like yours
 
-- **No Content Hosted:** This repository, application, and its developers **do not** host, upload, database, or store any copyrighted audio, video, media files, or metadata.
-- **No Copyright Ownership:** The developers of Bloom do not own or claim the copyrights to any music, album art, lyrics, or metadata displayed within the application. All rights belong to their respective original creators and copyright holders.
-- **API Aggregation:** The application acts purely as a passthrough interface that formats user queries and proxies them to publicly accessible third-party APIs on the internet. 
-- **Personal Use:** This tool is provided "as is" for personal, educational, and non-commercial use only. The developers hold no liability for how end-users choose to utilize this software. 
+---
 
-By running or deploying this software, you agree that you are solely responsible for complying with all applicable copyright and digital media laws in your jurisdiction.
+## 👑 How rooms work
+
+Every room has a **Host**. The host controls playback — play, pause, skip, rename the party, and manage the queue. The host can also promote friends to **Admin**, giving them the same controls.
+
+### 🗳️ Song recommendations & voting
+
+Anyone in the room can suggest a song. When they do, a voting card appears in the chat for everyone:
+
+| Situation | What happens |
+|---|---|
+| Host or admin votes **Agree** | Song is immediately added to the queue |
+| Host or admin votes **Disagree** | Song is rejected (host veto) |
+| Host/admin doesn't vote | If **50% or more** of the room votes Agree, it gets auto-added |
+
+A live progress bar on each recommendation card shows how many votes are in and how many are needed — so no one's left guessing.
+
+When everyone leaves, the room is gone. No history, no data stored.
+
+---
+
+## 🚀 Running Bloom locally
+
+You'll need [Node.js](https://nodejs.org) (v20+) and the [Netlify CLI](https://docs.netlify.com/cli/get-started/) installed.
+
+```bash
+# Install Netlify CLI (one-time setup)
+npm install -g netlify-cli
+
+# Clone and install
+git clone https://github.com/TheGandabherunda/bloom.git
+cd bloom
+npm install
+
+# Start the app
+netlify dev
+```
+
+Then open `http://localhost:8888` in your browser.
+
+> **Note:** Use `netlify dev` — not `npm run dev`. The app needs the backend functions to work correctly.
+
+---
+
+## 🌐 Deploying
+
+Bloom is built to deploy on [Netlify](https://netlify.com) straight from this repo — no extra configuration needed. Just connect the repo in Netlify and it handles the rest.
+
+---
+
+## ⚖️ Legal Notice
+
+Bloom is an **educational, open-source project** and is intended for **personal, non-commercial use only**.
+
+- This app does not host, store, or own any music, lyrics, or album art.
+- All content is sourced in real-time from publicly available third-party services.
+- All rights to any music displayed belong to their respective artists and rights holders.
+
+By using this software, you take full responsibility for complying with copyright laws in your region.
+
+---
+
+<div align="center">
+  Made with 🌸 — for the love of music and good company.
+</div>

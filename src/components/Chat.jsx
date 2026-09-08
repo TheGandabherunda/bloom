@@ -649,7 +649,7 @@ const Chat = () => {
             window.dispatchEvent(
               new CustomEvent('bloom:chat-message', {
                 detail: {
-                  text: `"${msg.track?.title}" reached 50% party agreement and was added to queue!`,
+                  text: `"${msg.track?.title}" was added to queue by majority vote (${agreeCount}/${totalPeers} agreed)!`,
                   type: 'system',
                   sender: 'System',
                   timestamp: Date.now(),
@@ -752,47 +752,67 @@ const Chat = () => {
                       <span className="material-symbols-rounded text-base">cancel</span>
                       <span>Rejected by Host</span>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2 pt-0.5">
-                      {/* Pill Shape: White for Agree */}
-                      <button
-                        type="button"
-                        onClick={() => handleVote(msg.id, 'agree')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-4 rounded-full text-xs font-bold transition-all select-none active:scale-95 shadow-sm ${
-                          msg.votes?.[peerId] === 'agree'
-                            ? 'bg-white text-black ring-2 ring-white/40 scale-[1.02]'
-                            : 'bg-white text-black hover:bg-white/90'
-                        }`}
-                      >
-                        <span
-                          className="material-symbols-rounded text-sm"
-                          style={{ fontVariationSettings: "'FILL' 1" }}
-                        >
-                          thumb_up
-                        </span>
-                        <span>Agree ({Object.values(msg.votes || {}).filter((v) => v === 'agree').length})</span>
-                      </button>
+                  ) : (() => {
+                    const agreeCount = Object.values(msg.votes || {}).filter((v) => v === 'agree').length;
+                    const disagreeCount = Object.values(msg.votes || {}).filter((v) => v === 'disagree').length;
+                    const totalPeers = peers && peers.length > 0 ? peers.length : 1;
+                    const neededVotes = Math.ceil(totalPeers * 0.5);
+                    const progressPct = Math.min(100, Math.round((agreeCount / totalPeers) * 100));
+                    return (
+                      <div className="flex flex-col gap-2 pt-0.5">
+                        {/* Vote progress bar */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-white/70 rounded-full transition-all duration-500"
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-white/40 font-mono tabular-nums shrink-0">
+                            {agreeCount}/{totalPeers} · {neededVotes} needed
+                          </span>
+                        </div>
+                        {/* Vote Buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleVote(msg.id, 'agree')}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-4 rounded-full text-xs font-bold transition-all select-none active:scale-95 shadow-sm ${
+                              msg.votes?.[peerId] === 'agree'
+                                ? 'bg-white text-black ring-2 ring-white/40 scale-[1.02]'
+                                : 'bg-white text-black hover:bg-white/90'
+                            }`}
+                          >
+                            <span
+                              className="material-symbols-rounded text-sm"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >
+                              thumb_up
+                            </span>
+                            <span>Agree ({agreeCount})</span>
+                          </button>
 
-                      {/* Pill Shape: Monochromatic Neutral for Disagree */}
-                      <button
-                        type="button"
-                        onClick={() => handleVote(msg.id, 'disagree')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-4 rounded-full text-xs font-bold transition-all select-none active:scale-95 shadow-sm ${
-                          msg.votes?.[peerId] === 'disagree'
-                            ? 'bg-white/25 text-white ring-1 ring-white/30 scale-[1.02]'
-                            : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
-                        }`}
-                      >
-                        <span
-                          className="material-symbols-rounded text-sm"
-                          style={{ fontVariationSettings: msg.votes?.[peerId] === 'disagree' ? "'FILL' 1" : undefined }}
-                        >
-                          thumb_down
-                        </span>
-                        <span>Disagree ({Object.values(msg.votes || {}).filter((v) => v === 'disagree').length})</span>
-                      </button>
-                    </div>
-                  )}
+                          <button
+                            type="button"
+                            onClick={() => handleVote(msg.id, 'disagree')}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-4 rounded-full text-xs font-bold transition-all select-none active:scale-95 shadow-sm ${
+                              msg.votes?.[peerId] === 'disagree'
+                                ? 'bg-white/25 text-white ring-1 ring-white/30 scale-[1.02]'
+                                : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                            }`}
+                          >
+                            <span
+                              className="material-symbols-rounded text-sm"
+                              style={{ fontVariationSettings: msg.votes?.[peerId] === 'disagree' ? "'FILL' 1" : undefined }}
+                            >
+                              thumb_down
+                            </span>
+                            <span>Disagree ({disagreeCount})</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : msg.type === 'gif-group' ? (
                 <div className="text-sm flex items-start gap-1.5">
