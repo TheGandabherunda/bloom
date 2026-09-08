@@ -440,7 +440,7 @@ const Player = ({ activeMobileView }) => {
       {currentTrack && (
         <div 
           ref={draggableRef}
-          className={`bg-black flex flex-col items-center justify-center select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : `fixed inset-0 bottom-[60px] lg:absolute lg:inset-0 lg:bottom-0 lg:right-[400px] z-[95] lg:z-[45] pb-[80px] lg:pb-24`}`}
+          className={`bg-black flex flex-col items-center justify-center select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} ${isFullscreen ? 'fixed inset-0 z-[9999] pb-0' : 'fixed inset-0 z-[110] pb-[calc(20px+env(safe-area-inset-bottom,0px))] lg:absolute lg:inset-0 lg:bottom-0 lg:right-[400px] lg:z-[45] lg:pb-24'}`}
           onClick={handleExpandedClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isFullscreen && setShowFsControls(false)}
@@ -454,8 +454,11 @@ const Player = ({ activeMobileView }) => {
             style={{ backgroundImage: `url(${currentTrack.thumbnail})` }} 
           />
           
+          {/* Top Drag Indicator for Mobile Sheet */}
+          <div className="lg:hidden absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full z-20" />
+
           {/* Top Right Buttons (Lyrics and Minimize) */}
-          <div className="absolute top-8 right-8 z-20 flex gap-2">
+          <div className="absolute top-4 lg:top-8 right-4 lg:right-8 z-20 flex gap-2 pt-[env(safe-area-inset-top,0px)]">
               <button 
                 className={`flex w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full items-center justify-center transition-colors ${showLyrics ? 'text-[var(--color-primary)] bg-white/20' : 'text-white/70 hover:text-white'}`}
                 onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
@@ -559,7 +562,7 @@ const Player = ({ activeMobileView }) => {
           <Visualizer playerRef={playerRef} isExpanded={isExpanded} isFullscreen={isFullscreen} isPlaying={isPlaying} />
 
           {/* Mobile Expanded Bottom Sheet Controls */}
-          <div className="lg:hidden absolute bottom-12 left-0 right-0 px-8 flex flex-col z-30" onClick={(e) => e.stopPropagation()}>
+          <div className="lg:hidden absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 px-8 flex flex-col z-30" onClick={(e) => e.stopPropagation()}>
             {/* Progress Bar & Time */}
             <MobileProgressBar playerRef={playerRef} duration={duration} canControl={canControl} seek={seek} />
 
@@ -603,7 +606,7 @@ const Player = ({ activeMobileView }) => {
 
       {/* Main Player Bar (Collapsed Miniplayer & Desktop Expanded) */}
       <div 
-        className={`absolute ${activeMobileView === 'chat' ? 'bottom-[136px]' : 'bottom-[60px]'} lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 select-none transition-all duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
+        className={`absolute ${activeMobileView === 'chat' ? 'bottom-[calc(136px+env(safe-area-inset-bottom,0px))]' : 'bottom-[calc(60px+env(safe-area-inset-bottom,0px))]'} lg:bottom-0 left-0 right-0 lg:right-[400px] z-[90] bg-black/60 backdrop-blur-3xl border-t border-white/10 select-none transition-all duration-500 cursor-pointer h-[77px] ${isFullscreen ? 'translate-y-full' : 'translate-y-0 animate-in slide-in-from-bottom'} ${isExpanded ? 'hidden lg:block' : 'block'}`}
         onClick={() => {
           if (maxDragRef.current < 10) {
             setIsExpanded(!isExpanded);

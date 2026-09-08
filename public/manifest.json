@@ -1,0 +1,26 @@
+{
+  "name": "Bloom - Good Vibes Only",
+  "short_name": "Bloom",
+  "description": "Decentralized P2P music player with synchronized listening rooms and real-time visualizers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["music", "entertainment", "social"],
+  "icons": [
+    {
+      "src": "/assets/Bloom.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/Bloom.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

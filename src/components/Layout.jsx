@@ -25,6 +25,28 @@ const Layout = ({ config, onLeave, onMinimize }) => {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [trendingTracks, setTrendingTracks] = useState([]);
   const [loadingTrending, setLoadingTrending] = useState(true);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setShowInstallBtn(false);
+    }
+    setDeferredPrompt(null);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -180,10 +202,10 @@ const Layout = ({ config, onLeave, onMinimize }) => {
         </div>
       </div>
 
-      <div className={`flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full lg:pb-0 z-10 ${activeMobileView === 'chat' ? 'pb-[60px]' : 'pb-[137px]'}`}>
+      <div className={`flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full lg:pb-0 z-10 ${activeMobileView === 'chat' ? 'pb-[calc(60px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(137px+env(safe-area-inset-bottom,0px))]'}`}>
         <main className={`w-full h-full flex-1 flex flex-col bg-transparent min-w-0 relative overflow-hidden ${activeMobileView !== 'home' ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
-          <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
+          <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
             <div className="flex items-center gap-3">
               <button
                 onClick={onMinimize}
@@ -228,6 +250,17 @@ const Layout = ({ config, onLeave, onMinimize }) => {
               >
                 <span className="material-symbols-rounded text-[26px] leading-none">link</span>
               </button>
+
+              {showInstallBtn && (
+                <button
+                  title="Install Bloom App"
+                  onClick={handleInstallApp}
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-full flex items-center gap-1.5 transition-all ml-1 border border-white/10"
+                >
+                  <span className="material-symbols-rounded text-[18px] text-[var(--color-primary)]">download</span>
+                  <span className="hidden sm:inline">Install</span>
+                </button>
+              )}
             </div>
 
             <div className="flex-1 max-w-xl mx-8 hidden lg:block">
@@ -302,7 +335,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
              {showSearch ? (
                <Search query={searchQuery} onClose={() => { setShowSearch(false); setSearchQuery(''); }} />
              ) : (
-               <div className="flex-1 overflow-y-auto p-6 pb-[90px] flex flex-col gap-8">
+               <div className="flex-1 overflow-y-auto p-6 pb-12 flex flex-col gap-8">
                   {!currentTrack ? (
                     <div className="w-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
                       {loadingTrending ? (
@@ -358,7 +391,7 @@ const Layout = ({ config, onLeave, onMinimize }) => {
         />
         
         {/* Bottom Navigation for Mobile */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-black/80 backdrop-blur-3xl border-t border-white/10 z-[100] flex items-center justify-around px-2">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[calc(60px+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px))] bg-black/80 backdrop-blur-3xl border-t border-white/10 z-[100] flex items-center justify-around px-2">
           <button 
             onClick={() => { setActiveMobileView('home'); setIsExpanded(false); }} 
             className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${activeMobileView === 'home' ? 'text-[var(--color-primary)]' : 'text-white/40 hover:text-white/70'}`}

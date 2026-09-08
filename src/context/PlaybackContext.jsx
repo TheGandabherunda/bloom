@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */  
+/* eslint-disable react-hooks/exhaustive-deps, no-empty */  
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useOrbit } from './OrbitContext';
 import { CustomAudioPlayer } from '../services/CustomAudioPlayer';
@@ -469,6 +469,11 @@ export const PlaybackProvider = ({ children }) => {
           if (trackId && currentTrackRef.current?.id !== trackId) return; // Ignore stale time updates
           
           let targetTime = time;
+          // Compensate for relay transit delay if timestamp is present (capped at 5s to guard against local clock drift)
+          if (timestamp && typeof timestamp === 'number') {
+            const transitLatency = Math.max(0, Math.min(5, (Date.now() - timestamp) / 1000));
+            targetTime += transitLatency;
+          }
           if (Math.abs(playerRef.current?.getCurrentTime() - targetTime) > 3) {
             playerRef.current?.seek(targetTime);
           }
@@ -847,16 +852,19 @@ export const PlaybackProvider = ({ children }) => {
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack) {
       // Use higher res thumbnail if possible
-      const hdThumbnail = currentTrack.thumbnail ? currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault') : './assets/Bloom.svg';
+      const hdThumbnail = currentTrack.thumbnail ? currentTrack.thumbnail.replace('w120-h120', 'w1080-h1080').replace('hqdefault', 'maxresdefault') : '/assets/Bloom.svg';
+      const defaultThumb = currentTrack.thumbnail || '/assets/Bloom.svg';
       
       navigator.mediaSession.metadata = new window.MediaMetadata({
         title: currentTrack.title || 'Unknown Title',
         artist: currentTrack.author || 'Unknown Artist',
         album: 'Bloom',
         artwork: [
-          { src: currentTrack.thumbnail || './assets/Bloom.svg', sizes: '96x96', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail || './assets/Bloom.svg', sizes: '128x128', type: 'image/jpeg' },
+          { src: defaultThumb, sizes: '96x96', type: 'image/jpeg' },
+          { src: defaultThumb, sizes: '128x128', type: 'image/jpeg' },
+          { src: defaultThumb, sizes: '192x192', type: 'image/jpeg' },
           { src: hdThumbnail, sizes: '256x256', type: 'image/jpeg' },
+          { src: hdThumbnail, sizes: '384x384', type: 'image/jpeg' },
           { src: hdThumbnail, sizes: '512x512', type: 'image/jpeg' },
         ]
       });
@@ -871,25 +879,40 @@ export const PlaybackProvider = ({ children }) => {
 
   useEffect(() => {
     if ('mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.setActionHandler('play', () => {
-          if (!isPlayingRef.current) togglePlay();
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-          if (isPlayingRef.current) togglePlay();
-        });
-        navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
-        navigator.mediaSession.setActionHandler('nexttrack', () => playNext(true));
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (details.seekTime !== undefined) {
-            seek(details.seekTime);
-          }
-        });
-      } catch (err) {
-        console.warn("MediaSession action handlers not supported", err);
-      }
+      const setHandler = (action, handler) => {
+        try {
+          navigator.mediaSession.setActionHandler(action, handler);
+        } catch (e) {}
+      };
+
+      setHandler('play', () => {
+        if (!isPlayingRef.current) togglePlay();
+      });
+      setHandler('pause', () => {
+        if (isPlayingRef.current) togglePlay();
+      });
+      setHandler('previoustrack', () => playPrev());
+      setHandler('nexttrack', () => playNext(true));
+      setHandler('seekbackward', (details) => {
+        const offset = details?.seekOffset || 10;
+        const cur = playerRef.current ? playerRef.current.getCurrentTime() : 0;
+        seek(Math.max(0, cur - offset));
+      });
+      setHandler('seekforward', (details) => {
+        const offset = details?.seekOffset || 10;
+        const cur = playerRef.current ? playerRef.current.getCurrentTime() : 0;
+        seek(Math.min(duration || 0, cur + offset));
+      });
+      setHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) {
+          seek(details.seekTime);
+        }
+      });
+      setHandler('stop', () => {
+        stopPlayback();
+      });
     }
-  }, [togglePlay, playPrev, playNext, seek]);
+  }, [togglePlay, playPrev, playNext, seek, stopPlayback, duration]);
 
   // Sync Media Session Position State (Progress Bar) — throttled to avoid per-frame calls
   useEffect(() => {

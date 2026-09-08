@@ -36,23 +36,6 @@ const CassetteTape = ({ thumbnail, isPlaying, isExpanded, playerRef }) => {
   const rightSpoolRef = React.useRef(null);
   const scrubRatioRef = React.useRef(null);
 
-  React.useEffect(() => {
-    const handleScrub = (e) => {
-      scrubRatioRef.current = e.detail;
-      updateRotation();
-    };
-    window.addEventListener('bloom:scrub', handleScrub);
-    return () => window.removeEventListener('bloom:scrub', handleScrub);
-  }, []);
-
-  React.useEffect(() => {
-    const handleScrubEnd = () => {
-      scrubRatioRef.current = null;
-    };
-    window.addEventListener('bloom:scrubEnd', handleScrubEnd);
-    return () => window.removeEventListener('bloom:scrubEnd', handleScrubEnd);
-  }, []);
-
   const updateRotation = React.useCallback(() => {
     let time = 0;
     if (scrubRatioRef.current !== null && playerRef?.current) {
@@ -68,27 +51,48 @@ const CassetteTape = ({ thumbnail, isPlaying, isExpanded, playerRef }) => {
   }, [playerRef]);
 
   React.useEffect(() => {
-    if (!playerRef?.current) return;
+    const handleScrub = (e) => {
+      scrubRatioRef.current = e.detail;
+      updateRotation();
+    };
+    window.addEventListener('bloom:scrub', handleScrub);
+    return () => window.removeEventListener('bloom:scrub', handleScrub);
+  }, [updateRotation]);
+
+  React.useEffect(() => {
+    const handleScrubEnd = () => {
+      scrubRatioRef.current = null;
+    };
+    window.addEventListener('bloom:scrubEnd', handleScrubEnd);
+    return () => window.removeEventListener('bloom:scrubEnd', handleScrubEnd);
+  }, []);
+
+  React.useEffect(() => {
+    const player = playerRef?.current;
+    if (!player) return;
     
     let animationFrameId;
     const loop = () => {
-       if (isPlaying && scrubRatioRef.current === null) {
-          updateRotation();
-       }
-       animationFrameId = requestAnimationFrame(loop);
+      if (isPlaying && isExpanded && scrubRatioRef.current === null) {
+        updateRotation();
+        animationFrameId = requestAnimationFrame(loop);
+      }
     };
-    loop();
+    
+    if (isPlaying && isExpanded) {
+      animationFrameId = requestAnimationFrame(loop);
+    }
     
     const handleTime = () => {
       if (!isPlaying && scrubRatioRef.current === null) updateRotation();
     };
-    playerRef.current.addTimeListener(handleTime);
+    player.addTimeListener(handleTime);
     
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (playerRef.current) playerRef.current.removeTimeListener(handleTime);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      player.removeTimeListener(handleTime);
     };
-  }, [playerRef, isPlaying, updateRotation]);
+  }, [playerRef, isPlaying, isExpanded, updateRotation]);
 
   return (
     <div 

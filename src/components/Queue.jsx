@@ -61,23 +61,22 @@ const TileVisualizer = ({ playerRef, isPlaying, cardColor }) => {
 
 const QueueItem = React.memo(({ 
   track, idx, queueLength, isActive, isPlaying, isLoading, canControl, 
-  loadTrack, removeFromQueue, moveQueueItem, hoveredIdx, setHoveredIdx, 
+  loadTrack, removeFromQueue, moveQueueItem, 
   draggedIdx, dragOverIdx, handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleTouchStart, playerRef 
 }) => {
   const [cardColor, setCardColor] = useState('var(--color-primary)');
-  const isAnyHovered = hoveredIdx !== -1;
-  const isHovered = hoveredIdx === idx;
   const isDragging = draggedIdx === idx;
   const isDragOver = dragOverIdx === idx && !isDragging;
 
   useEffect(() => {
-    if (!track?.thumbnail) return;
+    // ONLY extract color for the active playing track — avoids 100 parallel worker jobs when importing playlists
+    if (!isActive || !track?.thumbnail) return;
     let cancelled = false;
     extractPrimaryColor(track.thumbnail).then(color => {
       if (!cancelled) setCardColor(color);
     });
     return () => { cancelled = true; };
-  }, [track?.thumbnail]);
+  }, [isActive, track?.thumbnail]);
 
   return (
     <div
@@ -90,13 +89,11 @@ const QueueItem = React.memo(({
       onClick={() => { 
         if (canControl) { loadTrack(track, idx); } 
       }}
-      onMouseEnter={() => setHoveredIdx(idx)}
-      onMouseLeave={() => setHoveredIdx(-1)}
       className={`relative flex items-center gap-2 p-2 rounded-xl transition-all ${
         canControl ? 'cursor-pointer' : ''
-      } bg-white/[0.04] ${
-        isHovered ? '!opacity-100 hover:bg-white/10' : (isAnyHovered && !isActive ? 'opacity-40' : 'opacity-100')
-      } ${isActive ? '!opacity-100' : ''} ${
+      } bg-white/[0.04] hover:!opacity-100 hover:bg-white/10 ${
+        isActive ? '!opacity-100' : 'opacity-85 group-hover/queue:opacity-50'
+      } ${
         isDragging ? 'opacity-30 scale-[0.98]' : ''
       } ${
         isDragOver ? 'ring-2 ring-[var(--color-primary)] bg-white/10 scale-[1.01]' : ''
@@ -106,8 +103,11 @@ const QueueItem = React.memo(({
       {/* Drag Handle Icon for Desktop & Mobile */}
       {canControl && (
         <div 
-          onTouchStart={(e) => handleTouchStart(e, idx)}
-          className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/80 shrink-0 flex items-center justify-center p-0.5 touch-none"
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            handleTouchStart(e, idx);
+          }}
+          className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/80 shrink-0 flex items-center justify-center p-1 touch-none"
           title="Drag to reorder"
           onClick={(e) => e.stopPropagation()}
         >
@@ -201,7 +201,6 @@ const QueueItem = React.memo(({
          prev.isLoading === next.isLoading &&
          (!prev.isActive || prev.isPlaying === next.isPlaying) &&
          prev.canControl === next.canControl &&
-         prev.hoveredIdx === next.hoveredIdx &&
          prev.draggedIdx === next.draggedIdx &&
          prev.dragOverIdx === next.dragOverIdx &&
          prev.idx === next.idx &&
@@ -212,27 +211,45 @@ const QueueItem = React.memo(({
 const Queue = () => {
   const { 
     queue, currentIndex, loadTrack, isPlaying, isLoading, 
-    removeFromQueue, reorderQueue, moveQueueItem, playerRef, addToQueue, addMultipleToQueue 
+    removeFromQueue, reorderQueue, moveQueueItem, playerRef, addMultipleToQueue 
   } = usePlayback();
   const { peerId, peerRoles, peerNames, chatDb } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
   const canControl = role === 'owner' || role === 'admin';
-  const [hoveredIdx, setHoveredIdx] = useState(-1);
   const [draggedIdx, setDraggedIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(null);
 
   const containerRef = useRef(null);
   const touchActiveIdxRef = useRef(null);
+  const lastScrolledTrackIdRef = useRef(null);
+  const isUserInteractingRef = useRef(false);
+  const scrollTimeoutRef = useRef(null);
 
-  // Auto-scroll current playing song to top of queue section
+  const handleScroll = () => {
+    isUserInteractingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      isUserInteractingRef.current = false;
+    }, 2000);
+  };
+
+  // Auto-scroll current playing song to top of queue section ONLY once per track change
   useEffect(() => {
     if (currentIndex < 0 || queue.length === 0) return;
+    const currentTrackId = queue[currentIndex]?.id;
+    if (!currentTrackId) return;
 
-    const scrollToActive = () => {
-      if (!containerRef.current) return;
+    // Never auto-scroll if we already scrolled for this track, or if user is actively interacting with the queue
+    if (lastScrolledTrackIdRef.current === currentTrackId || isUserInteractingRef.current) {
+      return;
+    }
+
+    lastScrolledTrackIdRef.current = currentTrackId;
+
+    const timer = setTimeout(() => {
+      if (!containerRef.current || isUserInteractingRef.current) return;
       const activeEl = containerRef.current.querySelector(`[data-queue-idx="${currentIndex}"]`);
       if (activeEl) {
         const containerRect = containerRef.current.getBoundingClientRect();
@@ -243,11 +260,10 @@ const Queue = () => {
           behavior: 'smooth'
         });
       }
-    };
+    }, 150);
 
-    const timer = setTimeout(scrollToActive, 100);
     return () => clearTimeout(timer);
-  }, [currentIndex, queue.length === 0]);
+  }, [currentIndex, queue]);
 
   // Desktop Drag Handlers
   const handleDragStart = (e, index) => {
@@ -280,36 +296,47 @@ const Queue = () => {
     setDragOverIdx(null);
   };
 
-  // Touch Drag Handlers (Mobile)
+  // Touch Drag Handlers (Mobile) — Only active when explicitly holding the drag handle
   const handleTouchStart = (e, index) => {
     if (!canControl) return;
     touchActiveIdxRef.current = index;
     setDraggedIdx(index);
   };
 
-  const handleTouchMove = (e) => {
-    if (touchActiveIdxRef.current === null || !canControl) return;
-    const touch = e.touches[0];
-    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (targetEl) {
-      const queueItemEl = targetEl.closest('[data-queue-idx]');
-      if (queueItemEl) {
-        const targetIdx = parseInt(queueItemEl.getAttribute('data-queue-idx'), 10);
-        if (!isNaN(targetIdx) && targetIdx !== dragOverIdx) {
-          setDragOverIdx(targetIdx);
+  useEffect(() => {
+    if (draggedIdx === null) return;
+
+    const onTouchMove = (e) => {
+      if (touchActiveIdxRef.current === null || !canControl) return;
+      const touch = e.touches[0];
+      const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (targetEl) {
+        const queueItemEl = targetEl.closest('[data-queue-idx]');
+        if (queueItemEl) {
+          const targetIdx = parseInt(queueItemEl.getAttribute('data-queue-idx'), 10);
+          if (!isNaN(targetIdx) && targetIdx !== dragOverIdx) {
+            setDragOverIdx(targetIdx);
+          }
         }
       }
-    }
-  };
+    };
 
-  const handleTouchEnd = () => {
-    if (touchActiveIdxRef.current !== null && dragOverIdx !== null && touchActiveIdxRef.current !== dragOverIdx) {
-      reorderQueue(touchActiveIdxRef.current, dragOverIdx);
-    }
-    touchActiveIdxRef.current = null;
-    setDraggedIdx(null);
-    setDragOverIdx(null);
-  };
+    const onTouchEnd = () => {
+      if (touchActiveIdxRef.current !== null && dragOverIdx !== null && touchActiveIdxRef.current !== dragOverIdx) {
+        reorderQueue(touchActiveIdxRef.current, dragOverIdx);
+      }
+      touchActiveIdxRef.current = null;
+      setDraggedIdx(null);
+      setDragOverIdx(null);
+    };
+
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+    return () => {
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [draggedIdx, dragOverIdx, canControl, reorderQueue]);
 
   const handleImport = async (e) => {
     e.preventDefault();
@@ -320,7 +347,6 @@ const Queue = () => {
     setImportUrl('');
 
     // Stage 1: Initializing & fetching playlist metadata
-    setImportProgress({ current: 0, total: 0, percent: 5, statusText: 'Fetching playlist tracks...' });
     window.dispatchEvent(new CustomEvent('bloom:notify', {
       detail: {
         id: 'playlist-import',
@@ -335,7 +361,6 @@ const Queue = () => {
       const parsedTracks = await importPlaylist(urlToImport);
       if (!parsedTracks || parsedTracks.length === 0) {
         setIsImporting(false);
-        setImportProgress(null);
         window.dispatchEvent(new CustomEvent('bloom:notify', {
           detail: {
             id: 'playlist-import',
@@ -349,7 +374,6 @@ const Queue = () => {
       }
       
       const total = parsedTracks.length;
-      setImportProgress({ current: 0, total, percent: 10, statusText: `Found ${total} songs. Resolving...` });
       window.dispatchEvent(new CustomEvent('bloom:notify', {
         detail: {
           id: 'playlist-import',
@@ -394,7 +418,6 @@ const Queue = () => {
         const percent = Math.min(95, Math.round(10 + (currentCount / total) * 85));
         const statusText = `Importing playlist: ${currentCount} of ${total} (${percent}%)...`;
 
-        setImportProgress({ current: currentCount, total, percent, statusText });
         window.dispatchEvent(new CustomEvent('bloom:notify', {
           detail: {
             id: 'playlist-import',
@@ -457,17 +480,11 @@ const Queue = () => {
       }));
     } finally {
       setIsImporting(false);
-      setImportProgress(null);
     }
   };
 
   return (
-    <div 
-      className="flex-1 flex flex-col min-h-0" 
-      onMouseLeave={() => setHoveredIdx(-1)}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="flex-1 flex flex-col min-h-0">
       {/* Import Playlist Bar */}
       {canControl && (
         <div className="px-4 pt-4 pb-2 shrink-0">
@@ -477,27 +494,24 @@ const Queue = () => {
               type="text" 
               value={importUrl}
               onChange={(e) => setImportUrl(e.target.value)}
-              placeholder={isImporting && importProgress ? importProgress.statusText : "Paste YouTube or Spotify Playlist Link..."} 
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-16 text-[13px] text-white placeholder-white/40 focus:outline-none focus:bg-white/10 transition-colors"
+              placeholder="Paste YouTube or Spotify Playlist Link..." 
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-[13px] text-white placeholder-white/40 focus:outline-none focus:bg-white/10 transition-colors"
               disabled={isImporting}
             />
-            {isImporting ? (
-              <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
-                {importProgress && importProgress.percent > 0 && (
-                  <span className="text-[11px] font-bold text-white/70">{importProgress.percent}%</span>
-                )}
-                <span className="material-symbols-rounded text-white/60 text-lg animate-spin">progress_activity</span>
-              </div>
-            ) : importUrl ? (
+            {importUrl && !isImporting && (
               <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-black w-7 h-7 rounded-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
                 <span className="material-symbols-rounded text-[16px] font-bold">add</span>
               </button>
-            ) : null}
+            )}
           </form>
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-4 pt-2 space-y-2">
+      <div 
+        ref={containerRef} 
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 pt-2 pb-12 space-y-2 group/queue overscroll-contain"
+      >
         {queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20 group-hover/queue:opacity-100">
              <span className="material-symbols-rounded text-5xl">music_note</span>
@@ -518,8 +532,6 @@ const Queue = () => {
               removeFromQueue={removeFromQueue}
               moveQueueItem={moveQueueItem}
               reorderQueue={reorderQueue}
-              hoveredIdx={hoveredIdx}
-              setHoveredIdx={setHoveredIdx}
               draggedIdx={draggedIdx}
               dragOverIdx={dragOverIdx}
               handleDragStart={handleDragStart}

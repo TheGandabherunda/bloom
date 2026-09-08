@@ -93,7 +93,7 @@ const Chat = () => {
         chatDb.events.off('update', handleUpdate);
       }
     };
-  }, [chatDb, addMessage]);
+  }, [chatDb, addMessage, peerId]);
 
   // Listen for local system messages dispatched by other contexts (e.g. PlaybackContext)
   useEffect(() => {

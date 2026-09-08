@@ -9,13 +9,19 @@ console.log = noop;
 console.info = noop;
 console.debug = noop;
 
-// Unregister any legacy service workers that might interfere with Vite
+// Register Service Worker in production for PWA App Shell caching; unregister in dev
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister();
-    }
-  });
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  } else {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

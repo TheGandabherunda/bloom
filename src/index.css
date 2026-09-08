@@ -4,6 +4,14 @@
 
 :root {
   --header-height: 72px;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -14,6 +22,13 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, input, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Fix Chrome/WebKit autofill */

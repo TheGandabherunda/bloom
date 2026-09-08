@@ -228,7 +228,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
       
       <AmbientLight />
 
-      <header className="bg-black/40 backdrop-blur-xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between border-b border-white/10 shrink-0 z-40 relative gap-4 md:h-[72px]">
+      <header className="bg-black/40 backdrop-blur-xl p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] shadow-sm flex flex-col md:flex-row items-center justify-between border-b border-white/10 shrink-0 z-40 relative gap-4 md:h-[72px]">
         <div className="flex items-center gap-3 w-full md:w-auto justify-between z-20">
           <h2 className="font-bold text-white tracking-wide text-2xl flex items-center gap-2">
             Bloom
@@ -404,7 +404,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
 
       {/* Mini Player when minimized */}
       {minimizedConfig && status === 'connected' && (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-xl z-[150] flex flex-col gap-2">
+        <div className="fixed bottom-[calc(3rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-xl z-[150] flex flex-col gap-2">
           {/* Top: Room Details */}
           <div className="flex items-center justify-center gap-2 px-2 opacity-80 cursor-pointer" onClick={onRestore}>
             <span className="text-white/60 text-xs font-medium tracking-wide">Inside</span>
@@ -495,7 +495,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
       )}
 
       {/* Bottom Bar: Left = Date & Time, Middle = Live Parties Count, Right = Imprints Button */}
-      <div className="fixed bottom-4 left-4 right-4 z-40 pointer-events-none flex items-center justify-between px-2">
+      <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-40 pointer-events-none flex items-center justify-between px-2">
         <div className="pointer-events-auto">
           <p className="text-white/30 text-xs font-medium tracking-wide">
             {locationCode} · {formatTimeDate(currentTime)}

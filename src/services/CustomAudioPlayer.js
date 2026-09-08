@@ -119,11 +119,9 @@ export class CustomAudioPlayer {
 
     this.audio.addEventListener('timeupdate', () => {
       const now = performance.now();
-      const deltaReal = now - lastTimeUpdate;
-      const deltaAudio = (this.audio.currentTime - lastAudioTime) * 1000;
-      
-      if (deltaReal > 500 && this.isPlaying) {
-        console.warn(`[DEBUG] timeupdate delayed! Real time passed: ${deltaReal.toFixed(1)}ms, Audio advanced: ${deltaAudio.toFixed(1)}ms`);
+      // Auto-recover AudioContext if suspended
+      if (this.isPlaying && this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
       }
       
       lastTimeUpdate = now;
@@ -313,7 +311,7 @@ export class CustomAudioPlayer {
         setVal(this.compressor.release, 0.1);
         break;
 
-      case 'natural':
+      case 'natural': {
         // Profile 1: Natural (Studio Reference) - Oratory1990 Optimum HiFi
         setVal(this.headroomGain.gain, 0.708); // -3.0 dB
         const natConfig = [
@@ -339,8 +337,9 @@ export class CustomAudioPlayer {
         setVal(this.compressor.attack, 0.03);
         setVal(this.compressor.release, 0.1);
         break;
+      }
 
-      case 'enhanced': 
+      case 'enhanced': {
         // Profile 2: Enhanced (Pristine Studio Separation) - Oratory1990 DT990 Mix Target
         setVal(this.headroomGain.gain, 0.543); // -5.3 dB
         const enhConfig = [
@@ -373,8 +372,9 @@ export class CustomAudioPlayer {
         setVal(this.compressor.attack, 0.03);
         setVal(this.compressor.release, 0.1);
         break;
+      }
 
-      case 'bassboosted': 
+      case 'bassboosted': {
         // Profile 3: Bass Boosted (Professional Basshead) - AutoEQ Sub-Bass Target
         setVal(this.headroomGain.gain, 0.251); // -12.0 dB
         const bassConfig = [
@@ -400,6 +400,7 @@ export class CustomAudioPlayer {
         setVal(this.compressor.attack, 0.005);
         setVal(this.compressor.release, 0.05);
         break;
+      }
         
       default:
         break;
@@ -442,7 +443,11 @@ export class CustomAudioPlayer {
       
       if (autoPlay) {
         // Unlock audio element synchronously during user gesture!
-        this.audio.play().catch(e => console.warn('[AudioPlayer] Unlock play failed (expected if blocked):', e));
+        this.audio.play().catch(e => {
+          if (e.name !== 'AbortError') {
+            console.warn('[AudioPlayer] Unlock play failed (expected if blocked):', e);
+          }
+        });
       }
       
       let timeoutId;

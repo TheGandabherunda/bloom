@@ -90,5 +90,35 @@ export default defineConfig({
     alias: {
       // Some P2P libs might need specific aliases
     },
+  },
+  build: {
+    target: 'es2022',
+    minify: 'esbuild',
+    cssMinify: true,
+    sourcemap: false,
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('nostr-tools') || id.includes('@libp2p')) {
+              return 'vendor-p2p';
+            }
+            if (id.includes('crypto-js')) {
+              return 'vendor-crypto';
+            }
+            if (id.includes('lucide-react') || id.includes('clsx') || id.includes('tailwind-merge')) {
+              return 'vendor-ui';
+            }
+            if (id.includes('fast-xml-parser') || id.includes('spotify-url-info')) {
+              return 'vendor-parser';
+            }
+          }
+        }
+      }
+    }
   }
 })

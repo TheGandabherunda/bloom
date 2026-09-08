@@ -24,7 +24,9 @@ function App() {
       try {
         pk = await window.nostr.getPublicKey();
         sk = 'extension';
-      } catch(e) {}
+      } catch (e) {
+        /* NIP-07 extension key fetch failed, fallback to local generated keys */
+      }
     } 
     
     if (!pk) {

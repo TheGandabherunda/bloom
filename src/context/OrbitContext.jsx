@@ -165,9 +165,6 @@ export const OrbitProvider = ({ children }) => {
       isPublicRef.current = isPublic;
       relaysRef.current = relays;
 
-      isPublicRef.current = isPublic;
-      relaysRef.current = relays;
-
       const stateProxy = {
         events: new MiniEmitter(),
         store: {},

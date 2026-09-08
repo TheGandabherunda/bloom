@@ -70,7 +70,7 @@ const PeersList = () => {
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 pb-12 space-y-2 no-scrollbar">
       {allPeers.map(p => {
         const name = peerNames[p] || (p === peerId ? localStorage.getItem('bloom_name') : 'Unknown');
         const role = peerRoles[p] || 'peer';
