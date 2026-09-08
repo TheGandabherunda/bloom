@@ -56,14 +56,9 @@ A live progress bar on each card shows exactly how many votes are needed.
 
 ## Running locally
 
-Requires [Node.js](https://nodejs.org) v20+.
+Requires [Node.js](https://nodejs.org) v20+. Clone the repo from here:
 
-```bash
-git clone https://github.com/TheGandabherunda/bloom.git
-cd bloom
-npm install
-npm run dev
-```
+**[github.com/TheGandabherunda/bloom](https://github.com/TheGandabherunda/bloom)**
 
 ---
 
