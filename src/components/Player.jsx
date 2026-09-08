@@ -5,6 +5,7 @@ import { usePlayback } from '../context/PlaybackContext';
 import Lyrics from './Lyrics';
 import { PlayerTrackSkeleton } from './Skeleton';
 import CassetteTape from './CassetteTape';
+import ContinuousMarquee from './ContinuousMarquee';
 
 const Visualizer = React.memo(({ playerRef, isExpanded, isFullscreen, isPlaying }) => {
   const barsRef = useRef([]);
@@ -500,31 +501,27 @@ const Player = ({ activeMobileView }) => {
               {/* Title and Artist (Above Cassette) */}
               <div className="w-full flex flex-col items-center mb-6 lg:mb-20 px-6 text-center animate-in fade-in slide-in-from-top-4 duration-700 relative z-40">
                 {currentTrack.title.length > 20 ? (
-                  <div className="w-full max-w-3xl overflow-hidden mask-image-x relative flex justify-start pb-4 -mb-4 pt-2 -mt-2">
-                    <div className="flex w-max animate-marquee whitespace-nowrap items-center">
-                      <div className="flex items-center shrink-0 pr-16">
-                        <h2 className="text-3xl lg:text-5xl font-serif text-white leading-normal">{currentTrack.title}</h2>
-                      </div>
-                      <div className="flex items-center shrink-0 pr-16">
-                        <h2 className="text-3xl lg:text-5xl font-serif text-white leading-normal">{currentTrack.title}</h2>
-                      </div>
-                    </div>
-                  </div>
+                  <ContinuousMarquee
+                    repeat={4}
+                    speed="slow"
+                    className="max-w-3xl justify-start pb-4 -mb-4 pt-2 -mt-2"
+                    separator={<span className="text-white/20 text-2xl lg:text-4xl px-8 lg:px-12 font-sans leading-none">•</span>}
+                  >
+                    <h2 className="text-3xl lg:text-5xl font-serif text-white leading-normal shrink-0">{currentTrack.title}</h2>
+                  </ContinuousMarquee>
                 ) : (
                   <h2 className="text-3xl lg:text-5xl font-serif text-white w-full max-w-3xl truncate pb-4 -mb-4 pt-2 -mt-2 leading-normal">{currentTrack.title}</h2>
                 )}
                 
                 {currentTrack.author.length > 35 ? (
-                  <div className="w-full max-w-2xl overflow-hidden mask-image-x relative flex justify-start pb-2 -mb-2 mt-2">
-                    <div className="flex w-max animate-marquee whitespace-nowrap items-center">
-                      <div className="flex items-center shrink-0 pr-16">
-                        <p className="text-lg lg:text-2xl font-semibold text-white/70 leading-normal">{currentTrack.author}</p>
-                      </div>
-                      <div className="flex items-center shrink-0 pr-16">
-                        <p className="text-lg lg:text-2xl font-semibold text-white/70 leading-normal">{currentTrack.author}</p>
-                      </div>
-                    </div>
-                  </div>
+                  <ContinuousMarquee
+                    repeat={4}
+                    speed="slow"
+                    className="max-w-2xl justify-start pb-2 -mb-2 mt-2"
+                    separator={<span className="text-white/20 text-base lg:text-lg px-6 lg:px-8 leading-none">•</span>}
+                  >
+                    <p className="text-lg lg:text-2xl font-semibold text-white/70 leading-normal shrink-0">{currentTrack.author}</p>
+                  </ContinuousMarquee>
                 ) : (
                   <p className="text-lg lg:text-2xl font-semibold text-white/70 w-full max-w-2xl truncate mt-2 pb-2 -mb-2 leading-normal">{currentTrack.author}</p>
                 )}

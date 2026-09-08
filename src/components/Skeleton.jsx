@@ -1,5 +1,6 @@
 import React from 'react';
 import AmbientLight from './AmbientLight';
+import ContinuousMarquee from './ContinuousMarquee';
 
 // ─── Base shimmer block ──────────────────────────────────────
 export const Shimmer = ({ className = '' }) => (
@@ -92,31 +93,18 @@ export const AppInitSkeleton = ({ status }) => {
         </div>
       </div>
 
-      <div className="w-full relative z-10 flex mask-image-x overflow-hidden">
-        <div className="flex w-max animate-marquee whitespace-nowrap">
-          {/* Half 1 */}
-          <div className="flex items-center gap-4 shrink-0 pr-4">
-            {Array(20).fill(0).map((_, i) => (
-              <React.Fragment key={`h1-${i}`}>
-                <span className={`text-sm sm:text-base font-medium ${textColor}`}>
-                  {loadingText}
-                </span>
-                <span className={`text-[10px] ${dotColor}`}>•</span>
-              </React.Fragment>
-            ))}
-          </div>
-          {/* Half 2 */}
-          <div className="flex items-center gap-4 shrink-0 pr-4">
-            {Array(20).fill(0).map((_, i) => (
-              <React.Fragment key={`h2-${i}`}>
-                <span className={`text-sm sm:text-base font-medium ${textColor}`}>
-                  {loadingText}
-                </span>
-                <span className={`text-[10px] ${dotColor}`}>•</span>
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+      <div className="w-full relative z-10 flex">
+        <ContinuousMarquee
+          repeat={16}
+          speed="normal"
+          className="w-full"
+          pauseOnHover={false}
+          separator={<span className={`text-[10px] px-3 ${dotColor}`}>•</span>}
+        >
+          <span className={`text-sm sm:text-base font-medium ${textColor} shrink-0`}>
+            {loadingText}
+          </span>
+        </ContinuousMarquee>
       </div>
 
       {status === 'failed' && (

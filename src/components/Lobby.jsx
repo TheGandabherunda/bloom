@@ -6,6 +6,7 @@ import { LobbyTileSkeleton } from './Skeleton';
 import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import Imprints from './Imprints';
+import ContinuousMarquee from './ContinuousMarquee';
 
 const MiniProgressBar = React.memo(({ playerRef, duration }) => {
   const progressRef = useRef(null);
@@ -339,50 +340,30 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                     </div>
                     
                     {room.currentTrack ? (
-                      <div className="mt-2 w-full overflow-hidden mask-image-x relative flex">
-                        <div className="flex w-max animate-marquee hover:[animation-play-state:paused] whitespace-nowrap">
-                          {/* Half 1 */}
-                          <div className="flex items-center gap-4 shrink-0 pr-4">
-                            {Array(5).fill(0).map((_, i) => (
-                              <React.Fragment key={`p1-${i}`}>
-                                <span className="text-white text-sm group-hover:text-blue-400 transition-colors">{room.currentTrack.title}</span>
-                                <span className="text-white/30 text-[10px]">•</span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                          {/* Half 2 */}
-                          <div className="flex items-center gap-4 shrink-0 pr-4">
-                            {Array(5).fill(0).map((_, i) => (
-                              <React.Fragment key={`p2-${i}`}>
-                                <span className="text-white text-sm group-hover:text-blue-400 transition-colors">{room.currentTrack.title}</span>
-                                <span className="text-white/30 text-[10px]">•</span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        </div>
+                      <div className="mt-2 w-full relative flex">
+                        <ContinuousMarquee
+                          repeat={4}
+                          speed="slow"
+                          className="w-full"
+                          separator={<span className="text-white/30 text-[10px] px-3">•</span>}
+                        >
+                          <span className="text-white text-sm group-hover:text-blue-400 transition-colors shrink-0">
+                            {room.currentTrack.title}
+                          </span>
+                        </ContinuousMarquee>
                       </div>
                     ) : (
-                      <div className="mt-2 w-full overflow-hidden mask-image-x relative flex">
-                        <div className="flex w-max animate-marquee whitespace-nowrap">
-                          {/* Half 1 */}
-                          <div className="flex items-center gap-4 shrink-0 pr-4">
-                            {Array(5).fill(0).map((_, i) => (
-                              <React.Fragment key={`e1-${i}`}>
-                                <span className="text-white/30 text-sm">Nothing playing right now</span>
-                                <span className="text-white/10 text-[10px]">•</span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                          {/* Half 2 */}
-                          <div className="flex items-center gap-4 shrink-0 pr-4">
-                            {Array(5).fill(0).map((_, i) => (
-                              <React.Fragment key={`e2-${i}`}>
-                                <span className="text-white/30 text-sm">Nothing playing right now</span>
-                                <span className="text-white/10 text-[10px]">•</span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        </div>
+                      <div className="mt-2 w-full relative flex">
+                        <ContinuousMarquee
+                          repeat={4}
+                          speed="slow"
+                          className="w-full"
+                          separator={<span className="text-white/10 text-[10px] px-3">•</span>}
+                        >
+                          <span className="text-white/30 text-sm shrink-0">
+                            Nothing playing right now
+                          </span>
+                        </ContinuousMarquee>
                       </div>
                     )}
                   </div>
@@ -443,10 +424,17 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
             </div>
 
             {/* Middle: Marquee (Song Details) */}
-            <div className="flex-1 overflow-hidden px-4 mask-image-x relative flex min-w-0">
-              <div className="flex w-max animate-marquee hover:[animation-play-state:paused] whitespace-nowrap items-center">
-                <div className="flex items-center gap-2 shrink-0 pr-12">
-                  <span className="font-bold text-white text-sm tracking-wide">{currentTrack ? currentTrack.title : 'Nothing playing right now'}</span>
+            <div className="flex-1 px-4 relative flex min-w-0">
+              <ContinuousMarquee
+                repeat={5}
+                speed="slow"
+                className="w-full"
+                separator={<span className="text-white/30 text-sm px-6">•</span>}
+              >
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-bold text-white text-sm tracking-wide">
+                    {currentTrack ? currentTrack.title : 'Nothing playing right now'}
+                  </span>
                   {currentTrack?.author && (
                     <>
                       <span className="text-white/30 text-sm">•</span>
@@ -454,16 +442,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                     </>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0 pr-12">
-                  <span className="font-bold text-white text-sm tracking-wide">{currentTrack ? currentTrack.title : 'Nothing playing right now'}</span>
-                  {currentTrack?.author && (
-                    <>
-                      <span className="text-white/30 text-sm">•</span>
-                      <span className="text-white/70 text-sm">{currentTrack.author}</span>
-                    </>
-                  )}
-                </div>
-              </div>
+              </ContinuousMarquee>
             </div>
 
             {/* Right: Controls */}
