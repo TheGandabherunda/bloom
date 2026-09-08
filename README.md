@@ -42,15 +42,7 @@ When everyone leaves, the room vanishes. No history, no data stored, no trace.
 
 Every room has a **Host** who controls playback — play, pause, skip, and manage the queue. The host can promote others to **Admin**, giving them the same controls.
 
-**Song recommendations & voting:**
-
-| What happens | Result |
-|---|---|
-| Host or admin votes Agree | Song is immediately added |
-| Host or admin votes Disagree | Song is rejected |
-| Host/admin doesn't vote | Auto-added once 50%+ of the room agrees |
-
-A live progress bar on each card shows exactly how many votes are needed.
+Anyone can suggest a song — host/admin can approve or reject it instantly, or it auto-adds once 50%+ of the room agrees.
 
 ---
 
