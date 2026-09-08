@@ -74,24 +74,38 @@ const NotificationStrip = () => {
       const msg = e.detail;
       if (!msg) return;
 
-      // Respect the global notification mute setting
-      if (localStorage.getItem('bloom_chat_sound') === 'false') return;
+      const isProgress = msg.type === 'progress';
+      const isSystem = msg.type === 'system';
 
-      // Ignore if the message was sent by the current user (unless it's a local system message without a peerId)
-      if (peerId && msg.peerId === peerId && msg.type !== 'system') return;
+      // Respect the global notification mute setting for chat messages (allow progress and system notifications)
+      if (!isProgress && !isSystem && localStorage.getItem('bloom_chat_sound') === 'false') return;
+
+      // Ignore if the message was sent by the current user (unless it's a local system/progress message without a peerId)
+      if (peerId && msg.peerId === peerId && !isSystem && !isProgress) return;
 
       // Ignore standard "is now playing" spam to avoid annoyance when users change songs
-      if (msg.type === 'system' && msg.text && (msg.text.toLowerCase().includes('playing') || msg.text.toLowerCase().includes('started'))) {
+      if (isSystem && msg.text && (msg.text.toLowerCase().includes('playing') || msg.text.toLowerCase().includes('started'))) {
         return;
       }
       
-      // Update with new message, using a unique key to force animation reset
-      setNotification({ ...msg, keyId: Date.now() });
+      // Update with new message, preserving keyId if updating an active progress notification with matching id
+      setNotification(prev => {
+        const keyId = (msg.id && prev?.id === msg.id) ? prev.keyId : Date.now();
+        return { ...msg, keyId };
+      });
       
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setNotification(null);
-      }, 4000);
+      if (isProgress && !msg.complete) {
+        // Keep active progress open, with a safety timeout of 2 minutes
+        timeoutId = setTimeout(() => {
+          setNotification(null);
+        }, 120000);
+      } else {
+        // Auto-close standard or completed notifications after 3.5 seconds
+        timeoutId = setTimeout(() => {
+          setNotification(null);
+        }, 3500);
+      }
     };
 
     window.addEventListener('bloom:chat-message', handleLocal);
@@ -106,6 +120,7 @@ const NotificationStrip = () => {
   if (!notification) return null;
 
   const isSystem = notification.type === 'system';
+  const isProgress = notification.type === 'progress';
   
   // If the message has a specific peerId, use their color. Otherwise (system/local messages), use the local user's color.
   const color = notification.peerId ? getPeerColor(notification.peerId) : getPeerColor(peerId);
@@ -113,7 +128,7 @@ const NotificationStrip = () => {
   const sender = notification.sender || 'System';
   
   let displayText = '';
-  if (isSystem) {
+  if (isSystem || isProgress) {
     displayText = notification.text;
   } else if (notification.type === 'gif') {
     displayText = `${sender} sent a GIF`;
@@ -125,29 +140,56 @@ const NotificationStrip = () => {
     <div className="w-full z-[100] shrink-0 pointer-events-none animate-in slide-in-from-top-2 duration-200">
       <div 
         key={notification.keyId}
-        className="flex items-center justify-between px-3 py-0.5 pointer-events-auto shadow-sm relative"
+        className="flex items-center justify-between px-3 py-0.5 pointer-events-auto shadow-sm relative overflow-hidden"
         style={{ backgroundColor: color }}
       >
-        <p 
-          className="text-[11px] font-bold truncate leading-tight" 
-          style={{ color: textColor }}
-        >
-          {displayText}
-        </p>
+        <div className="flex items-center gap-2 min-w-0">
+          {isProgress && (
+            notification.complete ? (
+              <span className="material-symbols-rounded text-[14px] text-emerald-300 shrink-0">check_circle</span>
+            ) : (
+              <span className="material-symbols-rounded text-[14px] animate-spin shrink-0">progress_activity</span>
+            )
+          )}
+          <p 
+            className="text-[11px] font-bold truncate leading-tight" 
+            style={{ color: textColor }}
+          >
+            {displayText}
+          </p>
+        </div>
         
-        <button 
-          onClick={() => setNotification(null)}
-          className="shrink-0 transition-opacity hover:opacity-70 ml-2 flex items-center"
-          style={{ color: textColor }}
-        >
-          <span className="material-symbols-rounded text-[14px]">close</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          {isProgress && notification.progress !== undefined && !notification.complete && (
+            <span 
+              className="text-[10px] font-black px-1.5 py-0.2 rounded bg-black/25 tracking-tight"
+              style={{ color: textColor }}
+            >
+              {Math.round(notification.progress)}%
+            </span>
+          )}
+          <button 
+            onClick={() => setNotification(null)}
+            className="shrink-0 transition-opacity hover:opacity-70 flex items-center"
+            style={{ color: textColor }}
+            title="Close"
+          >
+            <span className="material-symbols-rounded text-[14px]">close</span>
+          </button>
+        </div>
 
-        {/* Timer Bar filling from left to right indicating auto-close */}
-        <div 
-          className="absolute bottom-0 left-0 h-[2px] bg-white/50"
-          style={{ animation: 'fillRight 4s linear forwards' }}
-        />
+        {/* Progress bar or timer countdown bar */}
+        {notification.progress !== undefined ? (
+          <div 
+            className="absolute bottom-0 left-0 h-[2.5px] bg-white transition-all duration-300 ease-out shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+            style={{ width: `${Math.max(0, Math.min(100, notification.progress))}%` }}
+          />
+        ) : (
+          <div 
+            className="absolute bottom-0 left-0 h-[2px] bg-white/50"
+            style={{ animation: 'fillRight 3.5s linear forwards' }}
+          />
+        )}
       </div>
       
       <style>{`

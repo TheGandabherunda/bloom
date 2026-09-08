@@ -222,6 +222,7 @@ const Queue = () => {
   const [dragOverIdx, setDragOverIdx] = useState(null);
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(null);
 
   const containerRef = useRef(null);
   const touchActiveIdxRef = useRef(null);
@@ -315,40 +316,113 @@ const Queue = () => {
     if (!importUrl.trim() || !canControl) return;
     
     setIsImporting(true);
-    const urlToImport = importUrl;
+    const urlToImport = importUrl.trim();
     setImportUrl('');
+
+    // Stage 1: Initializing & fetching playlist metadata
+    setImportProgress({ current: 0, total: 0, percent: 5, statusText: 'Fetching playlist tracks...' });
+    window.dispatchEvent(new CustomEvent('bloom:notify', {
+      detail: {
+        id: 'playlist-import',
+        type: 'progress',
+        progress: 5,
+        text: 'Fetching playlist tracks...',
+        sender: 'Queue'
+      }
+    }));
 
     try {
       const parsedTracks = await importPlaylist(urlToImport);
-      if (parsedTracks.length === 0) {
+      if (!parsedTracks || parsedTracks.length === 0) {
         setIsImporting(false);
+        setImportProgress(null);
+        window.dispatchEvent(new CustomEvent('bloom:notify', {
+          detail: {
+            id: 'playlist-import',
+            type: 'system',
+            complete: true,
+            text: 'Could not find any playable tracks in this playlist.',
+            sender: 'Queue'
+          }
+        }));
         return;
       }
       
-      let importedTracks = [];
-      for (const t of parsedTracks) {
-        const cleanTitle = t.title.replace(/[\(\[].*?[\)\]]|official|video|audio|lyric|mv/ig, '').trim();
-        const cleanAuthor = t.author.replace(/- Topic|VEVO|music/ig, '').trim();
-        const query = (cleanTitle + ' ' + cleanAuthor).trim();
-
-        try {
-          const results = await searchTracks(query);
-          if (results && results.length > 0) {
-            importedTracks.push(results[0]);
-          } else {
-            const fallbackResults = await searchTracks(cleanTitle);
-            if (fallbackResults && fallbackResults.length > 0) {
-              importedTracks.push(fallbackResults[0]);
-            }
-          }
-        } catch (err) {
-          console.log(`Failed to match track: ${t.title}`);
+      const total = parsedTracks.length;
+      setImportProgress({ current: 0, total, percent: 10, statusText: `Found ${total} songs. Resolving...` });
+      window.dispatchEvent(new CustomEvent('bloom:notify', {
+        detail: {
+          id: 'playlist-import',
+          type: 'progress',
+          progress: 10,
+          text: `Found ${total} songs. Resolving audio streams...`,
+          sender: 'Queue'
         }
+      }));
+
+      let importedTracks = [];
+      const BATCH_SIZE = 4;
+
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const chunk = parsedTracks.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(chunk.map(async (t) => {
+          const cleanTitle = t.title.replace(/[\(\[].*?[\)\]]|official|video|audio|lyric|mv/ig, '').trim();
+          const cleanAuthor = t.author.replace(/- Topic|VEVO|music/ig, '').trim();
+          const query = (cleanTitle + ' ' + cleanAuthor).trim();
+
+          try {
+            const results = await searchTracks(query);
+            if (results && results.length > 0) {
+              return results[0];
+            } else {
+              const fallbackResults = await searchTracks(cleanTitle);
+              if (fallbackResults && fallbackResults.length > 0) {
+                return fallbackResults[0];
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to match track: ${t.title}`);
+          }
+          return null;
+        }));
+
+        for (const res of batchResults) {
+          if (res) importedTracks.push(res);
+        }
+
+        const currentCount = Math.min(i + chunk.length, total);
+        const percent = Math.min(95, Math.round(10 + (currentCount / total) * 85));
+        const statusText = `Importing playlist: ${currentCount} of ${total} (${percent}%)...`;
+
+        setImportProgress({ current: currentCount, total, percent, statusText });
+        window.dispatchEvent(new CustomEvent('bloom:notify', {
+          detail: {
+            id: 'playlist-import',
+            type: 'progress',
+            progress: percent,
+            text: statusText,
+            sender: 'Queue'
+          }
+        }));
       }
 
       if (importedTracks.length > 0) {
         addMultipleToQueue(importedTracks);
         const userName = peerNames[peerId] || localStorage.getItem('bloom_name') || 'Someone';
+
+        // Notify local user with 100% completed status in NotificationStrip
+        window.dispatchEvent(new CustomEvent('bloom:notify', {
+          detail: {
+            id: 'playlist-import',
+            type: 'progress',
+            progress: 100,
+            complete: true,
+            text: `Successfully added ${importedTracks.length} tracks to queue!`,
+            sender: 'Queue'
+          }
+        }));
+
+        // Broadcast a single system announcement to the room chat
         const systemMsg = { 
           text: `${userName} imported ${importedTracks.length} songs from a playlist.`, 
           type: 'system', 
@@ -359,11 +433,32 @@ const Queue = () => {
         if (chatDb) {
           try { await chatDb.add(systemMsg); } catch(err) {}
         }
+      } else {
+        window.dispatchEvent(new CustomEvent('bloom:notify', {
+          detail: {
+            id: 'playlist-import',
+            type: 'system',
+            complete: true,
+            text: 'Could not match any tracks to playable audio streams.',
+            sender: 'Queue'
+          }
+        }));
       }
     } catch (error) {
       console.error('Failed to import playlist:', error);
+      window.dispatchEvent(new CustomEvent('bloom:notify', {
+        detail: {
+          id: 'playlist-import',
+          type: 'system',
+          complete: true,
+          text: `Failed to import playlist: ${error.message || 'Unknown error'}`,
+          sender: 'Queue'
+        }
+      }));
+    } finally {
+      setIsImporting(false);
+      setImportProgress(null);
     }
-    setIsImporting(false);
   };
 
   return (
@@ -382,12 +477,17 @@ const Queue = () => {
               type="text" 
               value={importUrl}
               onChange={(e) => setImportUrl(e.target.value)}
-              placeholder="Paste YouTube or Spotify Playlist Link..." 
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-[13px] text-white placeholder-white/40 focus:outline-none focus:bg-white/10 transition-colors"
+              placeholder={isImporting && importProgress ? importProgress.statusText : "Paste YouTube or Spotify Playlist Link..."} 
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-16 text-[13px] text-white placeholder-white/40 focus:outline-none focus:bg-white/10 transition-colors"
               disabled={isImporting}
             />
             {isImporting ? (
-              <span className="material-symbols-rounded absolute right-3 text-white/50 text-lg animate-spin pointer-events-none">progress_activity</span>
+              <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
+                {importProgress && importProgress.percent > 0 && (
+                  <span className="text-[11px] font-bold text-white/70">{importProgress.percent}%</span>
+                )}
+                <span className="material-symbols-rounded text-white/60 text-lg animate-spin">progress_activity</span>
+              </div>
             ) : importUrl ? (
               <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-black w-7 h-7 rounded-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
                 <span className="material-symbols-rounded text-[16px] font-bold">add</span>

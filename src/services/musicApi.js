@@ -342,10 +342,12 @@ export const importPlaylist = async (url) => {
     if (match && match[1]) {
       const playlistId = match[1];
       const instances = [
-        'vid.puffyan.us',
         'inv.nadeko.net',
         'invidious.nerdvpn.de',
-        'invidious.slipfox.xyz'
+        'invidious.slipfox.xyz',
+        'yewtu.be',
+        'invidious.private.coffee',
+        'vid.puffyan.us'
       ];
       
       for (const instance of instances) {
