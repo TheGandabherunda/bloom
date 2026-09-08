@@ -19,7 +19,7 @@ No accounts. No servers. No limits.
 
 ## What is Bloom?
 
-Bloom lets you and your friends listen to the same song at the exact same moment — without any central server coordinating you. Create a room, share the code, press play. Everyone hears it together.
+Bloom lets you and your friends listen to the same song at the exact same moment — without any central server coordinating you. Create a room, share the invite link, press play. Everyone hears it together.
 
 When everyone leaves, the room vanishes. No history, no data stored, no trace.
 
