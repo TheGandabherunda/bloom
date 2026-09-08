@@ -77,6 +77,10 @@ const NotificationStrip = () => {
       const isProgress = msg.type === 'progress';
       const isSystem = msg.type === 'system';
 
+      // Ignore internal recommendation synchronization events or empty messages
+      if (msg.type === 'recommendation_vote' || msg.type === 'recommendation_status' || msg.type === 'recommendation_delete') return;
+      if (!msg.text && msg.type !== 'gif' && msg.type !== 'recommendation' && !isProgress) return;
+
       // Respect the global notification mute setting for chat messages (allow progress and system notifications)
       if (!isProgress && !isSystem && localStorage.getItem('bloom_chat_sound') === 'false') return;
 
@@ -129,12 +133,18 @@ const NotificationStrip = () => {
   
   let displayText = '';
   if (isSystem || isProgress) {
-    displayText = notification.text;
+    displayText = notification.text || '';
+  } else if (notification.type === 'recommendation') {
+    displayText = `${sender} recommended "${notification.track?.title || 'a song'}"`;
   } else if (notification.type === 'gif') {
     displayText = `${sender} sent a GIF`;
-  } else {
+  } else if (notification.text) {
     displayText = `${sender}: ${notification.text}`;
+  } else {
+    return null;
   }
+
+  if (!displayText) return null;
 
   return (
     <div className="w-full z-[100] shrink-0 pointer-events-none animate-in slide-in-from-top-2 duration-200">

@@ -7,9 +7,9 @@ import { TrackGridSkeleton } from './Skeleton';
 
 const Search = ({ query, onClose }) => {
   const { loadTrack, addToQueue } = usePlayback();
-  const { peerId, peerRoles } = useOrbit();
-  const role = peerRoles[peerId] || 'peer';
-  const canControl = role === 'owner' || role === 'admin';
+  const { peerId, peerRoles, isHost } = useOrbit();
+  const role = (peerId && isHost) ? 'owner' : (peerRoles[peerId] || 'peer');
+  const canControl = Boolean(isHost || role === 'owner' || role === 'admin');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState('');

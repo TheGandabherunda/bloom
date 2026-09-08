@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { pool, signEvent, hexToBytes, DEFAULT_RELAYS } from '../services/nostr';
 import { finalizeEvent } from 'nostr-tools';
+import { getSavedDeletedRecs, saveDeletedRec } from '../utils/chatStorage';
 
 const OrbitContext = createContext(null);
 
@@ -27,7 +28,11 @@ export const OrbitProvider = ({ children }) => {
   const [peers, setPeers] = useState([]);
   const [peerNames, setPeerNames] = useState({});
   const [peerRoles, setPeerRoles] = useState({});
+  const [isHost, setIsHost] = useState(false);
+  const [roomId, setRoomId] = useState(null);
+  const [hostId, setHostId] = useState(null);
   
+  const deletedRecsRef = useRef(new Set());
   const peerRolesRef = useRef({});
   const peerNamesRef = useRef({});
   const statusRef = useRef('disconnected');
@@ -123,10 +128,14 @@ export const OrbitProvider = ({ children }) => {
       const myName = peerNamesRef.current[peerId] || localStorage.getItem('bloom_name') || 'A user';
       console.log(`[Nostr] Sending leave intent for room ${roomRef.current}`);
       try {
+        const leaveTags = [['d', `leave-${roomRef.current}`]];
+        if (hostIdRef.current) {
+          leaveTags.push(['p', hostIdRef.current]);
+        }
         await publishSigned({
           kind: 30000,
           created_at: Math.floor(Date.now() / 1000),
-          tags: [['d', `leave-${roomRef.current}`], ['p', hostIdRef.current]],
+          tags: leaveTags,
           content: JSON.stringify({ displayName: myName })
         });
       } catch (e) {}
@@ -140,12 +149,19 @@ export const OrbitProvider = ({ children }) => {
     if (statePublishTimeoutRef.current) clearTimeout(statePublishTimeoutRef.current);
     if (beaconPublishTimeoutRef.current) clearTimeout(beaconPublishTimeoutRef.current);
 
+    window.dispatchEvent(new CustomEvent('bloom:stop-playback'));
+
     roomRef.current = null;
     setStateDbReady(null);
     setChatDbReady(null);
     setPeers([]);
     setPeerNames({});
     setPeerRoles({});
+    isHostRef.current = false;
+    setIsHost(false);
+    hostIdRef.current = null;
+    setHostId(null);
+    setRoomId(null);
     setStatusWrapped('disconnected');
   }, [peerId]);
 
@@ -158,12 +174,18 @@ export const OrbitProvider = ({ children }) => {
       console.log('Connecting to Nostr Relays...');
 
       roomRef.current = roomId;
+      setRoomId(roomId);
       setPeerId(nostrPk);
       skRef.current = nostrSk;
-      hostIdRef.current = hostId || nostrPk;
+      const initialHostId = isHost ? nostrPk : (hostId || null);
+      hostIdRef.current = initialHostId;
+      setHostId(initialHostId);
       isHostRef.current = isHost;
+      setIsHost(isHost);
       isPublicRef.current = isPublic;
       relaysRef.current = relays;
+
+      deletedRecsRef.current = getSavedDeletedRecs(roomId);
 
       const stateProxy = {
         events: new MiniEmitter(),
@@ -289,10 +311,14 @@ export const OrbitProvider = ({ children }) => {
             }
           } else {
             // Peer sends intent to host (using Replaceable event 30000 to prevent ephemeral drops and spam)
+            const intentTags = [['d', `intent-${roomId}-${key}`]];
+            if (hostIdRef.current) {
+              intentTags.push(['p', hostIdRef.current]);
+            }
             await publishSigned({
               kind: 30000,
               created_at: Math.floor(Date.now() / 1000),
-              tags: [['d', `intent-${roomId}-${key}`], ['p', hostIdRef.current]],
+              tags: intentTags,
               content: JSON.stringify({ key, value, ts: Date.now() }) // ts ensures content changes
             });
           }
@@ -308,17 +334,78 @@ export const OrbitProvider = ({ children }) => {
         arr: [],
         add: async (msg) => {
           if (!msg) return;
-          const isDuplicate = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image));
-          if (!isDuplicate) {
-            chatProxy.arr.push(msg);
-            if (chatProxy.arr.length > 200) chatProxy.arr.shift();
-            chatProxy.events.emit('update', { payload: { value: msg } });
+          if (!chatProxy.arr) chatProxy.arr = [];
+
+          if (msg.type === 'recommendation') {
+            const deletedSet = new Set([...deletedRecsRef.current, ...getSavedDeletedRecs(roomRef.current)]);
+            if (deletedSet.has(msg.id)) {
+              console.log(`[OrbitContext] Dropping locally added deleted recommendation ${msg.id}`);
+              return;
+            }
           }
+
+          if (msg.type === 'recommendation_vote') {
+            const rec = chatProxy.arr.find(m => m.id === msg.recommendationId);
+            if (rec) {
+              if (!rec.votes) rec.votes = {};
+              if (msg.vote === null) {
+                delete rec.votes[msg.peerId];
+              } else {
+                rec.votes[msg.peerId] = msg.vote;
+              }
+              chatProxy.events.emit('update', { payload: { value: { ...rec } } });
+            }
+          } else if (msg.type === 'recommendation_status') {
+            const rec = chatProxy.arr.find(m => m.id === msg.recommendationId);
+            if (rec) {
+              rec.status = msg.status;
+              chatProxy.events.emit('update', { payload: { value: { ...rec } } });
+            }
+          } else if (msg.type === 'recommendation_delete') {
+            deletedRecsRef.current.add(msg.recommendationId);
+            saveDeletedRec(msg.recommendationId, roomRef.current);
+            chatProxy.arr = (chatProxy.arr || []).filter(
+              m => m.id !== msg.recommendationId && m.recommendationId !== msg.recommendationId
+            );
+            chatProxy.events.emit('update', { payload: { value: msg } });
+          } else {
+            const isDuplicate = chatProxy.arr.some(m => 
+              (m.id && msg.id && m.id === msg.id) ||
+              (m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image))
+            );
+            if (!isDuplicate) {
+              chatProxy.arr.push(msg);
+              if (chatProxy.arr.length > 200) chatProxy.arr.shift();
+              chatProxy.events.emit('update', { payload: { value: msg } });
+            }
+          }
+
           if (isHostRef.current) {
             const currentHistory = stateProxy.store['chat_history'] || [];
-            if (!currentHistory.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender)) {
-              const updatedHistory = [...currentHistory, msg].slice(-100);
+            if (msg.type === 'recommendation_delete') {
+              const updatedHistory = currentHistory.filter(
+                m => m.id !== msg.recommendationId && m.recommendationId !== msg.recommendationId
+              );
               stateProxy.put('chat_history', updatedHistory);
+            } else if (msg.type === 'recommendation_vote' || msg.type === 'recommendation_status') {
+              const histIdx = currentHistory.findIndex(m => m.id === msg.recommendationId);
+              if (histIdx !== -1) {
+                const target = { ...currentHistory[histIdx] };
+                if (msg.type === 'recommendation_vote') {
+                  if (!target.votes) target.votes = {};
+                  if (msg.vote === null) delete target.votes[msg.peerId];
+                  else target.votes[msg.peerId] = msg.vote;
+                } else {
+                  target.status = msg.status;
+                }
+                currentHistory[histIdx] = target;
+                stateProxy.put('chat_history', [...currentHistory]);
+              }
+            } else {
+              if (!currentHistory.some(m => (m.id && msg.id && m.id === msg.id) || (m.timestamp === msg.timestamp && m.sender === msg.sender))) {
+                const updatedHistory = [...currentHistory, msg].slice(-100);
+                stateProxy.put('chat_history', updatedHistory);
+              }
             }
           }
           await publishSigned({
@@ -328,20 +415,38 @@ export const OrbitProvider = ({ children }) => {
             content: JSON.stringify(msg)
           });
         },
-        all: async () => (chatProxy.arr || []).map(value => ({ payload: { value } }))
+        all: async () => {
+          const deletedSet = new Set([...deletedRecsRef.current, ...getSavedDeletedRecs(roomRef.current)]);
+          return (chatProxy.arr || [])
+            .filter(m => {
+              if (!m) return false;
+              if (m.type === 'recommendation_vote' || m.type === 'recommendation_status' || m.type === 'recommendation_delete') return false;
+              if (m.type === 'recommendation' && (!m.id || deletedSet.has(m.id))) return false;
+              return true;
+            })
+            .map(value => ({ payload: { value } }));
+        }
       };
 
       setChatDbReady(chatProxy);
 
       // Set up subscriptions
       const hostPubKey = isHost ? nostrPk : hostIdRef.current;
+      const stateFilter = {
+        kinds: [30000],
+        '#d': [roomId, `${roomId}-queue`, `${roomId}-originalQueue`, `${roomId}-chat`, `${roomId}-time`]
+      };
+      if (hostPubKey) {
+        stateFilter.authors = [hostPubKey];
+      }
       const filters = [
-        { kinds: [30000], '#d': [roomId, `${roomId}-queue`, `${roomId}-originalQueue`, `${roomId}-chat`, `${roomId}-time`], authors: [hostPubKey] }, // State sync from host
+        stateFilter,
         { kinds: [9], '#h': [roomId] }, // Chat
       ];
       
       if (isHost) {
-        filters.push({ kinds: [30000], '#p': [nostrPk] }); // State intents & Join intents from peers
+        filters.push({ kinds: [30000], '#p': [nostrPk] }); // State intents & Join intents directly tagged to host
+        filters.push({ kinds: [30000], '#d': [`join-${roomId}`, `leave-${roomId}`] }); // Discovery join/leave intents
       }
 
       console.log(`[Nostr] Subscribing with filters:`, filters);
@@ -357,6 +462,10 @@ export const OrbitProvider = ({ children }) => {
               // During 'initializing', the host needs to process stored events from the relay to recover state.
               if (isHostRef.current && event.pubkey === nostrPk && statusRef.current === 'connected') {
                 return;
+              }
+              if (!isHostRef.current && !hostIdRef.current && event.pubkey) {
+                hostIdRef.current = event.pubkey;
+                setHostId(event.pubkey);
               }
               // Host state update (received by peers)
               try {
@@ -401,13 +510,19 @@ export const OrbitProvider = ({ children }) => {
                       peerList.push(pk);
                     }
                   } else if (key === 'chat_history' && Array.isArray(data[key])) {
+                    const deletedSet = new Set([...deletedRecsRef.current, ...getSavedDeletedRecs(roomRef.current)]);
                     data[key].forEach(msg => {
-                      const isDup = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender);
+                      if (!msg) return;
+                      if (msg.type === 'recommendation_vote' || msg.type === 'recommendation_status' || msg.type === 'recommendation_delete') return;
+                      if (msg.type === 'recommendation' && (!msg.id || deletedSet.has(msg.id))) return;
+                      const isDup = chatProxy.arr.some(m => 
+                        (m.id && msg.id && m.id === msg.id) ||
+                        (m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image))
+                      );
                       if (!isDup) {
                         chatProxy.arr.push(msg);
                         if (chatProxy.arr.length > 200) chatProxy.arr.shift();
                         chatProxy.events.emit('update', { payload: { value: msg } });
-                        window.dispatchEvent(new CustomEvent('bloom:chat-message', { detail: msg }));
                       }
                     });
                   }
@@ -420,8 +535,10 @@ export const OrbitProvider = ({ children }) => {
                   window.dispatchEvent(new CustomEvent('orbit:state:update', { detail: { key, value }, payload: { key, value } }));
 
                   if (key === 'banned' && value === nostrPk) {
+                    window.dispatchEvent(new CustomEvent('bloom:stop-playback'));
                     window.location.href = window.location.pathname;
                   } else if (key === 'room_ended' && value === true) {
+                    window.dispatchEvent(new CustomEvent('bloom:stop-playback'));
                     window.location.href = window.location.pathname;
                   }
                 });
@@ -445,10 +562,16 @@ export const OrbitProvider = ({ children }) => {
                 } else {
                   if (isMainBundle) {
                     // Full reset of peers if it's the main bundle
+                    if (hostIdRef.current) {
+                      newPeerRoles[hostIdRef.current] = 'owner';
+                    }
                     setPeerNames(newPeerNames);
                     setPeerRoles(newPeerRoles);
-                    setPeers([...new Set([...peerList, hostIdRef.current])]); // Always include host
+                    setPeers([...new Set([...peerList, hostIdRef.current].filter(Boolean))]); // Always include host
                   } else {
+                    if (hostIdRef.current) {
+                      newPeerRoles[hostIdRef.current] = 'owner';
+                    }
                     if (Object.keys(newPeerNames).length > 0) {
                       setPeerNames(prev => ({ ...prev, ...newPeerNames }));
                     }
@@ -456,7 +579,7 @@ export const OrbitProvider = ({ children }) => {
                       setPeerRoles(prev => ({ ...prev, ...newPeerRoles }));
                     }
                     if (peerList.length > 0) {
-                      setPeers(prev => [...new Set([...prev, ...peerList])]);
+                      setPeers(prev => [...new Set([...prev, ...peerList].filter(Boolean))]);
                     }
                   }
                 }
@@ -467,7 +590,7 @@ export const OrbitProvider = ({ children }) => {
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse state event from relay:', e);
               }
-            } else if (dTag?.startsWith(`intent-${roomId}-`) && isHost) {
+            } else if (dTag?.startsWith(`intent-${roomId}-`) && (isHost || isHostRef.current)) {
               // Peer intent to host
               try {
                 const intent = JSON.parse(event.content);
@@ -487,7 +610,7 @@ export const OrbitProvider = ({ children }) => {
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse intent from peer:', e);
               }
-            } else if (dTag === `join-${roomId}` && isHost) {
+            } else if (dTag === `join-${roomId}` && (isHost || isHostRef.current)) {
               // Peer join intent to host
               try {
                 let peerName = null;
@@ -535,7 +658,7 @@ export const OrbitProvider = ({ children }) => {
               } catch (e) {
                 console.error('[OrbitContext] Failed to parse join intent:', e);
               }
-            } else if (dTag === `leave-${roomId}` && isHost) {
+            } else if (dTag === `leave-${roomId}` && (isHost || isHostRef.current)) {
               // Peer leave intent to host
               try {
                 const leavingPk = event.pubkey;
@@ -572,7 +695,78 @@ export const OrbitProvider = ({ children }) => {
             try {
               const msg = JSON.parse(event.content);
               console.log('[OrbitContext] Received chat message from relay:', msg);
-              const isDuplicate = chatProxy.arr.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image));
+              if (msg.type === 'recommendation_vote') {
+                const rec = chatProxy.arr.find(m => m.id === msg.recommendationId);
+                if (rec) {
+                  if (!rec.votes) rec.votes = {};
+                  if (msg.vote === null) {
+                    delete rec.votes[msg.peerId];
+                  } else {
+                    rec.votes[msg.peerId] = msg.vote;
+                  }
+                  chatProxy.events.emit('update', { payload: { value: { ...rec } } });
+                }
+                if (isHostRef.current) {
+                  const currentHistory = stateProxy.store['chat_history'] || [];
+                  const histIdx = currentHistory.findIndex(m => m.id === msg.recommendationId);
+                  if (histIdx !== -1) {
+                    const target = { ...currentHistory[histIdx] };
+                    if (!target.votes) target.votes = {};
+                    if (msg.vote === null) delete target.votes[msg.peerId];
+                    else target.votes[msg.peerId] = msg.vote;
+                    currentHistory[histIdx] = target;
+                    stateProxy.put('chat_history', [...currentHistory]);
+                  }
+                }
+                return;
+              }
+
+              if (msg.type === 'recommendation_status') {
+                const rec = chatProxy.arr.find(m => m.id === msg.recommendationId);
+                if (rec) {
+                  rec.status = msg.status;
+                  chatProxy.events.emit('update', { payload: { value: { ...rec } } });
+                }
+                if (isHostRef.current) {
+                  const currentHistory = stateProxy.store['chat_history'] || [];
+                  const histIdx = currentHistory.findIndex(m => m.id === msg.recommendationId);
+                  if (histIdx !== -1) {
+                    currentHistory[histIdx] = { ...currentHistory[histIdx], status: msg.status };
+                    stateProxy.put('chat_history', [...currentHistory]);
+                  }
+                }
+                return;
+              }
+
+              if (msg.type === 'recommendation') {
+                const deletedSet = new Set([...deletedRecsRef.current, ...getSavedDeletedRecs(roomRef.current)]);
+                if (!msg.id || deletedSet.has(msg.id)) {
+                  console.log(`[OrbitContext] Dropping deleted recommendation from relay: ${msg.id}`);
+                  return;
+                }
+              }
+
+              if (msg.type === 'recommendation_delete') {
+                deletedRecsRef.current.add(msg.recommendationId);
+                saveDeletedRec(msg.recommendationId, roomRef.current);
+                chatProxy.arr = (chatProxy.arr || []).filter(
+                  m => m.id !== msg.recommendationId && m.recommendationId !== msg.recommendationId
+                );
+                if (isHostRef.current) {
+                  const currentHistory = stateProxy.store['chat_history'] || [];
+                  const updatedHistory = currentHistory.filter(
+                    m => m.id !== msg.recommendationId && m.recommendationId !== msg.recommendationId
+                  );
+                  stateProxy.put('chat_history', updatedHistory);
+                }
+                chatProxy.events.emit('update', { payload: { value: msg } });
+                return;
+              }
+
+              const isDuplicate = chatProxy.arr.some(m => 
+                (m.id && msg.id && m.id === msg.id) ||
+                (m.timestamp === msg.timestamp && m.sender === msg.sender && (m.text === msg.text || m.image === msg.image))
+              );
               if (!isDuplicate) {
                 chatProxy.arr.push(msg);
                 if (chatProxy.arr.length > 200) chatProxy.arr.shift();
@@ -580,7 +774,7 @@ export const OrbitProvider = ({ children }) => {
               }
               if (isHostRef.current) {
                 const currentHistory = stateProxy.store['chat_history'] || [];
-                if (!currentHistory.some(m => m.timestamp === msg.timestamp && m.sender === msg.sender)) {
+                if (!currentHistory.some(m => (m.id && msg.id && m.id === msg.id) || (m.timestamp === msg.timestamp && m.sender === msg.sender))) {
                   const updatedHistory = [...currentHistory, msg].slice(-100);
                   stateProxy.put('chat_history', updatedHistory);
                 }
@@ -597,6 +791,8 @@ export const OrbitProvider = ({ children }) => {
       if (isHost) {
         setPeerNames(prev => ({ ...prev, [nostrPk]: displayName }));
         setPeerRoles(prev => ({ ...prev, [nostrPk]: 'owner' }));
+        peerRolesRef.current = { ...peerRolesRef.current, [nostrPk]: 'owner' };
+        peerNamesRef.current = { ...peerNamesRef.current, [nostrPk]: displayName };
         setPeers(prev => [...new Set([...prev, nostrPk])]);
         
         // Wait briefly for WebSockets to open before slamming them with the initial state
@@ -649,10 +845,14 @@ export const OrbitProvider = ({ children }) => {
         // Send join intent in a loop until we get connected (Host acks by setting our peer_name)
         const sendJoin = () => {
           console.log(`[Nostr] Sending Join Intent (30000) to host PK: ${hostIdRef.current}`);
+          const joinTags = [['d', `join-${roomId}`]];
+          if (hostIdRef.current) {
+            joinTags.push(['p', hostIdRef.current]);
+          }
           publishSigned({
             kind: 30000,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [['d', `join-${roomId}`], ['p', hostIdRef.current]],
+            tags: joinTags,
             content: JSON.stringify({ displayName })
           });
         };
@@ -690,10 +890,12 @@ export const OrbitProvider = ({ children }) => {
 
   const getConnectedRelays = useCallback(() => relaysRef.current, []);
 
+  const isHostActive = Boolean(isHost || isHostRef.current || (peerId && peerRoles[peerId] === 'owner'));
+
   const contextValue = React.useMemo(() => ({
     helia: null, orbitdb: null, stateDb: stateDbReady, chatDb: chatDbReady, 
-    status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays, deleteRoom
-  }), [stateDbReady, chatDbReady, status, peerId, peers, peerNames, peerRoles, initP2P, stopP2P, getConnectedRelays, deleteRoom]);
+    status, peerId, hostId: hostIdRef.current || hostId, peers, peerNames, peerRoles, isHost: isHostActive, roomId, initP2P, stopP2P, getConnectedRelays, deleteRoom
+  }), [stateDbReady, chatDbReady, status, peerId, hostId, peers, peerNames, peerRoles, isHostActive, roomId, initP2P, stopP2P, getConnectedRelays, deleteRoom]);
 
   return (
     <OrbitContext.Provider value={contextValue}>

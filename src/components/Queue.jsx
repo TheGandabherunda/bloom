@@ -211,11 +211,11 @@ const QueueItem = React.memo(({
 const Queue = () => {
   const { 
     queue, currentIndex, loadTrack, isPlaying, isLoading, 
-    removeFromQueue, reorderQueue, moveQueueItem, playerRef, addMultipleToQueue 
+    removeFromQueue, clearQueue, reorderQueue, moveQueueItem, playerRef, addMultipleToQueue 
   } = usePlayback();
-  const { peerId, peerRoles, peerNames, chatDb } = useOrbit();
+  const { peerId, peerRoles, peerNames, chatDb, isHost } = useOrbit();
   const role = peerRoles[peerId] || 'peer';
-  const canControl = role === 'owner' || role === 'admin';
+  const canControl = Boolean(isHost || role === 'owner' || role === 'admin');
   const [draggedIdx, setDraggedIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
   const [importUrl, setImportUrl] = useState('');
@@ -504,6 +504,25 @@ const Queue = () => {
               </button>
             )}
           </form>
+        </div>
+      )}
+
+      {/* Queue Info & Clear All Action */}
+      {queue.length > 0 && (
+        <div className="px-4 py-1.5 flex items-center justify-between text-xs text-white/40 shrink-0 select-none">
+          <span className="font-medium tracking-wide">
+            {queue.length} {queue.length === 1 ? 'track' : 'tracks'}
+          </span>
+          {canControl && (
+            <button
+              type="button"
+              onClick={clearQueue}
+              className="text-xs font-semibold text-white/50 hover:text-white transition-all px-2.5 py-1 rounded-full bg-white/[0.06] hover:bg-white/15 active:scale-95 shadow-sm"
+              title="Clear all tracks and stop playback"
+            >
+              Clear All
+            </button>
+          )}
         </div>
       )}
 

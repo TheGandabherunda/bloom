@@ -11,9 +11,22 @@ import { getOrCreateKeys, getUserRelays } from './services/nostr';
 function App() {
   const [config, setConfig] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('bloom_name'));
+  const [userName, setUserName] = useState(() => localStorage.getItem('bloom_name') || '');
   const [hasInvite, setHasInvite] = useState(false);
   const [inviteRoomId, setInviteRoomId] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  useEffect(() => {
+    const handleNameChange = (e) => {
+      const newName = e.detail;
+      if (newName) {
+        setUserName(newName);
+        setConfig((prev) => (prev ? { ...prev, displayName: newName } : prev));
+      }
+    };
+    window.addEventListener('bloom:name-change', handleNameChange);
+    return () => window.removeEventListener('bloom:name-change', handleNameChange);
+  }, []);
 
   const fetchKeysAndSetConfig = async (baseConfig) => {
     let pk = null;
@@ -66,6 +79,7 @@ function App() {
 
   const handleLogin = (loginData) => {
     setIsLoggedIn(true);
+    setUserName(localStorage.getItem('bloom_name') || '');
   };
 
   const handleJoinLobby = (roomId, hostId, roomName) => {
@@ -104,7 +118,7 @@ function App() {
                   <Lobby 
                     onJoin={handleJoinLobby} 
                     onCreateRoom={handleCreateRoom} 
-                    displayName={localStorage.getItem('bloom_name')} 
+                    displayName={userName} 
                     onRestore={() => setIsMinimized(false)}
                     minimizedConfig={config}
                   />
@@ -115,6 +129,7 @@ function App() {
                 >
                   <Layout config={config} onLeave={() => {
                     sessionStorage.removeItem(`bloom_host_${config.roomId}`);
+                    window.dispatchEvent(new CustomEvent('bloom:stop-playback'));
                     setConfig(null);
                     setIsMinimized(false);
                     window.location.hash = '';
@@ -126,7 +141,7 @@ function App() {
                 <Lobby 
                   onJoin={handleJoinLobby} 
                   onCreateRoom={handleCreateRoom} 
-                  displayName={localStorage.getItem('bloom_name')} 
+                  displayName={userName} 
                 />
               </div>
             )}

@@ -312,10 +312,10 @@ const Player = ({ activeMobileView }) => {
     soundMode,
     setSoundMode
   } = usePlayback();
-  const { peerId, peerRoles } = useOrbit();
+  const { peerId, peerRoles, isHost } = useOrbit();
   
-  const role = peerRoles[peerId] || 'peer';
-  const canControl = role === 'owner' || role === 'admin';
+  const role = (peerId && isHost) ? 'owner' : (peerRoles[peerId] || 'peer');
+  const canControl = Boolean(isHost || role === 'owner' || role === 'admin');
 
   const [showPlayAnim, setShowPlayAnim] = useState(false);
   const animTimeout = useRef(null);

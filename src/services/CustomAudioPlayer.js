@@ -525,6 +525,21 @@ export class CustomAudioPlayer {
     }
   }
 
+  stop() {
+    this.isPlaying = false;
+    this.pause();
+    if (this.audio) {
+      this.audio.pause();
+      this.audio.removeAttribute('src');
+      this.audio.currentTime = 0;
+      this.audio.load();
+    }
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = null;
+    }
+  }
+
   seek(time) {
     if (this.audio) {
       this.audio.currentTime = time;

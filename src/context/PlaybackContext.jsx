@@ -7,7 +7,7 @@ import { decodeHtml, resolveTrackStream } from '../services/musicApi';
 const PlaybackContext = createContext(null);
 
 export const PlaybackProvider = ({ children }) => {
-  const { stateDb, chatDb, peerId, peerRoles, status } = useOrbit();
+  const { stateDb, chatDb, peerId, peerRoles, status, isHost, hostId } = useOrbit();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [queue, setQueueState] = useState([]);
@@ -33,6 +33,11 @@ export const PlaybackProvider = ({ children }) => {
   const currentIndexRef = useRef(-1);
   const networkIsPlayingRef = useRef(false);
   const peerIdRef = useRef(peerId);
+  const hostIdRef = useRef(hostId);
+
+  useEffect(() => {
+    hostIdRef.current = hostId;
+  }, [hostId]);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -75,7 +80,7 @@ export const PlaybackProvider = ({ children }) => {
     };
     player.onEnded = () => {
       // ONLY the Host is allowed to automatically advance the queue
-      if (peerRolesRef.current[peerIdRef.current] === 'owner') {
+      if (isHost || peerRolesRef.current[peerIdRef.current] === 'owner') {
         if (playNextRef.current) playNextRef.current(true);
       } else {
         console.log('[Playback] Local audio ended. Waiting for Host to sync next track.');
@@ -121,7 +126,7 @@ export const PlaybackProvider = ({ children }) => {
       return;
     }
     
-    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
     if (isLocal && !isOwner) {
        console.log(`[Playback] Admin intent dispatched to Host for track: ${track.id}`);
        if (stateDb) {
@@ -206,7 +211,8 @@ export const PlaybackProvider = ({ children }) => {
             index: targetIndex, 
             originator: peerId,
             startTime: startTime || 0,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            autoPlay: autoPlay
           });
         } catch (err) {
           console.error("Failed to sync playback state:", err);
@@ -313,17 +319,18 @@ export const PlaybackProvider = ({ children }) => {
 
   const canControl = useCallback(() => {
     if (statusRef.current !== 'connected') return true;
+    if (isHost) return true;
     const role = peerRolesRef.current[peerId];
     return role === 'owner' || role === 'admin';
-  }, [peerId]);
+  }, [peerId, isHost]);
 
   // ONLY Host (Room Owner) periodically syncs real audio playhead position to stateDb
   useEffect(() => {
-    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
     if (!isPlaying || !isOwner || !stateDb) return;
     
     const interval = setInterval(() => {
-      if (playerRef.current && isPlaying) {
+      if (playerRef.current && isPlaying && !playerRef.current.audio?.paused) {
         const curTime = playerRef.current.getCurrentTime();
         if (curTime > 0) {
           stateDb.put('currentTime', { time: curTime, trackId: currentTrackRef.current?.id, originator: peerId, timestamp: Date.now() }).catch(() => {});
@@ -376,19 +383,81 @@ export const PlaybackProvider = ({ children }) => {
   }, [stateDb]);
 
   const stopPlayback = useCallback(() => {
+    // 1. Immediately pause, unload, and reset audio engine
     if (playerRef.current) {
-      if (playerRef.current.audio) {
-        playerRef.current.audio.pause();
-        playerRef.current.audio.currentTime = 0;
+      if (typeof playerRef.current.stop === 'function') {
+        playerRef.current.stop();
+      } else {
+        if (playerRef.current.audio) {
+          playerRef.current.audio.pause();
+          playerRef.current.audio.removeAttribute('src');
+          playerRef.current.audio.currentTime = 0;
+          playerRef.current.audio.load();
+        }
+        playerRef.current.pause();
       }
-      setIsPlaying(false);
-      isPlayingRef.current = false;
-      setCurrentTrack(null);
-      setQueueState([]);
-      setOriginalQueue([]);
-      setCurrentIndex(-1);
+    }
+
+    // 2. Reset all local playback and queue state
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    setCurrentTrack(null);
+    currentTrackRef.current = null;
+    setCurrentIndex(-1);
+    currentIndexRef.current = -1;
+    setDuration(0);
+    setIsLoading(false);
+    loadingTrackId.current = null;
+    setNetworkIsPlaying(false);
+    networkIsPlayingRef.current = false;
+
+    setQueueState([]);
+    queueRef.current = [];
+    setOriginalQueue([]);
+    originalQueueRef.current = [];
+
+    // 3. Clear MediaSession if active
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+      if (navigator.mediaSession.metadata) {
+        navigator.mediaSession.metadata = null;
+      }
     }
   }, []);
+
+  const clearQueue = useCallback(() => {
+    if (!canControl()) return;
+
+    // 1. Stop local playback
+    stopPlayback();
+
+    // 2. Synchronize state over OrbitDB
+    if (stateDb) {
+      stateDb.put('currentTrack', null).catch(e => console.warn('Sync Failed', e));
+      stateDb.put('isPlaying', { status: false, originator: peerId }).catch(e => console.warn('Sync Failed', e));
+      stateDb.put('currentTime', { time: 0, trackId: null, originator: peerId, timestamp: Date.now() }).catch(e => console.warn('Sync Failed', e));
+      stateDb.put('queue', []).catch(e => console.warn('Sync Failed', e));
+      stateDb.put('originalQueue', []).catch(e => console.warn('Sync Failed', e));
+    }
+  }, [canControl, stopPlayback, stateDb, peerId]);
+
+  // Global event listener to force-stop audio from any component or layer
+  useEffect(() => {
+    const handleForceStop = () => {
+      console.log('[Playback] Received bloom:stop-playback event, halting all audio');
+      stopPlayback();
+    };
+    window.addEventListener('bloom:stop-playback', handleForceStop);
+    return () => window.removeEventListener('bloom:stop-playback', handleForceStop);
+  }, [stopPlayback]);
+
+  // Halt playback whenever disconnected from P2P room
+  useEffect(() => {
+    if (status === 'disconnected') {
+      console.log('[PlaybackContext] P2P status disconnected. Halting playback.');
+      stopPlayback();
+    }
+  }, [status, stopPlayback]);
 
   // Listen to OrbitDB updates
   useEffect(() => {
@@ -404,7 +473,11 @@ export const PlaybackProvider = ({ children }) => {
         if (!role && originator && stateDb) {
            role = await stateDb.get(`peer_role_${originator}`);
         }
-        const isAuthorized = role === 'owner' || role === 'admin';
+        const isHostOriginator = Boolean(
+          (hostIdRef.current && originator === hostIdRef.current) ||
+          (isHost && originator === peerId)
+        );
+        const isAuthorized = !originator || isHostOriginator || role === 'owner' || role === 'admin' || isHost;
 
         // Standard Deduplication is handled by OrbitContext deep-equality checks.
         
@@ -412,6 +485,25 @@ export const PlaybackProvider = ({ children }) => {
         if (!isAuthorized && originator) return;
 
         if (key === 'currentTrack') {
+          if (!value) {
+            console.log(`[Orbit Sync] Received null currentTrack. Stopping playback.`);
+            if (playerRef.current) {
+              if (playerRef.current.audio) {
+                playerRef.current.audio.pause();
+                playerRef.current.audio.currentTime = 0;
+              }
+              playerRef.current.pause();
+            }
+            setCurrentTrack(null);
+            currentTrackRef.current = null;
+            setCurrentIndex(-1);
+            currentIndexRef.current = -1;
+            setIsPlaying(false);
+            isPlayingRef.current = false;
+            setDuration(0);
+            setIsLoading(false);
+            return;
+          }
           const track = value.track || value;
           let index = value.index !== undefined ? value.index : -1;
           
@@ -482,8 +574,24 @@ export const PlaybackProvider = ({ children }) => {
           setQueueState(newQueue);
           queueRef.current = newQueue;
 
-          // Re-index currentTrack in the new queue so peers stay on the right track & index
-          if (currentTrackRef.current) {
+          if (newQueue.length === 0) {
+            console.log(`[Queue Sync] Queue is now empty. Stopping playback.`);
+            if (playerRef.current) {
+              if (playerRef.current.audio) {
+                playerRef.current.audio.pause();
+                playerRef.current.audio.currentTime = 0;
+              }
+              playerRef.current.pause();
+            }
+            setCurrentTrack(null);
+            currentTrackRef.current = null;
+            setCurrentIndex(-1);
+            currentIndexRef.current = -1;
+            setIsPlaying(false);
+            isPlayingRef.current = false;
+            setDuration(0);
+            setIsLoading(false);
+          } else if (currentTrackRef.current) {
             const newIndex = newQueue.findIndex(t => t.id === currentTrackRef.current.id);
             if (newIndex !== -1) {
               console.log(`[Queue Sync] Re-indexed currentTrack "${currentTrackRef.current.title}" to ${newIndex}`);
@@ -508,7 +616,7 @@ export const PlaybackProvider = ({ children }) => {
   const seek = useCallback((time) => {
     if (!canControl()) return;
     
-    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
     if (isOwner) {
       if (playerRef.current) playerRef.current.seek(time);
     }
@@ -565,7 +673,7 @@ export const PlaybackProvider = ({ children }) => {
     const newState = !isPlayingRef.current;
     console.log(`[Playback] togglePlay: toggling to ${newState}`);
     
-    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
     if (isOwner) {
       if (newState) {
         setError(null);
@@ -613,7 +721,7 @@ export const PlaybackProvider = ({ children }) => {
       console.log('[Playback] End of queue reached. Stopping playback.');
       setIsPlaying(false);
       isPlayingRef.current = false;
-      const isOwner = peerRolesRef.current[peerId] === 'owner';
+      const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
       if (isOwner) {
         playerRef.current?.pause();
       }
@@ -623,7 +731,7 @@ export const PlaybackProvider = ({ children }) => {
       return;
     }
 
-    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
     if (!isOwner) {
       // Optimistic UI updates
       setCurrentIndex(nextIndex);
@@ -661,7 +769,7 @@ export const PlaybackProvider = ({ children }) => {
 
     let prevIndex = Math.max(0, activeIdx - 1);
     
-    const isOwner = peerRolesRef.current[peerId] === 'owner';
+    const isOwner = isHost || peerRolesRef.current[peerId] === 'owner';
     if (!isOwner) {
       // Optimistic UI updates
       setCurrentIndex(prevIndex);
@@ -693,7 +801,11 @@ export const PlaybackProvider = ({ children }) => {
       stateDb.put('originalQueue', newOrig).catch(e => console.warn(e));
       stateDb.put('queue', newQ).catch(e => console.warn(e));
     }
-  }, [canControl, stateDb]);
+
+    if (!currentTrackRef.current && queueRef.current.length === 1) {
+      loadTrack(track, 0, 0, true, peerId);
+    }
+  }, [canControl, stateDb, loadTrack, peerId]);
 
   const addMultipleToQueue = useCallback((tracks) => {
     if (!canControl() || !tracks || tracks.length === 0) return;
@@ -951,12 +1063,12 @@ export const PlaybackProvider = ({ children }) => {
   }, [isPlaying, duration, playerRef.current]);
 
   const value = React.useMemo(() => ({
-      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, setCurrentIndex,
+      isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, clearQueue, reorderQueue, moveQueueItem, currentIndex, setCurrentIndex,
       duration, loadTrack, togglePlay, stopPlayback, seek,
       volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat,
       playNext, playPrev, error, setError, isExpanded, setIsExpanded,
       playerRef, networkIsPlaying, soundMode, setSoundMode
-  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying, soundMode, setSoundMode]);
+  }), [isPlaying, isLoading, currentTrack, queue, originalQueue, addToQueue, addMultipleToQueue, removeFromQueue, clearQueue, reorderQueue, moveQueueItem, currentIndex, duration, loadTrack, togglePlay, stopPlayback, seek, volume, setVolume, isShuffled, setIsShuffled, isRepeat, setIsRepeat, playNext, playPrev, error, setError, isExpanded, setIsExpanded, networkIsPlaying, soundMode, setSoundMode]);
 
   return (
     <PlaybackContext.Provider value={value}>

@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useOrbit } from '../context/OrbitContext';
 import { getPeerColor } from '../utils/peerColors';
+import EditNameModal from './EditNameModal';
 
 const PeersList = () => {
-  const { peers, peerId, peerNames, peerRoles, stateDb, chatDb, status } = useOrbit();
+  const { peers, peerId, peerNames, peerRoles, stateDb, chatDb, status, isHost } = useOrbit();
   const [loading, setLoading] = useState(true);
   const [kickConfirmPeer, setKickConfirmPeer] = useState(null);
+  const [showEditName, setShowEditName] = useState(false);
 
   useEffect(() => {
     // Shimmer loading wait for connections
@@ -54,9 +56,9 @@ const PeersList = () => {
   const bannedPeer = stateDb?.store?.['banned'];
   const allPeers = [...new Set([peerId, ...peers])]
     .filter(Boolean)
-    .filter(p => p !== bannedPeer && peerNames[p] && peerRoles[p]);
-  const isOwner = peerRoles[peerId] === 'owner';
-  const canManage = isOwner || peerRoles[peerId] === 'admin';
+    .filter(p => p !== bannedPeer && (peerNames[p] || p === peerId));
+  const isOwner = Boolean(isHost || peerRoles[peerId] === 'owner');
+  const canManage = Boolean(isOwner || peerRoles[peerId] === 'admin');
 
   if (loading || status === 'initializing') {
     return (
@@ -73,13 +75,25 @@ const PeersList = () => {
       <div className="flex-1 overflow-y-auto p-4 pb-12 space-y-2 no-scrollbar">
       {allPeers.map(p => {
         const name = peerNames[p] || (p === peerId ? localStorage.getItem('bloom_name') : 'Unknown');
-        const role = peerRoles[p] || 'peer';
+        const role = (p === peerId && isHost) ? 'owner' : (peerRoles[p] || 'peer');
         const color = getPeerColor(p);
         
         return (
           <div key={p} className="flex items-center justify-between group h-8">
             <div className="flex items-center gap-2">
-              <span className="font-medium" style={{ color }}>{name}</span>
+              {p === peerId ? (
+                <button
+                  type="button"
+                  onClick={() => setShowEditName(true)}
+                  title="Click to change name"
+                  className="font-medium px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer text-left focus:outline-none"
+                  style={{ color }}
+                >
+                  {name}
+                </button>
+              ) : (
+                <span className="font-medium" style={{ color }}>{name}</span>
+              )}
               {role === 'owner' && (
                 <div className="bg-purple-600 px-2 py-0.5 rounded-full flex items-center justify-center" title="Owner">
                   <span className="material-symbols-rounded text-[14px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>crown</span>
@@ -186,6 +200,12 @@ const PeersList = () => {
         </div>,
         document.body
       )}
+
+      <EditNameModal 
+        isOpen={showEditName} 
+        onClose={() => setShowEditName(false)} 
+        currentName={peerNames[peerId] || localStorage.getItem('bloom_name') || ''} 
+      />
     </>
   );
 };

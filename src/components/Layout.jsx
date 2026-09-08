@@ -9,44 +9,25 @@ import { getRecommendations, getTopVideos, getMix, getTrendingByLocation } from 
 import { extractDominantColors, extractPrimaryColor } from '../utils/colorExtractor';
 import TrackCard from './TrackCard';
 import { AppInitSkeleton, TrackGridSkeleton } from './Skeleton';
+import EditPartyNameModal from './EditPartyNameModal';
 
 const Layout = ({ config, onLeave, onMinimize }) => {
-  const { initP2P, stopP2P, status, peerId, peerRoles, getConnectedRelays, deleteRoom } = useOrbit();
+  const { initP2P, stopP2P, status, peerId, peerRoles, isHost, hostId, getConnectedRelays, deleteRoom } = useOrbit();
   const { isPlaying, currentTrack, setIsExpanded, loadTrack, addToQueue, stopPlayback, error, togglePlay, networkIsPlaying, isLoading, playerRef } = usePlayback();
   const [showSearch, setShowSearch] = useState(false);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
   
-  const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
-  const canControl = role === 'owner' || role === 'admin';
+  const isHostUser = Boolean(config?.isHost || isHost || (peerId && peerRoles?.[peerId] === 'owner'));
+  const role = isHostUser ? 'owner' : (peerRoles ? peerRoles[peerId] || 'peer' : 'peer');
+  const canControl = Boolean(isHostUser || role === 'owner' || role === 'admin');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMobileView, setActiveMobileView] = useState('home');
   const [activeSidebarTab, setActiveSidebarTab] = useState('queue');
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showEditPartyName, setShowEditPartyName] = useState(false);
   const [trendingTracks, setTrendingTracks] = useState([]);
   const [loadingTrending, setLoadingTrending] = useState(true);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallBtn, setShowInstallBtn] = useState(false);
-
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallBtn(true);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setShowInstallBtn(false);
-    }
-    setDeferredPrompt(null);
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -75,13 +56,20 @@ const Layout = ({ config, onLeave, onMinimize }) => {
     initP2P(config.roomId, config.displayName, config.isHost, config.hostId, config.nostrPk, config.nostrSk, config.isPublic, config.relays, config.roomName);
   }, [config, initP2P]);
 
+  // Clean up and halt audio playback when Layout unmounts
   useEffect(() => {
-    if (config.isHost && peerId) {
-      window.location.hash = `${config.roomId}?host=${peerId}`;
-    } else if (!config.isHost && config.hostId) {
-      window.location.hash = `${config.roomId}?host=${config.hostId}`;
+    return () => {
+      stopPlayback();
+      window.dispatchEvent(new CustomEvent('bloom:stop-playback'));
+    };
+  }, [stopPlayback]);
+
+  useEffect(() => {
+    const actualHost = isHostUser ? peerId : (hostId || config?.hostId);
+    if (actualHost && config?.roomId) {
+      window.location.hash = `${config.roomId}?host=${actualHost}`;
     }
-  }, [config, peerId]);
+  }, [config, peerId, isHostUser, hostId]);
 
   // Auto-hide search and extract colors when a track is played
   useEffect(() => {
@@ -206,24 +194,39 @@ const Layout = ({ config, onLeave, onMinimize }) => {
         <main className={`w-full h-full flex-1 flex flex-col bg-transparent min-w-0 relative overflow-hidden ${activeMobileView !== 'home' ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
           <header className="bg-black/40 backdrop-blur-xl p-3 lg:p-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-sm flex items-center justify-between border-b border-white/10 shrink-0 z-40 relative">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={onMinimize}
                 title="Back to Lobby"
-                className="text-white/40 hover:text-white transition-colors flex items-center justify-center -ml-1 mr-1"
+                className="text-white/40 hover:text-white transition-colors flex items-center justify-center p-1 -ml-1 rounded-sm hover:bg-white/10 focus:outline-none shrink-0"
               >
                 <span className="material-symbols-rounded text-[26px]">keyboard_arrow_down</span>
               </button>
-              <div className="flex items-center gap-3">
-                <h2 className="font-bold text-white tracking-wide text-lg lg:text-xl">Bloom</h2>
+
+              <div className="flex items-center gap-2.5 min-w-0">
+                <h2 className="font-bold text-white tracking-wide text-lg lg:text-xl shrink-0">
+                  Bloom
+                </h2>
+                <span className="text-white/30 font-bold select-none leading-none shrink-0">•</span>
+                {canControl ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPartyName(true)}
+                    title="Click to change party name"
+                    className="font-bold tracking-wide text-white/70 hover:text-white text-lg lg:text-xl truncate max-w-[130px] sm:max-w-[220px] lg:max-w-[320px] px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer text-left focus:outline-none"
+                  >
+                    {roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party'}
+                  </button>
+                ) : (
+                  <span
+                    title={roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party'}
+                    className="font-bold tracking-wide text-white/70 text-lg lg:text-xl truncate max-w-[130px] sm:max-w-[220px] lg:max-w-[320px] px-1.5 py-0.5 -mx-1.5 -my-0.5 text-left select-none"
+                  >
+                    {roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party'}
+                  </span>
+                )}
               </div>
-              <span className="text-white/30 font-bold">•</span>
-              
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white/30 tracking-wide text-lg lg:text-xl truncate max-w-[120px] lg:max-w-[200px]" title={roomName}>
-                  {roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party'}
-                </span>
-              </div>
+
               <button
                 title="Copy invite link"
                 onClick={() => {
@@ -236,7 +239,8 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                       const [hashPath, hashQuery] = url.hash.substring(1).split('?');
                       const params = new URLSearchParams(hashQuery || '');
                       params.set('r', rString);
-                      params.set('host', config.hostId || peerId);
+                      const actualHost = isHostUser ? peerId : (hostId || config?.hostId || '');
+                      if (actualHost) params.set('host', actualHost);
                       inviteLink = `${url.origin}${url.pathname}#${hashPath || config.roomId}?${params.toString()}`;
                     }
                   } catch (e) {}
@@ -246,21 +250,10 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                     }));
                   }).catch(() => {});
                 }}
-                className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center ml-2"
+                className="text-white/30 hover:text-[var(--color-primary)] transition-colors flex items-center justify-center p-1 rounded-sm hover:bg-white/10 focus:outline-none shrink-0"
               >
-                <span className="material-symbols-rounded text-[26px] leading-none">link</span>
+                <span className="material-symbols-rounded text-[22px] leading-none">link</span>
               </button>
-
-              {showInstallBtn && (
-                <button
-                  title="Install Bloom App"
-                  onClick={handleInstallApp}
-                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-full flex items-center gap-1.5 transition-all ml-1 border border-white/10"
-                >
-                  <span className="material-symbols-rounded text-[18px] text-[var(--color-primary)]">download</span>
-                  <span className="hidden sm:inline">Install</span>
-                </button>
-              )}
             </div>
 
             <div className="flex-1 max-w-xl mx-8 hidden lg:block">
@@ -463,10 +456,11 @@ const Layout = ({ config, onLeave, onMinimize }) => {
                 onClick={async () => {
                   setShowEndConfirm(false);
                   stopPlayback();
+                  window.dispatchEvent(new CustomEvent('bloom:stop-playback'));
                   if (config.isHost) {
                     await deleteRoom();
                   }
-                  stopP2P();
+                  await stopP2P();
                   if (onLeave) onLeave();
                 }}
                 className="flex items-center justify-center p-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-full transition-colors h-[48px]"
@@ -507,6 +501,13 @@ const Layout = ({ config, onLeave, onMinimize }) => {
           </div>
         </div>
       )}
+
+      <EditPartyNameModal
+        isOpen={showEditPartyName}
+        onClose={() => setShowEditPartyName(false)}
+        currentPartyName={roomName && !roomName.startsWith('bloom-') ? roomName : 'Bloom Party'}
+        onSave={(newName) => setRoomName(newName)}
+      />
     </div>
   );
 };
@@ -514,9 +515,10 @@ const Layout = ({ config, onLeave, onMinimize }) => {
 const TrendingSection = () => {
   const [items, setItems] = useState([]);
   const { loadTrack, addToQueue } = usePlayback();
-  const { peerId, peerRoles } = useOrbit();
-  const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
-  const canControl = role === 'owner' || role === 'admin';
+  const { peerId, peerRoles, isHost } = useOrbit();
+  const isHostUser = Boolean(isHost || (peerId && peerRoles?.[peerId] === 'owner'));
+  const role = isHostUser ? 'owner' : (peerRoles ? peerRoles[peerId] || 'peer' : 'peer');
+  const canControl = Boolean(isHostUser || role === 'owner' || role === 'admin');
 
   useEffect(() => {
     const fetch = async () => {
@@ -547,9 +549,10 @@ const RecommendationsFeed = ({ track }) => {
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
   const { loadTrack, addToQueue } = usePlayback();
-  const { peerId, peerRoles } = useOrbit();
-  const role = peerRoles ? peerRoles[peerId] || 'peer' : 'peer';
-  const canControl = role === 'owner' || role === 'admin';
+  const { peerId, peerRoles, isHost } = useOrbit();
+  const isHostUser = Boolean(isHost || (peerId && peerRoles?.[peerId] === 'owner'));
+  const role = isHostUser ? 'owner' : (peerRoles ? peerRoles[peerId] || 'peer' : 'peer');
+  const canControl = Boolean(isHostUser || role === 'owner' || role === 'admin');
 
   useEffect(() => {
     setLoading(true);

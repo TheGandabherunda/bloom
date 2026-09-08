@@ -7,6 +7,8 @@ import { usePlayback } from '../context/PlaybackContext';
 import { useOrbit } from '../context/OrbitContext';
 import Imprints from './Imprints';
 import ContinuousMarquee from './ContinuousMarquee';
+import EditNameModal from './EditNameModal';
+import EditPartyNameModal from './EditPartyNameModal';
 
 const MiniProgressBar = React.memo(({ playerRef, duration }) => {
   const progressRef = useRef(null);
@@ -43,6 +45,22 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showImprints, setShowImprints] = useState(false);
+  const [showEditName, setShowEditName] = useState(false);
+  const [showEditPartyName, setShowEditPartyName] = useState(false);
+  const [currentDisplayName, setCurrentDisplayName] = useState(displayName || localStorage.getItem('bloom_name') || '');
+
+  useEffect(() => {
+    if (displayName) setCurrentDisplayName(displayName);
+  }, [displayName]);
+
+  useEffect(() => {
+    const handleNameChange = (e) => {
+      if (e.detail) setCurrentDisplayName(e.detail);
+    };
+    window.addEventListener('bloom:name-change', handleNameChange);
+    return () => window.removeEventListener('bloom:name-change', handleNameChange);
+  }, []);
+
   const [newRoomName, setNewRoomName] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   
@@ -52,7 +70,10 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
   
   // Context hooks for mini-player
   const { currentTrack, isPlaying, togglePlay, playNext, playPrev, playerRef, duration } = usePlayback();
-  const { status, peerNames, stateDb } = useOrbit();
+  const { status, stateDb, peerId, peerRoles, isHost } = useOrbit();
+  const isHostUser = Boolean(minimizedConfig?.isHost || isHost || (peerId && peerRoles?.[peerId] === 'owner'));
+  const currentRole = isHostUser ? 'owner' : (peerRoles ? peerRoles[peerId] || 'peer' : 'peer');
+  const canChangePartyName = Boolean(isHostUser || currentRole === 'owner' || currentRole === 'admin');
   const [roomName, setRoomName] = useState(
     minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')
       ? minimizedConfig.roomName
@@ -231,12 +252,19 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
 
       <header className="bg-black/40 backdrop-blur-xl p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] shadow-sm flex flex-col md:flex-row items-center justify-between border-b border-white/10 shrink-0 z-40 relative gap-4 md:h-[72px]">
         <div className="flex items-center gap-3 w-full md:w-auto justify-between z-20">
-          <h2 className="font-bold text-white tracking-wide text-2xl flex items-center gap-2">
-            Bloom
-            {displayName && (
+          <h2 className="font-bold text-white tracking-wide text-2xl flex items-center gap-2.5">
+            <span>Bloom</span>
+            {currentDisplayName && (
               <>
-                <span className="text-white/30">•</span>
-                <span className="font-bold tracking-wide text-white/70">{displayName}</span>
+                <span className="text-white/30 font-bold select-none leading-none">•</span>
+                <button
+                  type="button"
+                  onClick={() => setShowEditName(true)}
+                  title="Click to change name"
+                  className="font-bold tracking-wide text-white/70 hover:text-white px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
+                >
+                  {currentDisplayName}
+                </button>
               </>
             )}
           </h2>
@@ -387,22 +415,59 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
       {minimizedConfig && status === 'connected' && (
         <div className="fixed bottom-[calc(3rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-xl z-[150] flex flex-col gap-2">
           {/* Top: Room Details */}
-          <div className="flex items-center justify-center gap-2 px-2 opacity-80 cursor-pointer" onClick={onRestore}>
-            <span className="text-white/60 text-xs font-medium tracking-wide">Inside</span>
-            <span className="text-[var(--color-primary)] text-[10px]">•</span>
-            <span className="font-bold text-white text-xs tracking-wider">
-              {roomName && !roomName.startsWith('bloom-') 
-                ? roomName 
-                : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
-                  ? minimizedConfig.roomName 
-                  : 'Bloom Party'}
+          <div className="flex items-center justify-center gap-2.5 px-2 opacity-80">
+            <span 
+              onClick={onRestore}
+              className="text-white/60 hover:text-white text-xs font-medium tracking-wide cursor-pointer transition-colors"
+            >
+              Inside
             </span>
-            <span className="text-[var(--color-primary)] text-[10px]">•</span>
-            <span className="text-white/60 text-xs font-medium tracking-widest">
-              {minimizedConfig.isHost 
-                ? (peerNames[minimizedConfig.nostrPk] || minimizedConfig.displayName || 'Host') 
-                : (peerNames[minimizedConfig.hostId] || 'Host')}
-            </span>
+            <span className="text-white/30 text-[10px] select-none">•</span>
+            {canChangePartyName ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEditPartyName(true);
+                }}
+                title="Click to change party name"
+                className="font-bold text-white hover:text-white/80 text-xs tracking-wider truncate max-w-[180px] px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
+              >
+                {roomName && !roomName.startsWith('bloom-') 
+                  ? roomName 
+                  : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
+                    ? minimizedConfig.roomName 
+                    : 'Bloom Party'}
+              </button>
+            ) : (
+              <span
+                onClick={onRestore}
+                title={roomName && !roomName.startsWith('bloom-') 
+                  ? roomName 
+                  : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
+                    ? minimizedConfig.roomName 
+                    : 'Bloom Party'}
+                className="font-bold text-white text-xs tracking-wider truncate max-w-[180px] px-1.5 py-0.5 -mx-1.5 -my-0.5 cursor-pointer hover:text-white/80 transition-colors"
+              >
+                {roomName && !roomName.startsWith('bloom-') 
+                  ? roomName 
+                  : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
+                    ? minimizedConfig.roomName 
+                    : 'Bloom Party'}
+              </span>
+            )}
+            <span className="text-white/30 text-[10px] select-none">•</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditName(true);
+              }}
+              title="Click to change name"
+              className="text-white/70 hover:text-white text-xs font-medium tracking-wide truncate max-w-[140px] px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
+            >
+              {currentDisplayName || 'Guest'}
+            </button>
           </div>
 
           <div className="flex flex-col gap-1.5 w-full">
@@ -587,6 +652,25 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
       {showImprints && (
         <Imprints onClose={() => setShowImprints(false)} />
       )}
+
+      <EditNameModal
+        isOpen={showEditName}
+        onClose={() => setShowEditName(false)}
+        currentName={currentDisplayName}
+      />
+
+      <EditPartyNameModal
+        isOpen={showEditPartyName}
+        onClose={() => setShowEditPartyName(false)}
+        currentPartyName={
+          roomName && !roomName.startsWith('bloom-') 
+            ? roomName 
+            : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
+              ? minimizedConfig.roomName 
+              : 'Bloom Party'
+        }
+        onSave={(newName) => setRoomName(newName)}
+      />
 
     </div>
   );
