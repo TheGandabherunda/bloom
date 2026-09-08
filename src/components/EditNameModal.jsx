@@ -50,7 +50,7 @@ const EditNameModal = ({ isOpen, onClose, currentName, onSave }) => {
 
   return (
     <div 
-      className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] flex flex-col justify-end md:justify-center items-center p-4 sm:p-6 pb-6 md:pb-6"
+      className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[300] flex flex-col justify-end md:justify-center items-center p-4 sm:p-6 pb-6 md:pb-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

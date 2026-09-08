@@ -431,7 +431,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                   setShowEditPartyName(true);
                 }}
                 title="Click to change party name"
-                className="font-bold text-white hover:text-white/80 text-xs tracking-wider truncate max-w-[180px] px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
+                className="font-bold text-white hover:text-white/80 text-xs tracking-wider truncate max-w-[220px] px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
               >
                 {roomName && !roomName.startsWith('bloom-') 
                   ? roomName 
@@ -447,7 +447,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                   : (minimizedConfig?.roomName && !minimizedConfig.roomName.startsWith('bloom-')) 
                     ? minimizedConfig.roomName 
                     : 'Bloom Party'}
-                className="font-bold text-white text-xs tracking-wider truncate max-w-[180px] px-1.5 py-0.5 -mx-1.5 -my-0.5 cursor-pointer hover:text-white/80 transition-colors"
+                className="font-bold text-white text-xs tracking-wider truncate max-w-[220px] px-1.5 py-0.5 -mx-1.5 -my-0.5 cursor-pointer hover:text-white/80 transition-colors"
               >
                 {roomName && !roomName.startsWith('bloom-') 
                   ? roomName 
@@ -456,18 +456,6 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
                     : 'Bloom Party'}
               </span>
             )}
-            <span className="text-white/30 text-[10px] select-none">•</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowEditName(true);
-              }}
-              title="Click to change name"
-              className="text-white/70 hover:text-white text-xs font-medium tracking-wide truncate max-w-[140px] px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-sm hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
-            >
-              {currentDisplayName || 'Guest'}
-            </button>
           </div>
 
           <div className="flex flex-col gap-1.5 w-full">
@@ -564,7 +552,7 @@ const Lobby = ({ onJoin, onCreateRoom, displayName, onRestore, minimizedConfig }
 
       {showCreate && (
         <div 
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] flex flex-col justify-end md:justify-center items-center p-4 sm:p-6 pb-6 md:pb-6"
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[300] flex flex-col justify-end md:justify-center items-center p-4 sm:p-6 pb-6 md:pb-6"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowCreate(false);
           }}
