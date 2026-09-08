@@ -9,7 +9,6 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite)](https://vitejs.dev)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v3-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
-[![Netlify](https://img.shields.io/badge/Deployed%20on-Netlify-00C7B7?style=flat-square&logo=netlify)](https://netlify.com)
 
 </div>
 
@@ -27,20 +26,14 @@ Bloom is a shared music player — create a room, share the code, and everyone h
 
 ## Running locally
 
-Requires [Node.js](https://nodejs.org) v20+ and the [Netlify CLI](https://docs.netlify.com/cli/get-started/).
+Requires [Node.js](https://nodejs.org) v20+.
 
 ```bash
 git clone https://github.com/TheGandabherunda/bloom.git
 cd bloom
 npm install
-netlify dev
+npm run dev
 ```
-
-> Use `netlify dev`, not `npm run dev` — the app needs the backend functions.
-
-## Deploying
-
-Connect the repo to [Netlify](https://netlify.com) and it deploys automatically. No extra config needed.
 
 ## Legal
 
